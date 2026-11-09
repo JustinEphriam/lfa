@@ -26,6 +26,9 @@ use std::time::Instant;
 const BATCH_SIZE: usize = 64;
 const BATCH_BUF_SIZE: usize = 8192;
 
+const _: () = assert!(BATCH_SIZE > 0 && BATCH_SIZE <= 1024);
+const _: () = assert!(BATCH_BUF_SIZE >= 1024 && BATCH_BUF_SIZE <= u16::MAX as usize);
+
 struct Batch {
     dirfd: Option<OwnedFd>,
     data: [u8; BATCH_BUF_SIZE],
@@ -60,6 +63,9 @@ impl Batch {
 
     #[inline(always)]
     fn append(&mut self, dir: &[u8], name: &[u8], lang: LangId, too_long: &mut bool) -> bool {
+        debug_assert!(!name.is_empty());
+        debug_assert!(self.count <= BATCH_SIZE);
+        debug_assert!(self.data_len <= BATCH_BUF_SIZE);
         let dir_len = dir.len();
         let name_len = name.len();
         let has_slash = dir_len > 0 && dir[dir_len - 1] == b'/';
@@ -94,16 +100,20 @@ impl Batch {
 
     #[inline(always)]
     fn get_path_cstr(&self, idx: usize) -> &CStr {
+        debug_assert!(idx < self.count);
         let off = self.offsets[idx] as usize;
         let len = self.lens[idx] as usize;
+        debug_assert!(off + len < self.data_len);
         CStr::from_bytes_with_nul(&self.data[off..off + len + 1]).unwrap()
     }
 
     #[inline(always)]
     fn get_rel_name_cstr(&self, idx: usize) -> &CStr {
+        debug_assert!(idx < self.count);
         let off = self.offsets[idx] as usize;
         let name_off = self.name_offsets[idx] as usize;
         let len = self.lens[idx] as usize;
+        debug_assert!(name_off >= off && off + len < self.data_len);
         CStr::from_bytes_with_nul(&self.data[name_off..off + len + 1]).unwrap()
     }
 }
@@ -162,6 +172,7 @@ impl WorkScheduler {
     }
 
     fn submit_batch_and_swap(&self, full_batch: Box<Batch>) -> Box<Batch> {
+        debug_assert!(full_batch.count > 0);
         let mut s = self.mutex.lock().unwrap();
         s.ready_batches.push(full_batch);
         self.cond.notify_one();
@@ -182,6 +193,7 @@ impl WorkScheduler {
     ) -> Task {
         let mut s = self.mutex.lock().unwrap();
         if let Some(b) = finished_batch {
+            debug_assert!(s.active_workers >= 1);
             s.free_batches.push(b);
             s.active_workers -= 1;
         }
@@ -194,6 +206,7 @@ impl WorkScheduler {
             if let Some((off, len)) = s.dirs_spans.pop() {
                 let start = off as usize;
                 let end = start + len as usize;
+                debug_assert!(end <= s.dirs_arena.len());
                 dir_buf.clear();
                 dir_buf.extend_from_slice(&s.dirs_arena[start..end]);
                 dir_buf.push(0);
@@ -228,12 +241,14 @@ impl WorkScheduler {
         local_batch: &mut Option<Box<Batch>>,
     ) {
         let mut s = self.mutex.lock().unwrap();
+        debug_assert!(s.active_workers >= 1);
         let subdirs_len = subdirs_spans.len();
         if subdirs_len > 0 {
             let base = s.dirs_arena.len() as u32;
             s.dirs_arena.extend_from_slice(subdirs_arena);
             s.dirs_spans.reserve(subdirs_len);
             for &(off, len) in subdirs_spans {
+                debug_assert!((off + len) as usize <= subdirs_arena.len());
                 s.dirs_spans.push((base + off, len));
             }
         }
@@ -655,7 +670,7 @@ fn print_usage(prog: &str) -> ! {
     process::exit(1);
 }
 
-fn parse_cli_args<'a>(args: &'a [ std::ffi::OsString ]) -> (&'a OsStr, u32, Option<LangId>) {
+fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Option<LangId>) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())
@@ -780,7 +795,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustix::fs::{mkdirat, mknodat, unlinkat};
+    use rustix::fs::{mkdirat, mknodat, symlinkat, unlinkat};
     use std::ffi::OsString;
     use std::fs;
 
@@ -866,6 +881,84 @@ mod tests {
     }
 
     #[test]
+    fn test_batch_limits_and_slash_normalization() {
+        let mut batch = Batch::new();
+        let mut too_long = false;
+
+        assert!(batch.append(b"/tmp/dir", b"a.c", LangId::C, &mut too_long));
+        assert!(!too_long);
+        assert_eq!(batch.get_path_cstr(0).to_bytes(), b"/tmp/dir/a.c");
+        assert_eq!(batch.get_rel_name_cstr(0).to_bytes(), b"a.c");
+
+        assert!(batch.append(b"/tmp/dir/", b"b.h", LangId::C, &mut too_long));
+        assert!(!too_long);
+        assert_eq!(batch.get_path_cstr(1).to_bytes(), b"/tmp/dir/b.h");
+        assert_eq!(batch.get_rel_name_cstr(1).to_bytes(), b"b.h");
+
+        let huge_dir = vec![b'x'; BATCH_BUF_SIZE];
+        assert!(!batch.append(&huge_dir, b"c.c", LangId::C, &mut too_long));
+        assert!(too_long);
+        assert_eq!(batch.count, 2);
+
+        batch.reset();
+        for i in 0..BATCH_SIZE {
+            let name = format!("f{}.c", i);
+            assert!(batch.append(b"/d", name.as_bytes(), LangId::C, &mut too_long));
+            assert!(!too_long);
+        }
+        assert_eq!(batch.count, BATCH_SIZE);
+        assert!(!batch.append(b"/d", b"overflow.c", LangId::C, &mut too_long));
+        assert!(!too_long);
+    }
+
+    #[test]
+    fn test_large_directory_multi_batch_and_symlinks() {
+        let tmp_dir = format!("/tmp/lfa_multi_batch_test_{}/", process::id());
+        let _ = fs::remove_dir_all(&tmp_dir);
+        mkdirat(CWD, tmp_dir.as_bytes(), Mode::RWXU).unwrap();
+
+        let file_count = 150usize;
+        for i in 0..file_count {
+            let p = format!("{}file_{}.c", tmp_dir, i);
+            fs::write(&p, "int x = 0;\nreturn x;\n").unwrap();
+        }
+
+        let empty_c = format!("{}empty.c", tmp_dir);
+        fs::write(&empty_c, "").unwrap();
+
+        let broken_link = format!("{}broken.c", tmp_dir);
+        symlinkat(&b"nonexistent_target.c"[..], CWD, broken_link.as_bytes()).unwrap();
+
+        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK);
+        let mut totals = WorkerResult::default();
+
+        thread::scope(|s| {
+            let mut handles = Vec::new();
+            for _ in 0..4 {
+                let sched_ref = &sched;
+                handles.push(s.spawn(move || unified_worker_proc(sched_ref)));
+            }
+            let main_res = unified_worker_proc(&sched);
+            totals.add(&main_res);
+            for h in handles {
+                totals.add(&h.join().unwrap());
+            }
+        });
+
+        let c_idx = LangId::C as usize;
+        assert_eq!(totals.files_found[c_idx], (file_count + 1) as i64);
+        assert_eq!(totals.files_processed[c_idx], (file_count + 1) as i64);
+        assert_eq!(totals.lang_stats.c.lines_processed, (file_count * 2) as i64);
+        assert_eq!(totals.lang_stats.c.total_keywords, (file_count * 2) as i64);
+
+        let disabled_sched = WorkScheduler::new(tmp_dir.as_bytes(), 0);
+        let disabled_res = unified_worker_proc(&disabled_sched);
+        assert_eq!(disabled_res.total_files_found(), 0);
+
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
     fn test_cli_flag_parsing() {
         let args = vec![OsString::from("lfa"), OsString::from("/tmp")];
         let (target, mask, detailed) = parse_cli_args(&args);
@@ -897,6 +990,7 @@ mod tests {
     #[test]
     fn test_format_number() {
         assert_eq!(format_number(0), "0");
+        assert_eq!(format_number(-42), "-42");
         assert_eq!(format_number(999), "999");
         assert_eq!(format_number(1000), "1,000");
         assert_eq!(format_number(1234567), "1,234,567");

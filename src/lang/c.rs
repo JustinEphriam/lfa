@@ -74,6 +74,9 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = [
     5, 6, 8, 5, 8, 10, 8, 8, 7, 14, 9, 13, 8, 7, 6, 13, 11, 10, 10, 7, 7, 4, 9, 5, 7, 13, 12, 4,
 ];
 
+const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
+const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
+
 const TOK_NONE: u8 = 0;
 const TOK_IDENT: u8 = 1;
 const TOK_SLASH: u8 = 2;
@@ -171,6 +174,7 @@ fn kw_match_len_2_to_14(cand: &[u8], kw: &[u8]) -> bool {
 
 #[inline(always)]
 fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
+    debug_assert!(i <= ptr.len());
     #[cfg(target_feature = "avx2")]
     {
         use safe_arch::*;
@@ -208,6 +212,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
 
 #[inline(always)]
 fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
+    debug_assert!(i <= ptr.len());
     #[cfg(target_feature = "avx2")]
     {
         use safe_arch::*;
@@ -277,12 +282,14 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             TOK_IDENT => {
                 let start = i;
                 i = skip_ident_cont_avx2(content, i + 1);
+                debug_assert!(i > start && i <= content_len);
                 let n = i - start;
                 if n.wrapping_sub(2) <= KW_MAX_LEN - 2 {
                     let h = kw_hash(content[start], content[i - 1], n);
                     let id = KW_TABLE[h];
                     if id != KW_EMPTY {
                         let idx = id as usize;
+                        debug_assert!(idx < KEYWORD_COUNT);
                         if KEYWORD_LENS[idx] as usize == n
                             && kw_match_len_2_to_14(
                                 &content[start..i],
@@ -582,5 +589,60 @@ mod tests {
         parse_into(&buf, &mut res);
         assert_eq!(res.total_keywords, placed);
         assert_eq!(res.keyword_counts[find_kw_id("_Static_assert")], placed);
+
+        for start_off in 0..96 {
+            for &kw_str in &["do", "if", "int", "return", "_Static_assert"] {
+                let mut b = vec![b' '; 160];
+                let kw_bytes = kw_str.as_bytes();
+                b[start_off..start_off + kw_bytes.len()].copy_from_slice(kw_bytes);
+                let mut r = ParseResult::default();
+                parse_into(&b, &mut r);
+                assert_eq!(r.total_keywords, 1);
+                assert_eq!(r.keyword_counts[find_kw_id(kw_str)], 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_malformed_and_eof_edge_cases() {
+        for empty_or_tiny in [
+            "",
+            "/",
+            "*",
+            "\"",
+            "'",
+            "\\",
+            "_",
+            "a",
+            "\n",
+            "//",
+            "/*",
+            "*/",
+            "/a",
+            "''",
+            "\"\"",
+            "\"unclosed string if return",
+            "\"unclosed string with escape \\",
+            "'unclosed char if return",
+            "'\\",
+        ] {
+            let mut res = ParseResult::default();
+            parse_into(empty_or_tiny.as_bytes(), &mut res);
+            assert_eq!(res.total_keywords, 0);
+        }
+
+        let tricky = concat!(
+            "'a' if /**/ return /*/*/ while ///*\n",
+            "for /* // */ int x = a / b / c; '"
+        );
+        let mut res = ParseResult::default();
+        parse_into(tricky.as_bytes(), &mut res);
+        assert_eq!(res.total_keywords, 5);
+        assert_eq!(res.keyword_counts[find_kw_id("if")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("while")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("for")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("int")], 1);
+        assert_eq!(res.lines_processed, 1);
     }
 }

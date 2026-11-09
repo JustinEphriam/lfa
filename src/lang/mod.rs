@@ -12,6 +12,9 @@ pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [LangId::C];
 
+const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
+const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
+
 impl LangId {
     #[inline(always)]
     pub const fn name(self) -> &'static str {
@@ -219,6 +222,7 @@ pub fn find_star_slash(slice: &[u8]) -> Option<usize> {
 
 #[inline(always)]
 pub fn skip_line_comment(content: &[u8], start_i: usize) -> usize {
+    debug_assert!(start_i <= content.len());
     let content_len = content.len();
     let mut i = start_i;
     while i < content_len {
@@ -241,6 +245,8 @@ pub fn skip_line_comment(content: &[u8], start_i: usize) -> usize {
 
 #[inline(always)]
 pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
+    debug_assert!(start_i <= content.len());
+    debug_assert!(quote == b'"' || quote == b'\'');
     let content_len = content.len();
     let mut i = start_i;
     while i < content_len {
@@ -260,4 +266,73 @@ pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
         i += 1;
     }
     content_len
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_count_newlines_saturation_and_boundaries() {
+        assert_eq!(count_newlines_avx2(b""), 0);
+        assert_eq!(count_newlines_avx2(b"a"), 0);
+        assert_eq!(count_newlines_avx2(b"\n"), 1);
+
+        for len in [1, 31, 32, 33, 63, 64, 65, 8159, 8160, 8161, 17000] {
+            let all_nl = vec![b'\n'; len];
+            assert_eq!(count_newlines_avx2(&all_nl), len);
+
+            let no_nl = vec![b'x'; len];
+            assert_eq!(count_newlines_avx2(&no_nl), 0);
+        }
+    }
+
+    #[test]
+    fn test_find_byte_and_star_slash_boundaries() {
+        assert_eq!(find_byte_avx2(b"", b'x'), None);
+        assert_eq!(find_star_slash(b""), None);
+        assert_eq!(find_star_slash(b"*"), None);
+        assert_eq!(find_star_slash(b"/"), None);
+        assert_eq!(find_star_slash(b"/*"), None);
+
+        for total_len in [2, 31, 32, 33, 63, 64, 65, 96, 100] {
+            for pos in 0..total_len {
+                let mut buf = vec![b'.'; total_len];
+                buf[pos] = b'!';
+                assert_eq!(find_byte_avx2(&buf, b'!'), Some(pos));
+                assert_eq!(find_byte_avx2(&buf, b'?'), None);
+            }
+
+            for pos in 0..total_len - 1 {
+                let mut buf = vec![b'.'; total_len];
+                buf[pos] = b'*';
+                buf[pos + 1] = b'/';
+                assert_eq!(find_star_slash(&buf), Some(pos));
+            }
+        }
+    }
+
+    #[test]
+    fn test_skip_comment_and_literal_edge_cases() {
+        assert_eq!(skip_line_comment(b"no newline at all", 0), 17);
+        assert_eq!(skip_line_comment(b"trailing backslash \\", 0), 20);
+        assert_eq!(skip_line_comment(b"spliced \\\nstill comment\nnext", 0), 24);
+        assert_eq!(
+            skip_line_comment(b"spliced crlf \\\r\nstill comment\r\nnext", 0),
+            31
+        );
+
+        assert_eq!(skip_literal(b"unclosed string", 0, b'"'), 15);
+        assert_eq!(skip_literal(b"trailing escape \\", 0, b'"'), 17);
+        assert_eq!(skip_literal(b"\\\\\"rest", 0, b'"'), 3);
+        assert_eq!(skip_literal(b"\\\\\\\"\"rest", 0, b'"'), 5);
+
+        for offset in 28..36 {
+            let mut s = vec![b'a'; 80];
+            s[offset] = b'\\';
+            s[offset + 1] = b'"';
+            s[offset + 10] = b'"';
+            assert_eq!(skip_literal(&s, 0, b'"'), offset + 11);
+        }
+    }
 }
