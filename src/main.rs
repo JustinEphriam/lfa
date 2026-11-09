@@ -664,7 +664,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies",
         prog
     );
     process::exit(1);
@@ -806,6 +806,13 @@ mod tests {
             .unwrap()
     }
 
+    fn find_cpp_kw_id(name: &str) -> usize {
+        lang::cpp::KEYWORD_NAMES
+            .iter()
+            .position(|&kw| kw == name)
+            .unwrap()
+    }
+
     #[test]
     fn test_directory_traversal_and_edge_cases() {
         let tmp_dir = format!("/tmp/lfa_rust_test_{}", process::id());
@@ -814,14 +821,20 @@ mod tests {
 
         let path_c = format!("{}/valid.c", tmp_dir);
         let path_h = format!("{}/UPPER.H", tmp_dir);
-        let path_cpp = format!("{}/ignored.cpp", tmp_dir);
+        let path_cpp = format!("{}/module.cpp", tmp_dir);
+        let path_py = format!("{}/ignored.py", tmp_dir);
         let path_fifo = format!("{}/named_pipe.c", tmp_dir);
         let sub_dir = format!("{}/subdir", tmp_dir);
         let sub_c = format!("{}/subdir/nested.c", tmp_dir);
 
         fs::write(&path_c, "int main(void) { if (true) return 0; }\n").unwrap();
         fs::write(&path_h, "typedef struct { constexpr int x; } Foo;\n").unwrap();
-        fs::write(&path_cpp, "int while for return if switch case default;\n").unwrap();
+        fs::write(
+            &path_cpp,
+            "namespace n { class C final { public: void f() override {} }; }\n",
+        )
+        .unwrap();
+        fs::write(&path_py, "int while for return if switch case default;\n").unwrap();
         mknodat(
             CWD,
             path_fifo.as_bytes(),
@@ -854,6 +867,7 @@ mod tests {
         });
 
         let c_idx = LangId::C as usize;
+        let cpp_idx = LangId::Cpp as usize;
         assert_eq!(totals.files_found[c_idx], 3);
         assert_eq!(totals.files_processed[c_idx], 3);
         assert_eq!(totals.lang_stats.c.lines_processed, 3);
@@ -871,9 +885,49 @@ mod tests {
             1
         );
 
+        assert_eq!(totals.files_found[cpp_idx], 1);
+        assert_eq!(totals.files_processed[cpp_idx], 1);
+        assert_eq!(totals.lang_stats.cpp.lines_processed, 1);
+        assert_eq!(totals.lang_stats.cpp.total_keywords, 6);
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("namespace")],
+            1
+        );
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("class")],
+            1
+        );
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("final")],
+            1
+        );
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("public")],
+            1
+        );
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("void")],
+            1
+        );
+        assert_eq!(
+            totals.lang_stats.cpp.keyword_counts[find_cpp_kw_id("override")],
+            1
+        );
+
+        let c_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::C.mask());
+        let c_only_res = unified_worker_proc(&c_only_sched);
+        assert_eq!(c_only_res.files_found[c_idx], 3);
+        assert_eq!(c_only_res.files_found[cpp_idx], 0);
+
+        let cpp_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::Cpp.mask());
+        let cpp_only_res = unified_worker_proc(&cpp_only_sched);
+        assert_eq!(cpp_only_res.files_found[c_idx], 0);
+        assert_eq!(cpp_only_res.files_found[cpp_idx], 2);
+
         unlinkat(CWD, sub_c.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, sub_dir.as_bytes(), AtFlags::REMOVEDIR).unwrap();
         unlinkat(CWD, path_fifo.as_bytes(), AtFlags::empty()).unwrap();
+        unlinkat(CWD, path_py.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_cpp.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_h.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_c.as_bytes(), AtFlags::empty()).unwrap();
@@ -985,6 +1039,16 @@ mod tests {
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask());
         assert_eq!(detailed, Some(LangId::C));
+
+        let args_cpp = vec![
+            OsString::from("lfa"),
+            OsString::from("-cpp"),
+            OsString::from("/tmp"),
+        ];
+        let (target, mask, detailed) = parse_cli_args(&args_cpp);
+        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(mask, LangId::Cpp.mask());
+        assert_eq!(detailed, Some(LangId::Cpp));
     }
 
     #[test]

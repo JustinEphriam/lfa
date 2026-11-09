@@ -1,16 +1,19 @@
 pub mod c;
+pub mod cpp;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LangId {
     C = 0,
+    Cpp = 1,
 }
 
-pub const LANG_COUNT: usize = 1;
+pub const LANG_COUNT: usize = 2;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
+pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
-pub const ALL_LANGS: [LangId; LANG_COUNT] = [LangId::C];
+pub const ALL_LANGS: [LangId; LANG_COUNT] = [LangId::C, LangId::Cpp];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
@@ -20,6 +23,7 @@ impl LangId {
     pub const fn name(self) -> &'static str {
         match self {
             Self::C => "C",
+            Self::Cpp => "C++",
         }
     }
 
@@ -32,6 +36,7 @@ impl LangId {
     pub fn from_flag(arg: &[u8]) -> Option<Self> {
         match arg {
             b"-c" | b"--c" | b"-C" => Some(Self::C),
+            b"-cpp" | b"--cpp" | b"-CPP" | b"--CPP" => Some(Self::Cpp),
             _ => None,
         }
     }
@@ -68,18 +73,21 @@ impl<const N: usize> ParseResult<N> {
 #[derive(Clone, Copy, Default)]
 pub struct LangStats {
     pub c: ParseResult<{ c::KEYWORD_COUNT }>,
+    pub cpp: ParseResult<{ cpp::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
     #[inline(always)]
     pub fn add(&mut self, other: &Self) {
         self.c.add(&other.c);
+        self.cpp.add(&other.cpp);
     }
 
     #[inline(always)]
     pub fn lines(&self, lang: LangId) -> i64 {
         match lang {
             LangId::C => self.c.lines_processed,
+            LangId::Cpp => self.cpp.lines_processed,
         }
     }
 
@@ -87,6 +95,7 @@ impl LangStats {
     pub fn total_keywords(&self, lang: LangId) -> i64 {
         match lang {
             LangId::C => self.c.total_keywords,
+            LangId::Cpp => self.cpp.total_keywords,
         }
     }
 
@@ -94,6 +103,7 @@ impl LangStats {
     pub fn keyword_names(lang: LangId) -> &'static [&'static str] {
         match lang {
             LangId::C => &c::KEYWORD_NAMES,
+            LangId::Cpp => &cpp::KEYWORD_NAMES,
         }
     }
 
@@ -101,6 +111,7 @@ impl LangStats {
     pub fn keyword_counts(&self, lang: LangId) -> &[i64] {
         match lang {
             LangId::C => &self.c.keyword_counts,
+            LangId::Cpp => &self.cpp.keyword_counts,
         }
     }
 }
@@ -110,6 +121,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
     if (enabled_mask & LANG_C_MASK) != 0 && c::is_c_extension(name) {
         return Some(LangId::C);
     }
+    if (enabled_mask & LANG_CPP_MASK) != 0 && (cpp::is_cpp_extension(name) || c::is_h_extension(name)) {
+        return Some(LangId::Cpp);
+    }
     None
 }
 
@@ -117,6 +131,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
 pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
     match lang {
         LangId::C => c::parse_into(content, &mut stats.c),
+        LangId::Cpp => cpp::parse_into(content, &mut stats.cpp),
     }
 }
 

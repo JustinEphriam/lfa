@@ -8,3 +8,5 @@ Favor cache-friendly patterns.
 
 Do not make core algorithm changes without consulting me and testing the performance of the changes
 with hyperfine prior to and after the change.
+
+

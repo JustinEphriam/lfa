@@ -1,0 +1,611 @@
+use super::{
+    count_newlines_avx2, find_byte_avx2, find_star_slash, skip_line_comment, skip_literal,
+    ParseResult,
+};
+
+pub const KEYWORD_COUNT: usize = 97;
+const KW_SLOT_MASK: usize = 511;
+const KW_MAX_LEN: usize = 16;
+const KW_EMPTY: u8 = 255;
+
+pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
+    "alignas",
+    "alignof",
+    "and",
+    "and_eq",
+    "asm",
+    "atomic_cancel",
+    "atomic_commit",
+    "atomic_noexcept",
+    "auto",
+    "bitand",
+    "bitor",
+    "bool",
+    "break",
+    "case",
+    "catch",
+    "char",
+    "char8_t",
+    "char16_t",
+    "char32_t",
+    "class",
+    "compl",
+    "concept",
+    "const",
+    "consteval",
+    "constexpr",
+    "constinit",
+    "const_cast",
+    "continue",
+    "co_await",
+    "co_return",
+    "co_yield",
+    "decltype",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "dynamic_cast",
+    "else",
+    "enum",
+    "explicit",
+    "export",
+    "extern",
+    "false",
+    "final",
+    "float",
+    "for",
+    "friend",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "mutable",
+    "namespace",
+    "new",
+    "noexcept",
+    "not",
+    "not_eq",
+    "nullptr",
+    "operator",
+    "or",
+    "or_eq",
+    "override",
+    "private",
+    "protected",
+    "public",
+    "register",
+    "reinterpret_cast",
+    "requires",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "static_assert",
+    "static_cast",
+    "struct",
+    "switch",
+    "template",
+    "this",
+    "thread_local",
+    "throw",
+    "true",
+    "try",
+    "typedef",
+    "typeid",
+    "typename",
+    "union",
+    "unsigned",
+    "using",
+    "virtual",
+    "void",
+    "volatile",
+    "wchar_t",
+    "while",
+    "xor",
+    "xor_eq",
+];
+
+pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = [
+    7, 7, 3, 6, 3, 13, 13, 15, 4, 6, 5, 4, 5, 4, 5, 4, 7, 8, 8, 5, 5, 7, 5, 9, 9, 9, 10, 8, 8, 9,
+    8, 8, 7, 6, 2, 6, 12, 4, 4, 8, 6, 6, 5, 5, 5, 3, 6, 4, 2, 6, 3, 4, 7, 9, 3, 8, 3, 6, 7, 8, 2,
+    5, 8, 7, 9, 6, 8, 16, 8, 6, 5, 6, 6, 6, 13, 11, 6, 6, 8, 4, 12, 5, 4, 3, 7, 6, 8, 5, 8, 5, 7,
+    4, 8, 7, 5, 3, 6,
+];
+
+const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
+const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
+
+const TOK_NONE: u8 = 0;
+const TOK_IDENT: u8 = 1;
+const TOK_SLASH: u8 = 2;
+const TOK_QUOTE: u8 = 3;
+const TOK_APOSTROPHE: u8 = 4;
+
+#[inline(always)]
+const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
+    let v = (first as usize)
+        .wrapping_mul(9)
+        .wrapping_add((mid as usize).wrapping_mul(73))
+        .wrapping_add((last as usize).wrapping_mul(403))
+        .wrapping_add(len.wrapping_mul(151));
+    (v ^ (v >> 4)) & KW_SLOT_MASK
+}
+
+const KW_TABLE: [u8; 512] = {
+    let mut table = [KW_EMPTY; 512];
+    let mut i = 0;
+    while i < KEYWORD_COUNT {
+        let name = KEYWORD_NAMES[i].as_bytes();
+        let len = KEYWORD_LENS[i] as usize;
+        assert!(name.len() == len);
+        assert!(len >= 2 && len <= KW_MAX_LEN);
+        let h = kw_hash(name[0], name[len >> 1], name[len - 1], len);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+};
+
+const TOKEN_KIND: [u8; 256] = {
+    let mut table = [TOK_NONE; 256];
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    table[b'_' as usize] = TOK_IDENT;
+    table[b'/' as usize] = TOK_SLASH;
+    table[b'"' as usize] = TOK_QUOTE;
+    table[b'\'' as usize] = TOK_APOSTROPHE;
+    table
+};
+
+const IDENT_CONT: [u8; 256] = {
+    let mut table = [0u8; 256];
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    let mut c = b'0';
+    while c <= b'9' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    table[b'_' as usize] = 1;
+    table
+};
+
+#[inline(always)]
+fn kw_match_len_2_to_16(cand: &[u8], kw: &[u8]) -> bool {
+    let n = cand.len();
+    if n != kw.len() || !(2..=KW_MAX_LEN).contains(&n) {
+        return false;
+    }
+    if n >= 8 {
+        let a1 = u64::from_ne_bytes(cand[..8].try_into().unwrap());
+        let b1 = u64::from_ne_bytes(kw[..8].try_into().unwrap());
+        let a2 = u64::from_ne_bytes(cand[n - 8..n].try_into().unwrap());
+        let b2 = u64::from_ne_bytes(kw[n - 8..n].try_into().unwrap());
+        ((a1 ^ b1) | (a2 ^ b2)) == 0
+    } else if n >= 4 {
+        let a1 = u32::from_ne_bytes(cand[..4].try_into().unwrap());
+        let b1 = u32::from_ne_bytes(kw[..4].try_into().unwrap());
+        let a2 = u32::from_ne_bytes(cand[n - 4..n].try_into().unwrap());
+        let b2 = u32::from_ne_bytes(kw[n - 4..n].try_into().unwrap());
+        ((a1 ^ b1) | (a2 ^ b2)) == 0
+    } else {
+        let a1 = u16::from_ne_bytes(cand[..2].try_into().unwrap());
+        let b1 = u16::from_ne_bytes(kw[..2].try_into().unwrap());
+        a1 == b1 && cand[n - 1] == kw[n - 1]
+    }
+}
+
+#[inline(always)]
+fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
+    debug_assert!(i <= ptr.len());
+    #[cfg(target_feature = "avx2")]
+    {
+        use safe_arch::*;
+        let lut_lo = m256i::from([
+            2_i8, 3, 11, 3, 3, 3, 3, 11, 3, 3, 3, 1, 1, 1, 1, 13, 2, 3, 11, 3, 3, 3, 3, 11, 3, 3,
+            3, 1, 1, 1, 1, 13,
+        ]);
+        let lut_hi = m256i::from([
+            0_i8, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]);
+        let mask_0f = set_splat_i8_m256i(0x0F);
+        let zero = zeroed_m256i();
+
+        let (chunks, _) = ptr[i..].as_chunks::<32>();
+        for &chunk in chunks {
+            let v = m256i::from(chunk);
+            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
+            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
+            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
+            let hit = m_lo & m_hi;
+            let is_zero = cmp_eq_mask_i8_m256i(hit, zero);
+            let mask = !(move_mask_i8_m256i(is_zero) as u32);
+            if mask != 0 {
+                return i + mask.trailing_zeros() as usize;
+            }
+            i += 32;
+        }
+    }
+    while i < ptr.len() && TOKEN_KIND[ptr[i] as usize] == TOK_NONE {
+        i += 1;
+    }
+    i
+}
+
+#[inline(always)]
+fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
+    debug_assert!(i <= ptr.len());
+    #[cfg(target_feature = "avx2")]
+    {
+        use safe_arch::*;
+        let lut_lo = m256i::from([
+            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
+            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
+        ]);
+        let lut_hi = m256i::from([
+            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]);
+        let mask_0f = set_splat_i8_m256i(0x0F);
+        let zero = zeroed_m256i();
+
+        let (chunks, _) = ptr[i..].as_chunks::<32>();
+        for &chunk in chunks {
+            let v = m256i::from(chunk);
+            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
+            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
+            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
+            let hit = m_lo & m_hi;
+            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
+            let mask = move_mask_i8_m256i(is_non_ident) as u32;
+            if mask != 0 {
+                return i + mask.trailing_zeros() as usize;
+            }
+            i += 32;
+        }
+    }
+    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
+        i += 1;
+    }
+    i
+}
+
+#[inline(always)]
+fn try_skip_raw_string(content: &[u8], quote_idx: usize) -> Option<usize> {
+    let content_len = content.len();
+    let delim_start = quote_idx + 1;
+    let max_scan = (delim_start + 17).min(content_len);
+    let mut paren_idx = None;
+    for k in delim_start..max_scan {
+        let b = content[k];
+        if b == b'(' {
+            paren_idx = Some(k);
+            break;
+        }
+        if b == b')' || b == b'\\' || b == b'"' || b <= b' ' {
+            return None;
+        }
+    }
+    let open_paren = paren_idx?;
+    let delim = &content[delim_start..open_paren];
+    let delim_len = delim.len();
+    let mut i = open_paren + 1;
+    while i < content_len {
+        let Some(pos) = find_byte_avx2(&content[i..], b')') else {
+            return Some(content_len);
+        };
+        let close_paren = i + pos;
+        let after_paren = close_paren + 1;
+        if after_paren + delim_len < content_len
+            && content[after_paren + delim_len] == b'"'
+            && &content[after_paren..after_paren + delim_len] == delim
+        {
+            return Some(after_paren + delim_len + 1);
+        }
+        i = close_paren + 1;
+    }
+    Some(content_len)
+}
+
+#[inline(always)]
+pub fn is_cpp_extension(name: &[u8]) -> bool {
+    let len = name.len();
+    if len < 3 {
+        return false;
+    }
+    if len >= 4 && name[len - 4] == b'.' {
+        let b0 = name[len - 3] | 0x20;
+        let b1 = name[len - 2] | 0x20;
+        let b2 = name[len - 1] | 0x20;
+        return matches!(
+            [b0, b1, b2],
+            [b'c', b'p', b'p']
+                | [b'c', b'x', b'x']
+                | [b'c', b'+', b'+']
+                | [b'h', b'p', b'p']
+                | [b'h', b'x', b'x']
+                | [b'h', b'+', b'+']
+                | [b'i', b'p', b'p']
+                | [b'i', b'n', b'l']
+                | [b'i', b'x', b'x']
+        );
+    }
+    if name[len - 3] == b'.' {
+        let b0 = name[len - 2] | 0x20;
+        let b1 = name[len - 1] | 0x20;
+        return matches!([b0, b1], [b'c', b'c'] | [b'h', b'h']);
+    }
+    if len >= 5 && name[len - 5] == b'.' {
+        let b0 = name[len - 4] | 0x20;
+        let b1 = name[len - 3] | 0x20;
+        let b2 = name[len - 2] | 0x20;
+        let b3 = name[len - 1] | 0x20;
+        return [b0, b1, b2, b3] == [b'c', b'p', b'p', b'm'];
+    }
+    false
+}
+
+pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
+    let content_len = content.len();
+    if content_len == 0 {
+        return;
+    }
+
+    acc.lines_processed += count_newlines_avx2(content) as i64;
+
+    let mut i = 0usize;
+    while i < content_len {
+        if TOKEN_KIND[content[i] as usize] == TOK_NONE {
+            i += 1;
+            if i < content_len && TOKEN_KIND[content[i] as usize] == TOK_NONE {
+                i = skip_non_tokens_avx2(content, i);
+            }
+            if i >= content_len {
+                break;
+            }
+        }
+
+        match TOKEN_KIND[content[i] as usize] {
+            TOK_IDENT => {
+                let start = i;
+                i = skip_ident_cont_avx2(content, i + 1);
+                debug_assert!(i > start && i <= content_len);
+                let n = i - start;
+                if n.wrapping_sub(2) <= KW_MAX_LEN - 2 {
+                    let h = kw_hash(content[start], content[start + (n >> 1)], content[i - 1], n);
+                    let id = KW_TABLE[h];
+                    if id != KW_EMPTY {
+                        let idx = id as usize;
+                        debug_assert!(idx < KEYWORD_COUNT);
+                        if KEYWORD_LENS[idx] as usize == n
+                            && kw_match_len_2_to_16(
+                                &content[start..i],
+                                KEYWORD_NAMES[idx].as_bytes(),
+                            )
+                        {
+                            acc.keyword_counts[idx] += 1;
+                            acc.total_keywords += 1;
+                        }
+                    }
+                }
+            }
+            TOK_SLASH => {
+                if i + 1 < content_len {
+                    let next_b = content[i + 1];
+                    if next_b == b'/' {
+                        i = skip_line_comment(content, i + 2);
+                        continue;
+                    } else if next_b == b'*' {
+                        if let Some(pos) = find_star_slash(&content[i + 2..]) {
+                            i += 2 + pos + 2;
+                        } else {
+                            i = content_len;
+                        }
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+            TOK_QUOTE => {
+                if i > 0
+                    && content[i - 1] == b'R'
+                    && let Some(next_i) = try_skip_raw_string(content, i)
+                {
+                    i = next_i;
+                    continue;
+                }
+                i = skip_literal(content, i + 1, b'"');
+            }
+            TOK_APOSTROPHE => {
+                if i > 0 && i + 1 < content_len {
+                    let prev = content[i - 1];
+                    let next = content[i + 1];
+                    if IDENT_CONT[prev as usize] != 0 && IDENT_CONT[next as usize] != 0 {
+                        i += 1;
+                        continue;
+                    }
+                }
+                i = skip_literal(content, i + 1, b'\'');
+            }
+            _ => {
+                i += 1;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    pub fn find_kw_id(name: &str) -> usize {
+        KEYWORD_NAMES.iter().position(|&kw| kw == name).unwrap()
+    }
+
+    #[test]
+    fn test_cpp_keyword_table_and_mph() {
+        assert_eq!(KEYWORD_COUNT, 97);
+        let mut seen_slot = [false; 512];
+        for i in 0..KEYWORD_COUNT {
+            let kw = KEYWORD_NAMES[i];
+            let len = kw.len();
+            assert_eq!(len, KEYWORD_LENS[i] as usize);
+            assert!((2..=KW_MAX_LEN).contains(&len));
+
+            let bytes = kw.as_bytes();
+            let h = kw_hash(bytes[0], bytes[len >> 1], bytes[len - 1], len);
+            assert!(!seen_slot[h]);
+            seen_slot[h] = true;
+            assert_eq!(KW_TABLE[h], i as u8);
+            assert!(kw_match_len_2_to_16(bytes, bytes));
+
+            let mut res = ParseResult::default();
+            parse_into(bytes, &mut res);
+            assert_eq!(res.total_keywords, 1);
+            assert_eq!(res.keyword_counts[i], 1);
+            assert_eq!(res.lines_processed, 0);
+        }
+
+        let non_keywords = [
+            "a",
+            "i",
+            "if_",
+            "_if",
+            "iff",
+            "inta",
+            "int_t",
+            "classes",
+            "namespaces",
+            "templates",
+            "typenames",
+            "virtuals",
+            "overrides",
+            "finals",
+            "reinterpret_casts",
+            "static_casts",
+            "dynamic_casts",
+            "const_casts",
+            "co_awaits",
+            "co_returns",
+            "co_yields",
+            "char64_t",
+            "_Bool",
+            "_Generic",
+            "_Static_assert",
+        ];
+        for s in non_keywords {
+            let mut res = ParseResult::default();
+            parse_into(s.as_bytes(), &mut res);
+            assert_eq!(res.total_keywords, 0);
+        }
+    }
+
+    #[test]
+    fn test_cpp_extensions() {
+        for valid in [
+            b"main.cpp".as_slice(),
+            b"main.cc",
+            b"main.cxx",
+            b"main.c++",
+            b"header.hpp",
+            b"header.hh",
+            b"header.hxx",
+            b"header.h++",
+            b"impl.ipp",
+            b"math.inl",
+            b"mod.ixx",
+            b"mod.cppm",
+            b"UPPER.CPP",
+            b"UPPER.HPP",
+            b"UPPER.CC",
+            b"UPPER.HH",
+            b"UPPER.CPPM",
+        ] {
+            assert!(is_cpp_extension(valid));
+        }
+
+        for invalid in [
+            b"main.c".as_slice(),
+            b"header.h",
+            b"UPPER.C",
+            b"UPPER.H",
+            b"script.py",
+            b"main.rs",
+            b"cpp",
+            b".c",
+            b"",
+        ] {
+            assert!(!is_cpp_extension(invalid));
+        }
+    }
+
+    #[test]
+    fn test_cpp_features_and_raw_strings() {
+        let src = concat!(
+            "namespace demo {\n",
+            "template <typename T> requires true\n",
+            "class Widget final : public Base {\n",
+            "public:\n",
+            "    constexpr Widget() noexcept = default;\n",
+            "    virtual void run() override {\n",
+            "        auto s1 = R\"(class namespace template return if while \"quoted\")\";\n",
+            "        auto s2 = R\"delim(reinterpret_cast<int>(x) ) \" )delim\";\n",
+            "        if (true and not false) {\n",
+            "            co_return;\n",
+            "        }\n",
+            "    }\n",
+            "};\n",
+            "}\n"
+        );
+
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+
+        assert_eq!(res.keyword_counts[find_kw_id("namespace")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("template")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("typename")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("requires")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("true")], 2);
+        assert_eq!(res.keyword_counts[find_kw_id("class")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("final")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("public")], 2);
+        assert_eq!(res.keyword_counts[find_kw_id("constexpr")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("noexcept")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("default")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("virtual")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("void")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("override")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("auto")], 2);
+        assert_eq!(res.keyword_counts[find_kw_id("if")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("and")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("not")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("false")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("co_return")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("reinterpret_cast")], 0);
+        assert_eq!(res.keyword_counts[find_kw_id("return")], 0);
+        assert_eq!(res.keyword_counts[find_kw_id("while")], 0);
+        assert_eq!(res.total_keywords, 23);
+        assert_eq!(res.lines_processed, 14);
+    }
+}

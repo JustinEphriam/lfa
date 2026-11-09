@@ -249,6 +249,12 @@ fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
 }
 
 #[inline(always)]
+pub fn is_h_extension(name: &[u8]) -> bool {
+    let len = name.len();
+    len >= 2 && name[len - 2] == b'.' && (name[len - 1] | 0x20) == b'h'
+}
+
+#[inline(always)]
 pub fn is_c_extension(name: &[u8]) -> bool {
     let len = name.len();
     if len < 2 || name[len - 2] != b'.' {
