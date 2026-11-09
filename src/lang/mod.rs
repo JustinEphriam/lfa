@@ -1,19 +1,22 @@
 pub mod c;
 pub mod cpp;
+pub mod rust;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LangId {
     C = 0,
     Cpp = 1,
+    Rust = 2,
 }
 
-pub const LANG_COUNT: usize = 2;
+pub const LANG_COUNT: usize = 3;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
+pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
-pub const ALL_LANGS: [LangId; LANG_COUNT] = [LangId::C, LangId::Cpp];
+pub const ALL_LANGS: [LangId; LANG_COUNT] = [LangId::C, LangId::Cpp, LangId::Rust];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
@@ -24,6 +27,7 @@ impl LangId {
         match self {
             Self::C => "C",
             Self::Cpp => "C++",
+            Self::Rust => "Rust",
         }
     }
 
@@ -37,6 +41,9 @@ impl LangId {
         match arg {
             b"-c" | b"--c" | b"-C" => Some(Self::C),
             b"-cpp" | b"--cpp" | b"-CPP" | b"--CPP" => Some(Self::Cpp),
+            b"-rs" | b"--rs" | b"-RS" | b"--RS" | b"-rust" | b"--rust" | b"-RUST" | b"--RUST" => {
+                Some(Self::Rust)
+            }
             _ => None,
         }
     }
@@ -74,6 +81,7 @@ impl<const N: usize> ParseResult<N> {
 pub struct LangStats {
     pub c: ParseResult<{ c::KEYWORD_COUNT }>,
     pub cpp: ParseResult<{ cpp::KEYWORD_COUNT }>,
+    pub rust: ParseResult<{ rust::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -81,6 +89,7 @@ impl LangStats {
     pub fn add(&mut self, other: &Self) {
         self.c.add(&other.c);
         self.cpp.add(&other.cpp);
+        self.rust.add(&other.rust);
     }
 
     #[inline(always)]
@@ -88,6 +97,7 @@ impl LangStats {
         match lang {
             LangId::C => self.c.lines_processed,
             LangId::Cpp => self.cpp.lines_processed,
+            LangId::Rust => self.rust.lines_processed,
         }
     }
 
@@ -96,6 +106,7 @@ impl LangStats {
         match lang {
             LangId::C => self.c.total_keywords,
             LangId::Cpp => self.cpp.total_keywords,
+            LangId::Rust => self.rust.total_keywords,
         }
     }
 
@@ -104,6 +115,7 @@ impl LangStats {
         match lang {
             LangId::C => &c::KEYWORD_NAMES,
             LangId::Cpp => &cpp::KEYWORD_NAMES,
+            LangId::Rust => &rust::KEYWORD_NAMES,
         }
     }
 
@@ -112,6 +124,7 @@ impl LangStats {
         match lang {
             LangId::C => &self.c.keyword_counts,
             LangId::Cpp => &self.cpp.keyword_counts,
+            LangId::Rust => &self.rust.keyword_counts,
         }
     }
 }
@@ -120,6 +133,9 @@ impl LangStats {
 pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
     if (enabled_mask & LANG_C_MASK) != 0 && c::is_c_extension(name) {
         return Some(LangId::C);
+    }
+    if (enabled_mask & LANG_RUST_MASK) != 0 && rust::is_rust_extension(name) {
+        return Some(LangId::Rust);
     }
     if (enabled_mask & LANG_CPP_MASK) != 0 && (cpp::is_cpp_extension(name) || c::is_h_extension(name)) {
         return Some(LangId::Cpp);
@@ -132,6 +148,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
     match lang {
         LangId::C => c::parse_into(content, &mut stats.c),
         LangId::Cpp => cpp::parse_into(content, &mut stats.cpp),
+        LangId::Rust => rust::parse_into(content, &mut stats.rust),
     }
 }
 
@@ -349,5 +366,46 @@ mod tests {
             s[offset + 10] = b'"';
             assert_eq!(skip_literal(&s, 0, b'"'), offset + 11);
         }
+    }
+
+    #[test]
+    fn test_detect_language_and_header_routing() {
+        assert_eq!(detect_language(b"foo.c", LANG_ALL_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.h", LANG_ALL_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.H", LANG_ALL_MASK), Some(LangId::C));
+        assert_eq!(
+            detect_language(b"foo.cpp", LANG_ALL_MASK),
+            Some(LangId::Cpp)
+        );
+        assert_eq!(
+            detect_language(b"foo.hpp", LANG_ALL_MASK),
+            Some(LangId::Cpp)
+        );
+        assert_eq!(
+            detect_language(b"foo.rs", LANG_ALL_MASK),
+            Some(LangId::Rust)
+        );
+        assert_eq!(detect_language(b"foo.py", LANG_ALL_MASK), None);
+
+        assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.h", LANG_C_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.cpp", LANG_C_MASK), None);
+        assert_eq!(detect_language(b"foo.hpp", LANG_C_MASK), None);
+
+        assert_eq!(detect_language(b"foo.c", LANG_CPP_MASK), None);
+        assert_eq!(detect_language(b"foo.h", LANG_CPP_MASK), Some(LangId::Cpp));
+        assert_eq!(detect_language(b"foo.H", LANG_CPP_MASK), Some(LangId::Cpp));
+        assert_eq!(
+            detect_language(b"foo.cpp", LANG_CPP_MASK),
+            Some(LangId::Cpp)
+        );
+        assert_eq!(
+            detect_language(b"foo.hpp", LANG_CPP_MASK),
+            Some(LangId::Cpp)
+        );
+
+        assert_eq!(detect_language(b"foo.c", 0), None);
+        assert_eq!(detect_language(b"foo.h", 0), None);
+        assert_eq!(detect_language(b"foo.cpp", 0), None);
     }
 }

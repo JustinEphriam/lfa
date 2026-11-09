@@ -292,6 +292,31 @@ fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
 }
 
 #[inline(always)]
+fn has_raw_string_prefix(content: &[u8], quote_idx: usize) -> bool {
+    if quote_idx == 0 || content[quote_idx - 1] != b'R' {
+        return false;
+    }
+    let r_idx = quote_idx - 1;
+    if r_idx == 0 || IDENT_CONT[content[r_idx - 1] as usize] == 0 {
+        return true;
+    }
+    let p1 = content[r_idx - 1];
+    if (p1 == b'L' || p1 == b'u' || p1 == b'U')
+        && (r_idx == 1 || IDENT_CONT[content[r_idx - 2] as usize] == 0)
+    {
+        return true;
+    }
+    if p1 == b'8'
+        && r_idx >= 2
+        && content[r_idx - 2] == b'u'
+        && (r_idx == 2 || IDENT_CONT[content[r_idx - 3] as usize] == 0)
+    {
+        return true;
+    }
+    false
+}
+
+#[inline(always)]
 fn try_skip_raw_string(content: &[u8], quote_idx: usize) -> Option<usize> {
     let content_len = content.len();
     let delim_start = quote_idx + 1;
@@ -428,8 +453,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 i += 1;
             }
             TOK_QUOTE => {
-                if i > 0
-                    && content[i - 1] == b'R'
+                if has_raw_string_prefix(content, i)
                     && let Some(next_i) = try_skip_raw_string(content, i)
                 {
                     i = next_i;
@@ -519,6 +543,26 @@ mod tests {
             parse_into(s.as_bytes(), &mut res);
             assert_eq!(res.total_keywords, 0);
         }
+
+        for b in 0..=255u8 {
+            let mut block = [b' '; 64];
+            block[19] = b;
+            let pos = skip_non_tokens_avx2(&block, 0);
+            if TOKEN_KIND[b as usize] != TOK_NONE {
+                assert_eq!(pos, 19);
+            } else {
+                assert_eq!(pos, block.len());
+            }
+
+            let mut block = [b'a'; 64];
+            block[19] = b;
+            let id_pos = skip_ident_cont_avx2(&block, 0);
+            if IDENT_CONT[b as usize] == 0 {
+                assert_eq!(id_pos, 19);
+            } else {
+                assert_eq!(id_pos, block.len());
+            }
+        }
     }
 
     #[test]
@@ -607,5 +651,94 @@ mod tests {
         assert_eq!(res.keyword_counts[find_kw_id("while")], 0);
         assert_eq!(res.total_keywords, 23);
         assert_eq!(res.lines_processed, 14);
+    }
+
+    #[test]
+    fn test_cpp_raw_string_prefixes_and_delimiters() {
+        let src = concat!(
+            "auto a = u8R\"(if while return)\";\n",
+            "auto b = LR\"(class struct union)\";\n",
+            "auto c = uR\"(const_cast dynamic_cast)\";\n",
+            "auto d = UR\"(co_await co_yield co_return)\";\n",
+            "auto e = R\"1234567890123456( ) )123456789012345 \"if\" return )1234567890123456\";\n",
+            "auto f = MY_MACRO_R\"(\\\")\"; if (true) return;\n",
+            "auto g = R\"unclosed(class virtual override"
+        );
+
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+
+        assert_eq!(res.keyword_counts[find_kw_id("auto")], 7);
+        assert_eq!(res.keyword_counts[find_kw_id("if")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("true")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("class")], 0);
+        assert_eq!(res.keyword_counts[find_kw_id("while")], 0);
+        assert_eq!(res.total_keywords, 10);
+    }
+
+    #[test]
+    fn test_cpp_avx2_boundaries_and_16_byte_keywords() {
+        let len = 32 * 300 + 19;
+        let mut buf = vec![b' '; len];
+        let kw = b"reinterpret_cast";
+        let kw_len = kw.len();
+        let mut placed = 0i64;
+        let mut off = 21usize;
+        while off + kw_len < len {
+            buf[off..off + kw_len].copy_from_slice(kw);
+            placed += 1;
+            off += 64;
+        }
+
+        let mut res = ParseResult::default();
+        parse_into(&buf, &mut res);
+        assert_eq!(res.total_keywords, placed);
+        assert_eq!(res.keyword_counts[find_kw_id("reinterpret_cast")], placed);
+
+        for start_off in 0..96 {
+            for &kw_str in &[
+                "or",
+                "and",
+                "auto",
+                "class",
+                "char16_t",
+                "char32_t",
+                "static_assert",
+                "atomic_noexcept",
+                "reinterpret_cast",
+            ] {
+                let mut b = vec![b' '; 160];
+                let kw_bytes = kw_str.as_bytes();
+                b[start_off..start_off + kw_bytes.len()].copy_from_slice(kw_bytes);
+                let mut r = ParseResult::default();
+                parse_into(&b, &mut r);
+                assert_eq!(r.total_keywords, 1);
+                assert_eq!(r.keyword_counts[find_kw_id(kw_str)], 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cpp_digit_separators_and_comments() {
+        let src = concat!(
+            "// spliced comment \\\n",
+            "class Ignored {};\n",
+            "constexpr int a = 0b1010'0101'1111;\n",
+            "constexpr unsigned b = 0xDEAD'BEEF'CAFEu;\n",
+            "/* block comment with namespace template typename */\n",
+            "return a;\n"
+        );
+
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+
+        assert_eq!(res.keyword_counts[find_kw_id("constexpr")], 2);
+        assert_eq!(res.keyword_counts[find_kw_id("int")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("unsigned")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("class")], 0);
+        assert_eq!(res.total_keywords, 5);
+        assert_eq!(res.lines_processed, 6);
     }
 }

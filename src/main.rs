@@ -664,7 +664,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies",
         prog
     );
     process::exit(1);
@@ -1049,6 +1049,18 @@ mod tests {
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::Cpp.mask());
         assert_eq!(detailed, Some(LangId::Cpp));
+
+        for flag in ["-rs", "--rs", "-rust", "--rust"] {
+            let args_rs = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_rs);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, LangId::Rust.mask());
+            assert_eq!(detailed, Some(LangId::Rust));
+        }
     }
 
     #[test]
