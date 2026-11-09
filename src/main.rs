@@ -664,7 +664,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies",
         prog
     );
     process::exit(1);
@@ -822,7 +822,7 @@ mod tests {
         let path_c = format!("{}/valid.c", tmp_dir);
         let path_h = format!("{}/UPPER.H", tmp_dir);
         let path_cpp = format!("{}/module.cpp", tmp_dir);
-        let path_py = format!("{}/ignored.py", tmp_dir);
+        let path_ignored = format!("{}/ignored.txt", tmp_dir);
         let path_fifo = format!("{}/named_pipe.c", tmp_dir);
         let sub_dir = format!("{}/subdir", tmp_dir);
         let sub_c = format!("{}/subdir/nested.c", tmp_dir);
@@ -834,7 +834,7 @@ mod tests {
             "namespace n { class C final { public: void f() override {} }; }\n",
         )
         .unwrap();
-        fs::write(&path_py, "int while for return if switch case default;\n").unwrap();
+        fs::write(&path_ignored, "int while for return if switch case default;\n").unwrap();
         mknodat(
             CWD,
             path_fifo.as_bytes(),
@@ -927,7 +927,7 @@ mod tests {
         unlinkat(CWD, sub_c.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, sub_dir.as_bytes(), AtFlags::REMOVEDIR).unwrap();
         unlinkat(CWD, path_fifo.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, path_py.as_bytes(), AtFlags::empty()).unwrap();
+        unlinkat(CWD, path_ignored.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_cpp.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_h.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, path_c.as_bytes(), AtFlags::empty()).unwrap();
@@ -1060,6 +1060,18 @@ mod tests {
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Rust.mask());
             assert_eq!(detailed, Some(LangId::Rust));
+        }
+
+        for flag in ["-py", "--py", "-python", "--python"] {
+            let args_py = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_py);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, LangId::Python.mask());
+            assert_eq!(detailed, Some(LangId::Python));
         }
     }
 
