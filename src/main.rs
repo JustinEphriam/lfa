@@ -517,6 +517,13 @@ struct KeywordStat {
     percentage: f64,
 }
 
+fn should_color() -> bool {
+    if env::var_os("NO_COLOR").is_some() {
+        return false;
+    }
+    rustix::termios::isatty(stdout())
+}
+
 fn print_detailed_results(
     totals: &WorkerResult,
     lang: LangId,
@@ -524,6 +531,13 @@ fn print_detailed_results(
     num_workers: usize,
     cpu_count: usize,
 ) {
+    let color = should_color();
+    let (c_bold, c_cyan, c_gray, c_reset) = if color {
+        ("\x1b[1m", "\x1b[36m", "\x1b[90m", "\x1b[0m")
+    } else {
+        ("", "", "", "")
+    };
+
     let idx = lang as usize;
     let files_found = totals.files_found[idx];
     let files_processed = totals.files_processed[idx];
@@ -538,15 +552,19 @@ fn print_detailed_results(
     let mut out = String::with_capacity(8192);
     let _ = writeln!(
         out,
-        "Processed {} files with {} worker threads (CPU cores: {})...",
+        "{}Processed {} files with {} worker threads (CPU cores: {})...{}",
+        c_gray,
         format_number(files_found),
         num_workers,
-        cpu_count
+        cpu_count,
+        c_reset
     );
     let _ = writeln!(
         out,
-        "{} Keyword Analyzer (Unified Work-Stealing)",
-        lang.name()
+        "{}{}{} Keyword Analyzer (Unified Work-Stealing)",
+        c_bold,
+        lang.name(),
+        c_reset
     );
     let _ = writeln!(out, "Files processed: {}", format_number(files_processed));
     let _ = writeln!(
@@ -581,14 +599,22 @@ fn print_detailed_results(
         ord => ord,
     });
 
-    let _ = writeln!(out, "\nKeyword frequencies (most frequent first):");
-    let _ = writeln!(out, "Rank Keyword         Count Percentage");
-    let _ = writeln!(out, "---- -------         ----- ----------");
+    let _ = writeln!(out, "\n{}Keyword frequencies (most frequent first):{}", c_bold, c_reset);
+    let _ = writeln!(
+        out,
+        "{}{:>5}  {:<16} {:>10}  {:>7}{}",
+        c_cyan, "Rank", "Keyword", "Count", "Percent", c_reset
+    );
+    let _ = writeln!(
+        out,
+        "{}─────  ──────────────── ──────────  ───────{}",
+        c_gray, c_reset
+    );
 
     for (i, st) in stats.iter().enumerate() {
         let _ = writeln!(
             out,
-            "{:4} {:<15} {:>10} {:6.2}%",
+            "{:>5}  {:<16} {:>10}  {:6.2}%",
             i + 1,
             kw_names[st.keyword_id as usize],
             format_number(st.count),
@@ -605,17 +631,32 @@ fn print_summary_results(
     num_workers: usize,
     cpu_count: usize,
 ) {
-    let mut out = String::with_capacity(4096);
-    let rule = "========================================================================================================";
-    let dash = "--------------------------------------------------------------------------------------------------------";
+    let color = should_color();
+    let (c_bold, c_cyan, c_gray, c_reset) = if color {
+        ("\x1b[1m", "\x1b[36m", "\x1b[90m", "\x1b[0m")
+    } else {
+        ("", "", "", "")
+    };
 
-    let _ = writeln!(out, "{}", rule);
+    let mut out = String::with_capacity(4096);
+    let border_top = "┌────────────────────┬──────────┬──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐";
+    let border_sep = "├────────────────────┼──────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────────────┤";
+    let border_bot = "└────────────────────┴──────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘";
+
+    let _ = writeln!(out, "{}{}{}", c_gray, border_top, c_reset);
     let _ = writeln!(
         out,
-        " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
-        "Language", "Files", "Lines", "Code", "Comments", "Blanks", "Keywords"
+        "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+        c_gray, c_bold, "Language",
+        c_gray, c_bold, "Files",
+        c_gray, c_bold, "Lines",
+        c_gray, c_bold, "Code",
+        c_gray, c_bold, "Comments",
+        c_gray, c_bold, "Blanks",
+        c_gray, c_bold, "Keywords",
+        c_gray
     );
-    let _ = writeln!(out, "{}", rule);
+    let _ = writeln!(out, "{}{}{}", c_gray, border_sep, c_reset);
 
     let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
     let mut total_files = 0i64;
@@ -649,37 +690,41 @@ fn print_summary_results(
     for (lang, files, lines, code, comments, blanks, kws) in rows {
         let _ = writeln!(
             out,
-            " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
-            lang.name(),
-            format_number(files),
-            format_number(lines),
-            format_number(code),
-            format_number(comments),
-            format_number(blanks),
-            format_number(kws),
+            "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+            c_gray, c_cyan, lang.name(),
+            c_gray, c_reset, format_number(files),
+            c_gray, c_reset, format_number(lines),
+            c_gray, c_reset, format_number(code),
+            c_gray, c_reset, format_number(comments),
+            c_gray, c_reset, format_number(blanks),
+            c_gray, c_reset, format_number(kws),
+            c_gray
         );
     }
 
-    let _ = writeln!(out, "{}", dash);
+    let _ = writeln!(out, "{}{}{}", c_gray, border_sep, c_reset);
     let _ = writeln!(
         out,
-        " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
-        "Total",
-        format_number(total_files),
-        format_number(total_lines),
-        format_number(total_code),
-        format_number(total_comments),
-        format_number(total_blanks),
-        format_number(total_keywords),
+        "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+        c_gray, c_bold, "Total",
+        c_gray, c_bold, format_number(total_files),
+        c_gray, c_bold, format_number(total_lines),
+        c_gray, c_bold, format_number(total_code),
+        c_gray, c_bold, format_number(total_comments),
+        c_gray, c_bold, format_number(total_blanks),
+        c_gray, c_bold, format_number(total_keywords),
+        c_gray
     );
-    let _ = writeln!(out, "{}", rule);
+    let _ = writeln!(out, "{}{}{}", c_gray, border_bot, c_reset);
     let _ = writeln!(
         out,
-        "Processed {} files with {} worker threads (CPU cores: {}) in {:.3}s",
+        "{}Processed {} files with {} worker threads (CPU cores: {}) in {:.3}s{}",
+        c_gray,
         format_number(totals.total_files_found()),
         num_workers,
         cpu_count,
-        processing_time
+        processing_time,
+        c_reset
     );
 
     let _ = write(stdout(), out.as_bytes());
