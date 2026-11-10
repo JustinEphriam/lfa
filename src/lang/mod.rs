@@ -544,8 +544,31 @@ pub trait LangLexer<const N: usize> {
     const SUPPORTS_TEMPLATES: bool;
     const TOKEN_KIND_INTERP: [u8; 256] = Self::TOKEN_KIND;
     const TOKEN_INTERP_LUT_LO: [i8; 32] = Self::TOKEN_LUT_LO;
+    const HAS_SPECIAL_IDENT: bool = false;
+    const HAS_LINE_START_HOOK: bool = false;
 
     fn match_keyword(cand: &[u8]) -> Option<usize>;
+
+    #[inline(always)]
+    fn handle_ident(
+        _content: &[u8],
+        _start: usize,
+        _end: usize,
+        _line_state: &mut u8,
+        _acc: &mut ParseResult<N>,
+    ) -> usize {
+        _end
+    }
+
+    #[inline(always)]
+    fn handle_line_start(
+        _content: &[u8],
+        _i: usize,
+        _line_state: &mut u8,
+        _acc: &mut ParseResult<N>,
+    ) -> usize {
+        _i
+    }
 
     fn handle_special(
         kind: u8,
@@ -583,6 +606,13 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
                 acc.lines_processed += 1;
                 i += 1;
                 continue;
+            }
+            if L::HAS_LINE_START_HOOK {
+                let next_i = L::handle_line_start(content, i, &mut line_state, acc);
+                if next_i != i {
+                    i = next_i;
+                    continue;
+                }
             }
         }
 
@@ -644,6 +674,13 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
                 } else {
                     skip_ident_cont_avx2(content, i + 1)
                 };
+                if L::HAS_SPECIAL_IDENT {
+                    let next_i = L::handle_ident(content, start, end, &mut line_state, acc);
+                    if next_i != end {
+                        i = next_i;
+                        continue;
+                    }
+                }
                 i = end;
                 if let Some(idx) = L::match_keyword(&content[start..end]) {
                     acc.keyword_counts[idx] += 1;

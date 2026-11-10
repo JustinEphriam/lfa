@@ -1,8 +1,8 @@
 use super::{
-    finish_trailing_line, STATE_CODE, STATE_COMMENT, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
     find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2, skip_literal,
-    skip_nested_block_comment, skip_non_tokens_with_lut_avx2, ParseResult, IDENT_CONT, TOK_CODE,
-    TOK_NL, TOK_WS,
+    skip_nested_block_comment, unified_parse_into, LangLexer, ParseResult, IDENT_CONT,
+    STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 55;
@@ -134,11 +134,6 @@ pub const TOKEN_KIND: [u8; 256] = {
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
 #[inline(always)]
-fn skip_non_tokens_avx2(ptr: &[u8], i: usize) -> usize {
-    skip_non_tokens_with_lut_avx2(ptr, i, &TOKEN_KIND, &TOKEN_LUT_LO)
-}
-
-#[inline(always)]
 fn skip_rust_raw_string(content: &[u8], start_i: usize, hashes: usize) -> usize {
     let content_len = content.len();
     let mut i = start_i;
@@ -172,144 +167,115 @@ pub fn is_rust_extension(name: &[u8]) -> bool {
     super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::Rust)
 }
 
-pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
-    let content_len = content.len();
-    if content_len == 0 {
-        return;
+pub struct RustLexer;
+
+impl LangLexer<KEYWORD_COUNT> for RustLexer {
+    const TOKEN_KIND: [u8; 256] = TOKEN_KIND;
+    const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
+    const HAS_DOLLAR_IDENT: bool = false;
+    const SUPPORTS_TEMPLATES: bool = false;
+    const HAS_SPECIAL_IDENT: bool = true;
+
+    #[inline(always)]
+    fn match_keyword(cand: &[u8]) -> Option<usize> {
+        let n = cand.len();
+        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
+            let h = kw_hash(cand[0], cand[n >> 1], cand[n - 1], n);
+            let id = KW_TABLE[h];
+            if id != KW_EMPTY {
+                let idx = id as usize;
+                debug_assert!(idx < KEYWORD_COUNT);
+                if KEYWORD_LENS[idx] as usize == n
+                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
+                {
+                    return Some(idx);
+                }
+            }
+        }
+        None
     }
 
-    let mut line_state = 0u8;
-    let mut i = 0usize;
-    while i < content_len {
-        if line_state == 0 {
-            while i < content_len && (content[i] == b' ' || content[i] == b'\t' || content[i] == b'\r') {
-                i += 1;
-            }
-            if i >= content_len {
-                break;
-            }
-            if content[i] == b'\n' {
-                acc.blank_lines += 1;
-                acc.lines_processed += 1;
-                i += 1;
-                continue;
+    #[inline(always)]
+    fn handle_ident(
+        content: &[u8],
+        start: usize,
+        end: usize,
+        _line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let content_len = content.len();
+        let cand = &content[start..end];
+        if end < content_len {
+            let next_b = content[end];
+            if next_b == b'#' && (cand == b"r" || cand == b"br" || cand == b"cr") {
+                let mut hash_end = end + 1;
+                while hash_end < content_len && content[hash_end] == b'#' {
+                    hash_end += 1;
+                }
+                let hashes = hash_end - end;
+                if hashes == 1
+                    && cand == b"r"
+                    && hash_end < content_len
+                    && IDENT_CONT[content[hash_end] as usize] != 0
+                {
+                    return skip_ident_cont_avx2(content, hash_end + 1);
+                }
+                if hash_end < content_len && content[hash_end] == b'"' {
+                    let next_i = skip_rust_raw_string(content, hash_end + 1, hashes);
+                    let nl = count_newlines_avx2(&content[hash_end + 1..next_i]);
+                    if nl > 0 {
+                        acc.code_lines += nl as i64;
+                        acc.lines_processed += nl as i64;
+                    }
+                    return next_i;
+                }
+            } else if next_b == b'"' && (cand == b"r" || cand == b"br" || cand == b"cr") {
+                let next_i = skip_rust_raw_string(content, end + 1, 0);
+                let nl = count_newlines_avx2(&content[end + 1..next_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                return next_i;
             }
         }
+        end
+    }
 
-        if TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
-            line_state |= STATE_CODE;
-            i += 1;
-            if i < content_len && TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
-                i = skip_non_tokens_avx2(content, i);
-            }
-            if i >= content_len {
-                break;
-            }
-        }
-
-        match TOKEN_KIND[content[i] as usize] {
-            TOK_NL => {
-                if (line_state & STATE_CODE) != 0 {
-                    acc.code_lines += 1;
-                } else if (line_state & STATE_COMMENT) != 0 {
-                    acc.comment_lines += 1;
-                } else {
-                    acc.blank_lines += 1;
-                }
-                acc.lines_processed += 1;
-                line_state = 0;
-                i += 1;
-            }
-            TOK_IDENT => {
-                line_state |= STATE_CODE;
-                let start = i;
-                i = skip_ident_cont_avx2(content, i + 1);
-                debug_assert!(i > start && i <= content_len);
-                let n = i - start;
-                let cand = &content[start..i];
-
-                if i < content_len {
-                    let next_b = content[i];
-                    if next_b == b'#'
-                        && (cand == b"r" || cand == b"br" || cand == b"cr")
-                    {
-                        let mut hash_end = i + 1;
-                        while hash_end < content_len && content[hash_end] == b'#' {
-                            hash_end += 1;
-                        }
-                        let hashes = hash_end - i;
-                        if hashes == 1
-                            && cand == b"r"
-                            && hash_end < content_len
-                            && IDENT_CONT[content[hash_end] as usize] != 0
-                        {
-                            i = skip_ident_cont_avx2(content, hash_end + 1);
-                            continue;
-                        }
-                        if hash_end < content_len && content[hash_end] == b'"' {
-                            let next_i = skip_rust_raw_string(content, hash_end + 1, hashes);
-                            let nl = count_newlines_avx2(&content[hash_end + 1..next_i]);
-                            if nl > 0 {
-                                acc.code_lines += nl as i64;
-                                acc.lines_processed += nl as i64;
-                            }
-                            i = next_i;
-                            continue;
-                        }
-                    } else if next_b == b'"'
-                        && (cand == b"r" || cand == b"br" || cand == b"cr")
-                    {
-                        let next_i = skip_rust_raw_string(content, i + 1, 0);
-                        let nl = count_newlines_avx2(&content[i + 1..next_i]);
-                        if nl > 0 {
-                            acc.code_lines += nl as i64;
-                            acc.lines_processed += nl as i64;
-                        }
-                        i = next_i;
-                        continue;
-                    }
-                }
-
-                if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-                    let h = kw_hash(content[start], content[start + (n >> 1)], content[i - 1], n);
-                    let id = KW_TABLE[h];
-                    if id != KW_EMPTY {
-                        let idx = id as usize;
-                        debug_assert!(idx < KEYWORD_COUNT);
-                        if KEYWORD_LENS[idx] as usize == n
-                            && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
-                        {
-                            acc.keyword_counts[idx] += 1;
-                            acc.total_keywords += 1;
-                        }
-                    }
-                }
-            }
+    #[inline(always)]
+    fn handle_special(
+        kind: u8,
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let content_len = content.len();
+        match kind {
             TOK_SLASH => {
                 if i + 1 < content_len {
                     let next_b = content[i + 1];
                     if next_b == b'/' {
-                        line_state |= STATE_COMMENT;
+                        *line_state |= STATE_COMMENT;
                         let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
-                            break;
+                            return content_len;
                         };
                         let nl_idx = i + 2 + pos;
-                        if (line_state & STATE_CODE) != 0 {
+                        if (*line_state & STATE_CODE) != 0 {
                             acc.code_lines += 1;
-                        } else if (line_state & STATE_COMMENT) != 0 {
+                        } else if (*line_state & STATE_COMMENT) != 0 {
                             acc.comment_lines += 1;
                         } else {
                             acc.blank_lines += 1;
                         }
                         acc.lines_processed += 1;
-                        line_state = 0;
-                        i = nl_idx + 1;
-                        continue;
+                        *line_state = 0;
+                        return nl_idx + 1;
                     } else if next_b == b'*' {
-                        line_state |= STATE_COMMENT;
+                        *line_state |= STATE_COMMENT;
                         let end_i = skip_nested_block_comment(content, i + 2);
                         if let Some(first_nl) = find_byte_avx2(&content[i + 2..end_i], b'\n') {
-                            if (line_state & STATE_CODE) != 0 {
+                            if (*line_state & STATE_CODE) != 0 {
                                 acc.code_lines += 1;
                             } else {
                                 acc.comment_lines += 1;
@@ -319,27 +285,26 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                             let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..end_i]);
                             acc.comment_lines += inter_nls as i64;
                             acc.lines_processed += inter_nls as i64;
-                            line_state = STATE_COMMENT;
+                            *line_state = STATE_COMMENT;
                         }
-                        i = end_i;
-                        continue;
+                        return end_i;
                     }
                 }
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
             TOK_QUOTE => {
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 let end_i = skip_literal(content, i + 1, b'"');
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
-                i = end_i;
+                end_i
             }
             TOK_APOSTROPHE => {
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 if i + 1 < content_len {
                     let next_b = content[i + 1];
                     if next_b == b'\\' {
@@ -349,27 +314,27 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                             acc.code_lines += nl as i64;
                             acc.lines_processed += nl as i64;
                         }
-                        i = end_i;
-                        continue;
+                        return end_i;
                     }
                     if i + 2 < content_len && content[i + 2] == b'\'' {
-                        i += 3;
-                        continue;
+                        return i + 3;
                     }
                     if IDENT_CONT[next_b as usize] != 0 {
-                        i += 1;
-                        continue;
+                        return i + 1;
                     }
                 }
-                i += 1;
+                i + 1
             }
             _ => {
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
         }
     }
-    finish_trailing_line(content, line_state, acc);
+}
+
+pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
+    unified_parse_into::<KEYWORD_COUNT, RustLexer>(content, acc);
 }
 
 #[cfg(test)]
@@ -467,7 +432,7 @@ mod tests {
         for b in 0..=255u8 {
             let mut block = [b' '; 64];
             block[19] = b;
-            let pos = skip_non_tokens_avx2(&block, 0);
+            let pos = super::super::skip_non_tokens_with_lut_avx2(&block, 0, &TOKEN_KIND, &TOKEN_LUT_LO);
             if TOKEN_KIND[b as usize] > TOK_CODE || b == b'\n' {
                 assert_eq!(pos, 19);
             } else {
