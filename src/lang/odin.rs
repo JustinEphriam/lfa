@@ -63,8 +63,12 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = {
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
 
+const STATE_NONE: u8 = 0;
+const STATE_CODE: u8 = 1;
+const STATE_COMMENT: u8 = 2;
+
 #[inline(always)]
-pub const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
+const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
     let val = (first as usize)
         .wrapping_mul(1176)
         .wrapping_add((mid as usize).wrapping_mul(2141))
@@ -73,12 +77,13 @@ pub const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
     (val ^ (val >> 1)) & KW_SLOT_MASK
 }
 
-pub const KW_SLOT: [u8; 256] = {
+const KW_TABLE: [u8; 256] = {
     let mut table = [KW_EMPTY; 256];
     let mut i = 0;
     while i < KEYWORD_COUNT {
         let name = KEYWORD_NAMES[i].as_bytes();
         let len = name.len();
+        assert!(len >= 2 && len <= KW_MAX_LEN);
         let h = kw_hash(name[0], name[len / 2], name[len - 1], len);
         assert!(table[h] == KW_EMPTY);
         table[h] = i as u8;
@@ -96,7 +101,7 @@ const TOK_QUOTE: u8 = 5;
 const TOK_APOSTROPHE: u8 = 6;
 const TOK_BACKTICK: u8 = 7;
 
-pub const TOKEN_KIND: [u8; 256] = {
+const TOKEN_KIND: [u8; 256] = {
     let mut t = [TOK_CODE; 256];
     t[b' ' as usize] = TOK_WS;
     t[b'\t' as usize] = TOK_WS;
@@ -182,10 +187,6 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         return;
     }
 
-    const STATE_NONE: u8 = 0;
-    const STATE_CODE: u8 = 1;
-    const STATE_COMMENT: u8 = 2;
-
     let mut line_state = STATE_NONE;
     let mut i = 0usize;
     while i < content_len {
@@ -246,7 +247,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     let mid = content[start + len / 2];
                     let last = content[end - 1];
                     let h = kw_hash(first, mid, last, len);
-                    let slot = KW_SLOT[h];
+                    let slot = KW_TABLE[h];
                     if slot != KW_EMPTY {
                         let idx = slot as usize;
                         if len == KEYWORD_LENS[idx] as usize
@@ -264,14 +265,6 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     if next_b == b'/' {
                         line_state |= STATE_COMMENT;
                         let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
-                            if (line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else if (line_state & STATE_COMMENT) != 0 {
-                                acc.comment_lines += 1;
-                            } else {
-                                acc.blank_lines += 1;
-                            }
-                            acc.lines_processed += 1;
                             break;
                         };
                         let nl_idx = i + 2 + pos;
@@ -385,7 +378,7 @@ mod tests {
             let h = kw_hash(first, mid, last, len);
             assert!(!seen[h]);
             seen[h] = true;
-            assert_eq!(KW_SLOT[h], i as u8);
+            assert_eq!(KW_TABLE[h], i as u8);
 
             let mut res = ParseResult::default();
             parse_into(bytes, &mut res);
@@ -469,5 +462,11 @@ mod tests {
         let mut res2 = ParseResult::default();
         parse_into(b"\"\"\"unclosed triple quote", &mut res2);
         assert_eq!(res2.total_keywords, 0);
+
+        let mut res3 = ParseResult::default();
+        parse_into(b"// unclosed line comment at eof", &mut res3);
+        assert_eq!(res3.total_keywords, 0);
+        assert_eq!(res3.comment_lines, 0);
+        assert_eq!(res3.lines_processed, 0);
     }
 }

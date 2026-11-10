@@ -699,7 +699,7 @@ fn print_usage(prog: &str) -> ! {
     process::exit(1);
 }
 
-fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Option<LangId>) {
+fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Vec<LangId>) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())
@@ -711,14 +711,16 @@ fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Option
 
     let mut target_os: Option<&'a OsStr> = None;
     let mut flag_mask = 0u32;
-    let mut detailed_lang: Option<LangId> = None;
+    let mut selected_langs: Vec<LangId> = Vec::new();
 
     for arg in &args[1..] {
         let bytes = arg.as_bytes();
         if bytes.starts_with(b"-") && bytes.len() > 1 {
             if let Some(lang) = LangId::from_flag(bytes) {
                 flag_mask |= lang.mask();
-                detailed_lang = Some(lang);
+                if !selected_langs.contains(&lang) {
+                    selected_langs.push(lang);
+                }
             } else {
                 eprintln!("Error: Unknown flag {}", arg.to_string_lossy());
                 print_usage(&prog);
@@ -741,13 +743,13 @@ fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Option
         LANG_ALL_MASK
     };
 
-    (target, enabled_mask, detailed_lang)
+    (target, enabled_mask, selected_langs)
 }
 
 fn main() {
     let start = Instant::now();
     let args: Vec<_> = env::args_os().collect();
-    let (target_os, enabled_mask, detailed_lang) = parse_cli_args(&args);
+    let (target_os, enabled_mask, selected_langs) = parse_cli_args(&args);
     let target_bytes = target_os.as_bytes();
 
     let Ok(stx) = statx(CWD, target_bytes, AtFlags::empty(), StatxFlags::TYPE) else {
@@ -814,10 +816,15 @@ fn main() {
     }
 
     let processing_time = start.elapsed().as_secs_f64();
-    if let Some(lang) = detailed_lang {
-        print_detailed_results(&totals, lang, processing_time, num_workers, cpu_count);
-    } else {
+    if selected_langs.is_empty() {
         print_summary_results(&totals, processing_time, num_workers, cpu_count);
+    } else {
+        for (i, &lang) in selected_langs.iter().enumerate() {
+            if i > 0 {
+                println!();
+            }
+            print_detailed_results(&totals, lang, processing_time, num_workers, cpu_count);
+        }
     }
 }
 
@@ -1047,7 +1054,7 @@ mod tests {
         let (target, mask, detailed) = parse_cli_args(&args);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
-        assert_eq!(detailed, None);
+        assert_eq!(detailed, Vec::<LangId>::new());
 
         let args_c = vec![
             OsString::from("lfa"),
@@ -1057,7 +1064,7 @@ mod tests {
         let (target, mask, detailed) = parse_cli_args(&args_c);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask());
-        assert_eq!(detailed, Some(LangId::C));
+        assert_eq!(detailed, vec![LangId::C]);
 
         let args_c_first = vec![
             OsString::from("lfa"),
@@ -1067,7 +1074,7 @@ mod tests {
         let (target, mask, detailed) = parse_cli_args(&args_c_first);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask());
-        assert_eq!(detailed, Some(LangId::C));
+        assert_eq!(detailed, vec![LangId::C]);
 
         let args_cpp = vec![
             OsString::from("lfa"),
@@ -1077,7 +1084,7 @@ mod tests {
         let (target, mask, detailed) = parse_cli_args(&args_cpp);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::Cpp.mask());
-        assert_eq!(detailed, Some(LangId::Cpp));
+        assert_eq!(detailed, vec![LangId::Cpp]);
 
         for flag in ["-rs", "--rs", "-rust", "--rust"] {
             let args_rs = vec![
@@ -1088,7 +1095,7 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_rs);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Rust.mask());
-            assert_eq!(detailed, Some(LangId::Rust));
+            assert_eq!(detailed, vec![LangId::Rust]);
         }
 
         for flag in ["-py", "--py", "-python", "--python"] {
@@ -1100,7 +1107,7 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_py);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Python.mask());
-            assert_eq!(detailed, Some(LangId::Python));
+            assert_eq!(detailed, vec![LangId::Python]);
         }
 
         for flag in ["-pl", "--pl", "-perl", "--perl"] {
@@ -1112,7 +1119,7 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_pl);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Perl.mask());
-            assert_eq!(detailed, Some(LangId::Perl));
+            assert_eq!(detailed, vec![LangId::Perl]);
         }
 
         for flag in ["-go", "--go", "-golang", "--golang"] {
@@ -1124,7 +1131,7 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_go);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Go.mask());
-            assert_eq!(detailed, Some(LangId::Go));
+            assert_eq!(detailed, vec![LangId::Go]);
         }
 
         for flag in ["-zig", "--zig"] {
@@ -1136,7 +1143,7 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_zig);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Zig.mask());
-            assert_eq!(detailed, Some(LangId::Zig));
+            assert_eq!(detailed, vec![LangId::Zig]);
         }
 
         for flag in ["-odin", "--odin"] {
@@ -1148,8 +1155,24 @@ mod tests {
             let (target, mask, detailed) = parse_cli_args(&args_odin);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Odin.mask());
-            assert_eq!(detailed, Some(LangId::Odin));
+            assert_eq!(detailed, vec![LangId::Odin]);
         }
+
+        let args_multi = vec![
+            OsString::from("lfa"),
+            OsString::from("-zig"),
+            OsString::from("/tmp"),
+            OsString::from("-c"),
+            OsString::from("-zig"),
+            OsString::from("-odin"),
+        ];
+        let (target, mask, detailed) = parse_cli_args(&args_multi);
+        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(
+            mask,
+            LangId::Zig.mask() | LangId::C.mask() | LangId::Odin.mask()
+        );
+        assert_eq!(detailed, vec![LangId::Zig, LangId::C, LangId::Odin]);
     }
 
     #[test]
