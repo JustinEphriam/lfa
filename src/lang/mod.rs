@@ -541,6 +541,9 @@ pub trait LangLexer<const N: usize> {
     const TOKEN_KIND: [u8; 256];
     const TOKEN_LUT_LO: [i8; 32];
     const HAS_DOLLAR_IDENT: bool;
+    const SUPPORTS_TEMPLATES: bool;
+    const TOKEN_KIND_INTERP: [u8; 256] = Self::TOKEN_KIND;
+    const TOKEN_INTERP_LUT_LO: [i8; 32] = Self::TOKEN_LUT_LO;
 
     fn match_keyword(cand: &[u8]) -> Option<usize>;
 
@@ -562,6 +565,7 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
         return;
     }
 
+    let mut tmpl = TemplateStack::new();
     let mut line_state = STATE_NONE;
     let mut i = 0usize;
     while i < content_len {
@@ -582,19 +586,35 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
             }
         }
 
-        if L::TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
+        let in_interp = L::SUPPORTS_TEMPLATES && !tmpl.is_empty();
+        let kinds = if in_interp {
+            &L::TOKEN_KIND_INTERP
+        } else {
+            &L::TOKEN_KIND
+        };
+
+        if kinds[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
             line_state |= STATE_CODE;
             i += 1;
             if i < content_len
-                && L::TOKEN_KIND[content[i] as usize] <= TOK_CODE
+                && kinds[content[i] as usize] <= TOK_CODE
                 && content[i] != b'\n'
             {
-                i = skip_non_tokens_with_lut_avx2(
-                    content,
-                    i,
-                    &L::TOKEN_KIND,
-                    &L::TOKEN_LUT_LO,
-                );
+                i = if in_interp {
+                    skip_non_tokens_with_lut_avx2(
+                        content,
+                        i,
+                        &L::TOKEN_KIND_INTERP,
+                        &L::TOKEN_INTERP_LUT_LO,
+                    )
+                } else {
+                    skip_non_tokens_with_lut_avx2(
+                        content,
+                        i,
+                        &L::TOKEN_KIND,
+                        &L::TOKEN_LUT_LO,
+                    )
+                };
             }
             if i >= content_len {
                 break;
@@ -602,7 +622,7 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
         }
 
         let b = content[i];
-        let kind = L::TOKEN_KIND[b as usize];
+        let kind = kinds[b as usize];
         match kind {
             TOK_NL => {
                 if (line_state & STATE_CODE) != 0 {
@@ -628,6 +648,35 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
                 if let Some(idx) = L::match_keyword(&content[start..end]) {
                     acc.keyword_counts[idx] += 1;
                     acc.total_keywords += 1;
+                }
+            }
+            7 if L::SUPPORTS_TEMPLATES => {
+                line_state |= STATE_CODE;
+                let end_i = skip_template(content, i + 1, &mut tmpl);
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                i = end_i;
+            }
+            8 if L::SUPPORTS_TEMPLATES => {
+                line_state |= STATE_CODE;
+                tmpl.open_brace();
+                i += 1;
+            }
+            9 if L::SUPPORTS_TEMPLATES => {
+                line_state |= STATE_CODE;
+                if tmpl.close_brace() {
+                    let end_i = skip_template(content, i + 1, &mut tmpl);
+                    let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                    if nl > 0 {
+                        acc.code_lines += nl as i64;
+                        acc.lines_processed += nl as i64;
+                    }
+                    i = end_i;
+                } else {
+                    i += 1;
                 }
             }
             _ => {

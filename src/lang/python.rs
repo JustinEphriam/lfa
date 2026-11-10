@@ -128,6 +128,7 @@ impl LangLexer<KEYWORD_COUNT> for PythonLexer {
     const TOKEN_KIND: [u8; 256] = TOKEN_KIND;
     const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
     const HAS_DOLLAR_IDENT: bool = false;
+    const SUPPORTS_TEMPLATES: bool = false;
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
