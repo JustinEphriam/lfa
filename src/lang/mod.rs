@@ -1,9 +1,11 @@
 pub mod c;
 pub mod cpp;
 pub mod go;
+pub mod odin;
 pub mod perl;
 pub mod python;
 pub mod rust;
+pub mod zig;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -14,15 +16,19 @@ pub enum LangId {
     Python = 3,
     Perl = 4,
     Go = 5,
+    Zig = 6,
+    Odin = 7,
 }
 
-pub const LANG_COUNT: usize = 6;
+pub const LANG_COUNT: usize = 8;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
 pub const LANG_PYTHON_MASK: u32 = 1 << (LangId::Python as u32);
 pub const LANG_PERL_MASK: u32 = 1 << (LangId::Perl as u32);
 pub const LANG_GO_MASK: u32 = 1 << (LangId::Go as u32);
+pub const LANG_ZIG_MASK: u32 = 1 << (LangId::Zig as u32);
+pub const LANG_ODIN_MASK: u32 = 1 << (LangId::Odin as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -32,6 +38,8 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Python,
     LangId::Perl,
     LangId::Go,
+    LangId::Zig,
+    LangId::Odin,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -47,6 +55,8 @@ impl LangId {
             Self::Python => "Python",
             Self::Perl => "Perl",
             Self::Go => "Go",
+            Self::Zig => "Zig",
+            Self::Odin => "Odin",
         }
     }
 
@@ -70,6 +80,8 @@ impl LangId {
             }
             b"-go" | b"--go" | b"-GO" | b"--GO" | b"-golang" | b"--golang" | b"-GOLANG"
             | b"--GOLANG" => Some(Self::Go),
+            b"-zig" | b"--zig" | b"-ZIG" | b"--ZIG" => Some(Self::Zig),
+            b"-odin" | b"--odin" | b"-ODIN" | b"--ODIN" => Some(Self::Odin),
             _ => None,
         }
     }
@@ -120,6 +132,8 @@ pub struct LangStats {
     pub python: ParseResult<{ python::KEYWORD_COUNT }>,
     pub perl: ParseResult<{ perl::KEYWORD_COUNT }>,
     pub go: ParseResult<{ go::KEYWORD_COUNT }>,
+    pub zig: ParseResult<{ zig::KEYWORD_COUNT }>,
+    pub odin: ParseResult<{ odin::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -131,6 +145,8 @@ impl LangStats {
         self.python.add(&other.python);
         self.perl.add(&other.perl);
         self.go.add(&other.go);
+        self.zig.add(&other.zig);
+        self.odin.add(&other.odin);
     }
 
     #[inline(always)]
@@ -142,6 +158,8 @@ impl LangStats {
             LangId::Python => self.python.lines_processed,
             LangId::Perl => self.perl.lines_processed,
             LangId::Go => self.go.lines_processed,
+            LangId::Zig => self.zig.lines_processed,
+            LangId::Odin => self.odin.lines_processed,
         }
     }
 
@@ -154,6 +172,8 @@ impl LangStats {
             LangId::Python => self.python.code_lines,
             LangId::Perl => self.perl.code_lines,
             LangId::Go => self.go.code_lines,
+            LangId::Zig => self.zig.code_lines,
+            LangId::Odin => self.odin.code_lines,
         }
     }
 
@@ -166,6 +186,8 @@ impl LangStats {
             LangId::Python => self.python.comment_lines,
             LangId::Perl => self.perl.comment_lines,
             LangId::Go => self.go.comment_lines,
+            LangId::Zig => self.zig.comment_lines,
+            LangId::Odin => self.odin.comment_lines,
         }
     }
 
@@ -178,6 +200,8 @@ impl LangStats {
             LangId::Python => self.python.blank_lines,
             LangId::Perl => self.perl.blank_lines,
             LangId::Go => self.go.blank_lines,
+            LangId::Zig => self.zig.blank_lines,
+            LangId::Odin => self.odin.blank_lines,
         }
     }
 
@@ -190,6 +214,8 @@ impl LangStats {
             LangId::Python => self.python.total_keywords,
             LangId::Perl => self.perl.total_keywords,
             LangId::Go => self.go.total_keywords,
+            LangId::Zig => self.zig.total_keywords,
+            LangId::Odin => self.odin.total_keywords,
         }
     }
 
@@ -202,6 +228,8 @@ impl LangStats {
             LangId::Python => &python::KEYWORD_NAMES,
             LangId::Perl => &perl::KEYWORD_NAMES,
             LangId::Go => &go::KEYWORD_NAMES,
+            LangId::Zig => &zig::KEYWORD_NAMES,
+            LangId::Odin => &odin::KEYWORD_NAMES,
         }
     }
 
@@ -214,6 +242,8 @@ impl LangStats {
             LangId::Python => &self.python.keyword_counts,
             LangId::Perl => &self.perl.keyword_counts,
             LangId::Go => &self.go.keyword_counts,
+            LangId::Zig => &self.zig.keyword_counts,
+            LangId::Odin => &self.odin.keyword_counts,
         }
     }
 }
@@ -238,6 +268,12 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
     if (enabled_mask & LANG_GO_MASK) != 0 && go::is_go_extension(name) {
         return Some(LangId::Go);
     }
+    if (enabled_mask & LANG_ZIG_MASK) != 0 && zig::is_zig_extension(name) {
+        return Some(LangId::Zig);
+    }
+    if (enabled_mask & LANG_ODIN_MASK) != 0 && odin::is_odin_extension(name) {
+        return Some(LangId::Odin);
+    }
     None
 }
 
@@ -250,6 +286,8 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Python => python::parse_into(content, &mut stats.python),
         LangId::Perl => perl::parse_into(content, &mut stats.perl),
         LangId::Go => go::parse_into(content, &mut stats.go),
+        LangId::Zig => zig::parse_into(content, &mut stats.zig),
+        LangId::Odin => odin::parse_into(content, &mut stats.odin),
     }
 }
 
@@ -507,6 +545,18 @@ mod tests {
             detect_language(b"foo.go", LANG_ALL_MASK),
             Some(LangId::Go)
         );
+        assert_eq!(
+            detect_language(b"foo.zig", LANG_ALL_MASK),
+            Some(LangId::Zig)
+        );
+        assert_eq!(
+            detect_language(b"foo.zon", LANG_ALL_MASK),
+            Some(LangId::Zig)
+        );
+        assert_eq!(
+            detect_language(b"foo.odin", LANG_ALL_MASK),
+            Some(LangId::Odin)
+        );
         assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
@@ -542,6 +592,13 @@ mod tests {
 
         assert_eq!(detect_language(b"foo.go", LANG_GO_MASK), Some(LangId::Go));
         assert_eq!(detect_language(b"foo.c", LANG_GO_MASK), None);
+
+        assert_eq!(detect_language(b"foo.zig", LANG_ZIG_MASK), Some(LangId::Zig));
+        assert_eq!(detect_language(b"foo.zon", LANG_ZIG_MASK), Some(LangId::Zig));
+        assert_eq!(detect_language(b"foo.c", LANG_ZIG_MASK), None);
+
+        assert_eq!(detect_language(b"foo.odin", LANG_ODIN_MASK), Some(LangId::Odin));
+        assert_eq!(detect_language(b"foo.c", LANG_ODIN_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", 0), None);
         assert_eq!(detect_language(b"foo.h", 0), None);
