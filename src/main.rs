@@ -632,9 +632,8 @@ fn print_summary_results(
     cpu_count: usize,
 ) {
     let color = should_color();
-    let (c_bold, c_cyan, c_white, c_green, c_gray, c_reset) = if color {
+    let (c_cyan, c_white, c_green, c_gray, c_reset) = if color {
         (
-            "\x1b[1m",
             "\x1b[36m",
             "\x1b[1;37m",
             "\x1b[1;32m",
@@ -642,7 +641,7 @@ fn print_summary_results(
             "\x1b[0m",
         )
     } else {
-        ("", "", "", "", "", "")
+        ("", "", "", "", "")
     };
 
     let mut out = String::with_capacity(4096);
@@ -714,12 +713,12 @@ fn print_summary_results(
         out,
         "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
         c_gray, c_green, "Total",
-        c_gray, c_bold, format_number(total_files),
-        c_gray, c_bold, format_number(total_lines),
-        c_gray, c_bold, format_number(total_code),
-        c_gray, c_bold, format_number(total_comments),
-        c_gray, c_bold, format_number(total_blanks),
-        c_gray, c_bold, format_number(total_keywords),
+        c_gray, c_white, format_number(total_files),
+        c_gray, c_white, format_number(total_lines),
+        c_gray, c_white, format_number(total_code),
+        c_gray, c_white, format_number(total_comments),
+        c_gray, c_white, format_number(total_blanks),
+        c_gray, c_white, format_number(total_keywords),
         c_gray
     );
     let _ = writeln!(out, "{}{}{}", c_gray, border_bot, c_reset);
