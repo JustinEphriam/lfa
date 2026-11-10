@@ -314,7 +314,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 let end = skip_ident_cont_avx2(content, i + 1);
                 i = end;
                 let len = end - start;
-                if len >= 2 && len <= KW_MAX_LEN {
+                if (2..=KW_MAX_LEN).contains(&len) {
                     let first = content[start];
                     let mid = content[start + len / 2];
                     let last = content[end - 1];

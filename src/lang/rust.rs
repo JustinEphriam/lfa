@@ -115,8 +115,8 @@ const TOKEN_KIND: [u8; 256] = {
     table[b' ' as usize] = TOK_WS;
     table[b'\t' as usize] = TOK_WS;
     table[b'\r' as usize] = TOK_WS;
-    table[0x0b as usize] = TOK_WS;
-    table[0x0c as usize] = TOK_WS;
+    table[0x0b_usize] = TOK_WS;
+    table[0x0c_usize] = TOK_WS;
     table[b'\n' as usize] = TOK_NL;
     let mut c = b'a';
     while c <= b'z' {
@@ -455,13 +455,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     let next_b = content[i + 1];
                     if next_b == b'/' {
                         line_state |= STATE_COMMENT;
-                        let mut j = i + 2;
-                        while j < content_len {
-                            let Some(pos) = find_byte_avx2(&content[j..], b'\n') else {
-                                j = content_len;
-                                break;
-                            };
-                            let nl_idx = j + pos;
+                        let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
                             if (line_state & STATE_CODE) != 0 {
                                 acc.code_lines += 1;
                             } else if (line_state & STATE_COMMENT) != 0 {
@@ -470,11 +464,19 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                                 acc.blank_lines += 1;
                             }
                             acc.lines_processed += 1;
-                            line_state = 0;
-                            j = nl_idx + 1;
                             break;
+                        };
+                        let nl_idx = i + 2 + pos;
+                        if (line_state & STATE_CODE) != 0 {
+                            acc.code_lines += 1;
+                        } else if (line_state & STATE_COMMENT) != 0 {
+                            acc.comment_lines += 1;
+                        } else {
+                            acc.blank_lines += 1;
                         }
-                        i = j;
+                        acc.lines_processed += 1;
+                        line_state = 0;
+                        i = nl_idx + 1;
                         continue;
                     } else if next_b == b'*' {
                         line_state |= STATE_COMMENT;

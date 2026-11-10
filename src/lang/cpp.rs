@@ -159,8 +159,8 @@ const TOKEN_KIND: [u8; 256] = {
     table[b' ' as usize] = TOK_WS;
     table[b'\t' as usize] = TOK_WS;
     table[b'\r' as usize] = TOK_WS;
-    table[0x0b as usize] = TOK_WS;
-    table[0x0c as usize] = TOK_WS;
+    table[0x0b_usize] = TOK_WS;
+    table[0x0c_usize] = TOK_WS;
     table[b'\n' as usize] = TOK_NL;
     let mut c = b'a';
     while c <= b'z' {
@@ -332,8 +332,7 @@ fn try_skip_raw_string(content: &[u8], quote_idx: usize) -> Option<usize> {
     let delim_start = quote_idx + 1;
     let max_scan = (delim_start + 17).min(content_len);
     let mut paren_idx = None;
-    for k in delim_start..max_scan {
-        let b = content[k];
+    for (k, &b) in content[..max_scan].iter().enumerate().skip(delim_start) {
         if b == b'(' {
             paren_idx = Some(k);
             break;
@@ -396,7 +395,7 @@ pub fn is_cpp_extension(name: &[u8]) -> bool {
         let b1 = name[len - 3] | 0x20;
         let b2 = name[len - 2] | 0x20;
         let b3 = name[len - 1] | 0x20;
-        return [b0, b1, b2, b3] == [b'c', b'p', b'p', b'm'];
+        return [b0, b1, b2, b3] == *b"cppm";
     }
     false
 }
