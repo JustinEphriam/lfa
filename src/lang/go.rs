@@ -36,9 +36,15 @@ pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "var",
 ];
 
-pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = [
-    5, 4, 4, 5, 8, 7, 5, 4, 11, 3, 4, 2, 4, 2, 6, 9, 3, 7, 5, 6, 6, 6, 6, 4, 3,
-];
+pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = {
+    let mut lens = [0u8; KEYWORD_COUNT];
+    let mut i = 0;
+    while i < KEYWORD_COUNT {
+        lens[i] = KEYWORD_NAMES[i].len() as u8;
+        i += 1;
+    }
+    lens
+};
 
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
@@ -52,68 +58,56 @@ const TOK_QUOTE: u8 = 5;
 const TOK_APOSTROPHE: u8 = 6;
 const TOK_BACKTICK: u8 = 7;
 
-pub const TOKEN_KIND: [u8; 256] = [
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_WS, TOK_NL, TOK_CODE, TOK_CODE, TOK_WS, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_WS, TOK_CODE, TOK_QUOTE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_APOSTROPHE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_SLASH,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_IDENT,
-    TOK_BACKTICK, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_IDENT,
-    TOK_IDENT, TOK_IDENT, TOK_IDENT, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-    TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
-];
-
-pub const KW_SLOT: [u8; 256] = [
-    255, 255, 255, 255, 255, 255, 20, 255, 255, 255, 255, 6, 255, 255, 255, 255,
-    255, 255, 255, 255, 16, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    14, 255, 255, 255, 255, 255, 255, 255, 255, 12, 255, 255, 255, 5, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 24, 255, 255, 10, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 17, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 4, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 21, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255,
-    255, 255, 18, 2, 255, 255, 255, 255, 3, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 9, 255, 255, 255, 255, 15, 255, 7, 255, 255, 0, 255, 255,
-    255, 255, 255, 13, 255, 255, 255, 255, 23, 255, 255, 255, 255, 255, 255, 8,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 22, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 11, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 19, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-];
-
 #[inline(always)]
-pub fn kw_hash(first: u8, second: u8, last: u8, len: usize) -> usize {
+pub const fn kw_hash(first: u8, second: u8, last: u8, len: usize) -> usize {
     let val = (first as usize) * 2066
         + (second as usize) * 654
         + (last as usize) * 3810
         + len * 320;
     (val ^ (val >> 1)) & KW_SLOT_MASK
 }
+
+pub const KW_SLOT: [u8; 256] = {
+    let mut table = [KW_EMPTY; 256];
+    let mut i = 0;
+    while i < KEYWORD_COUNT {
+        let name = KEYWORD_NAMES[i].as_bytes();
+        let len = KEYWORD_LENS[i] as usize;
+        assert!(name.len() == len);
+        assert!(len >= 2 && len <= KW_MAX_LEN);
+        let h = kw_hash(name[0], name[1], name[len - 1], len);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+};
+
+pub const TOKEN_KIND: [u8; 256] = {
+    let mut table = [TOK_CODE; 256];
+    table[b' ' as usize] = TOK_WS;
+    table[b'\t' as usize] = TOK_WS;
+    table[b'\r' as usize] = TOK_WS;
+    table[0x0b_usize] = TOK_WS;
+    table[0x0c_usize] = TOK_WS;
+    table[b'\n' as usize] = TOK_NL;
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    table[b'_' as usize] = TOK_IDENT;
+    table[b'/' as usize] = TOK_SLASH;
+    table[b'"' as usize] = TOK_QUOTE;
+    table[b'\'' as usize] = TOK_APOSTROPHE;
+    table[b'`' as usize] = TOK_BACKTICK;
+    table
+};
 
 #[inline(always)]
 fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
