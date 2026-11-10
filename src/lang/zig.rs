@@ -1,7 +1,7 @@
 use super::{
-    finish_trailing_line, STATE_CODE, STATE_COMMENT, STATE_NONE, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2, skip_literal,
-    skip_non_tokens_with_lut_avx2, ParseResult, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal, unified_parse_into,
+    LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, STATE_NONE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 46;
@@ -127,157 +127,116 @@ pub const TOKEN_KIND: [u8; 256] = {
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-fn skip_non_tokens_avx2(ptr: &[u8], i: usize) -> usize {
-    skip_non_tokens_with_lut_avx2(ptr, i, &TOKEN_KIND, &TOKEN_LUT_LO)
-}
-
 #[cfg(test)]
 #[inline(always)]
 pub fn is_zig_extension(name: &[u8]) -> bool {
     super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::Zig)
 }
 
-pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
-    let content_len = content.len();
-    if content_len == 0 {
-        return;
+pub struct ZigLexer;
+
+impl LangLexer<KEYWORD_COUNT> for ZigLexer {
+    const TOKEN_KIND: [u8; 256] = TOKEN_KIND;
+    const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
+    const HAS_DOLLAR_IDENT: bool = false;
+
+    #[inline(always)]
+    fn match_keyword(cand: &[u8]) -> Option<usize> {
+        let n = cand.len();
+        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
+            let h = kw_hash(cand[0], cand[n / 2], cand[n - 1], n);
+            let slot = KW_TABLE[h];
+            if slot != KW_EMPTY {
+                let idx = slot as usize;
+                if len_matches(n, idx)
+                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
+                {
+                    return Some(idx);
+                }
+            }
+        }
+        None
     }
 
-    let mut line_state = STATE_NONE;
-    let mut i = 0usize;
-    while i < content_len {
-        if line_state == STATE_NONE {
-            while i < content_len
-                && (content[i] == b' ' || content[i] == b'\t' || content[i] == b'\r')
-            {
-                i += 1;
-            }
-            if i >= content_len {
-                break;
-            }
-            if content[i] == b'\n' {
-                acc.blank_lines += 1;
-                acc.lines_processed += 1;
-                i += 1;
-                continue;
-            }
-        }
-
-        if TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
-            line_state |= STATE_CODE;
-            i += 1;
-            if i < content_len
-                && TOKEN_KIND[content[i] as usize] <= TOK_CODE
-                && content[i] != b'\n'
-            {
-                i = skip_non_tokens_avx2(content, i);
-            }
-            if i >= content_len {
-                break;
-            }
-        }
-
-        let b = content[i];
-        let kind = TOKEN_KIND[b as usize];
+    #[inline(always)]
+    fn handle_special(
+        kind: u8,
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let content_len = content.len();
         match kind {
-            TOK_NL => {
-                if (line_state & STATE_CODE) != 0 {
-                    acc.code_lines += 1;
-                } else if (line_state & STATE_COMMENT) != 0 {
-                    acc.comment_lines += 1;
-                } else {
-                    acc.blank_lines += 1;
-                }
-                acc.lines_processed += 1;
-                line_state = STATE_NONE;
-                i += 1;
-            }
-            TOK_IDENT => {
-                line_state |= STATE_CODE;
-                let start = i;
-                let end = skip_ident_cont_avx2(content, i + 1);
-                i = end;
-                let len = end - start;
-                if len.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-                    let first = content[start];
-                    let mid = content[start + len / 2];
-                    let last = content[end - 1];
-                    let h = kw_hash(first, mid, last, len);
-                    let slot = KW_TABLE[h];
-                    if slot != KW_EMPTY {
-                        let idx = slot as usize;
-                        if len == KEYWORD_LENS[idx] as usize
-                            && kw_match_2_to_16(&content[start..end], KEYWORD_NAMES[idx].as_bytes())
-                        {
-                            acc.keyword_counts[idx] += 1;
-                            acc.total_keywords += 1;
-                        }
-                    }
-                }
-            }
             TOK_SLASH => {
                 if i + 1 < content_len && content[i + 1] == b'/' {
-                    line_state |= STATE_COMMENT;
+                    *line_state |= STATE_COMMENT;
                     let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
-                        break;
+                        return content_len;
                     };
                     let nl_idx = i + 2 + pos;
-                    if (line_state & STATE_CODE) != 0 {
+                    if (*line_state & STATE_CODE) != 0 {
                         acc.code_lines += 1;
-                    } else if (line_state & STATE_COMMENT) != 0 {
+                    } else if (*line_state & STATE_COMMENT) != 0 {
                         acc.comment_lines += 1;
                     } else {
                         acc.blank_lines += 1;
                     }
                     acc.lines_processed += 1;
-                    line_state = STATE_NONE;
-                    i = nl_idx + 1;
-                    continue;
+                    *line_state = STATE_NONE;
+                    return nl_idx + 1;
                 }
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
             TOK_BACKSLASH => {
                 if i + 1 < content_len && content[i + 1] == b'\\' {
-                    line_state |= STATE_CODE;
+                    *line_state |= STATE_CODE;
                     let end_i = match find_byte_avx2(&content[i + 2..], b'\n') {
                         Some(pos) => i + 2 + pos,
                         None => content_len,
                     };
-                    i = end_i;
-                    continue;
+                    return end_i;
                 }
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
             TOK_QUOTE => {
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 let end_i = skip_literal(content, i + 1, b'"');
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
-                i = end_i;
+                end_i
             }
             TOK_APOSTROPHE => {
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 let end_i = skip_literal(content, i + 1, b'\'');
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
-                i = end_i;
+                end_i
             }
             _ => {
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
         }
     }
-    finish_trailing_line(content, line_state, acc);
+}
+
+#[inline(always)]
+fn len_matches(len: usize, idx: usize) -> bool {
+    len == KEYWORD_LENS[idx] as usize
+}
+
+#[inline(always)]
+pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
+    unified_parse_into::<KEYWORD_COUNT, ZigLexer>(content, acc);
 }
 
 #[cfg(test)]
