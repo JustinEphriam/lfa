@@ -537,6 +537,107 @@ pub fn finish_trailing_line<const N: usize>(
     acc.lines_processed += 1;
 }
 
+pub trait LangLexer<const N: usize> {
+    const TOKEN_KIND: [u8; 256];
+    const TOKEN_LUT_LO: [i8; 32];
+    const HAS_DOLLAR_IDENT: bool;
+
+    fn match_keyword(cand: &[u8]) -> Option<usize>;
+
+    fn handle_special(
+        kind: u8,
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<N>,
+    ) -> usize;
+}
+
+pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
+    content: &[u8],
+    acc: &mut ParseResult<N>,
+) {
+    let content_len = content.len();
+    if content_len == 0 {
+        return;
+    }
+
+    let mut line_state = STATE_NONE;
+    let mut i = 0usize;
+    while i < content_len {
+        if line_state == STATE_NONE {
+            while i < content_len
+                && (content[i] == b' ' || content[i] == b'\t' || content[i] == b'\r')
+            {
+                i += 1;
+            }
+            if i >= content_len {
+                break;
+            }
+            if content[i] == b'\n' {
+                acc.blank_lines += 1;
+                acc.lines_processed += 1;
+                i += 1;
+                continue;
+            }
+        }
+
+        if L::TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
+            line_state |= STATE_CODE;
+            i += 1;
+            if i < content_len
+                && L::TOKEN_KIND[content[i] as usize] <= TOK_CODE
+                && content[i] != b'\n'
+            {
+                i = skip_non_tokens_with_lut_avx2(
+                    content,
+                    i,
+                    &L::TOKEN_KIND,
+                    &L::TOKEN_LUT_LO,
+                );
+            }
+            if i >= content_len {
+                break;
+            }
+        }
+
+        let b = content[i];
+        let kind = L::TOKEN_KIND[b as usize];
+        match kind {
+            TOK_NL => {
+                if (line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else if (line_state & STATE_COMMENT) != 0 {
+                    acc.comment_lines += 1;
+                } else {
+                    acc.blank_lines += 1;
+                }
+                acc.lines_processed += 1;
+                line_state = STATE_NONE;
+                i += 1;
+            }
+            3 => {
+                line_state |= STATE_CODE;
+                let start = i;
+                let end = if L::HAS_DOLLAR_IDENT {
+                    skip_js_ident_cont_avx2(content, i + 1)
+                } else {
+                    skip_ident_cont_avx2(content, i + 1)
+                };
+                i = end;
+                if let Some(idx) = L::match_keyword(&content[start..end]) {
+                    acc.keyword_counts[idx] += 1;
+                    acc.total_keywords += 1;
+                }
+            }
+            _ => {
+                i = L::handle_special(kind, content, i, &mut line_state, acc);
+            }
+        }
+    }
+    finish_trailing_line(content, line_state, acc);
+}
+
 pub const fn compute_keyword_lens<const N: usize>(names: &[&str; N]) -> [u8; N] {
     assert!(N > 0 && N < 255);
     let mut lens = [0u8; N];

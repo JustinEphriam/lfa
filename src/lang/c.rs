@@ -1,8 +1,12 @@
 use super::{
-    finish_trailing_line, STATE_CODE, STATE_COMMENT, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2,
-    skip_literal, skip_non_tokens_with_lut_avx2, ParseResult, IDENT_CONT, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_literal,
+    unified_parse_into, LangLexer, ParseResult, IDENT_CONT, STATE_CODE, STATE_COMMENT, TOK_CODE,
+    TOK_NL, TOK_WS,
 };
+
+#[cfg(test)]
+use super::{skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2};
 
 pub const KEYWORD_COUNT: usize = 59;
 const KW_SLOT_MASK: usize = 255;
@@ -134,94 +138,53 @@ pub const TOKEN_KIND: [u8; 256] = {
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-fn skip_non_tokens_avx2(ptr: &[u8], i: usize) -> usize {
-    skip_non_tokens_with_lut_avx2(ptr, i, &TOKEN_KIND, &TOKEN_LUT_LO)
-}
-
 #[cfg(test)]
 #[inline(always)]
 pub fn is_c_extension(name: &[u8]) -> bool {
     super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::C)
 }
 
-pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
-    let content_len = content.len();
-    if content_len == 0 {
-        return;
+pub struct CLexer;
+
+impl LangLexer<KEYWORD_COUNT> for CLexer {
+    const TOKEN_KIND: [u8; 256] = TOKEN_KIND;
+    const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
+    const HAS_DOLLAR_IDENT: bool = false;
+
+    #[inline(always)]
+    fn match_keyword(cand: &[u8]) -> Option<usize> {
+        let n = cand.len();
+        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
+            let h = kw_hash(cand[0], cand[n - 1], n);
+            let id = KW_TABLE[h];
+            if id != KW_EMPTY {
+                let idx = id as usize;
+                debug_assert!(idx < KEYWORD_COUNT);
+                if KEYWORD_LENS[idx] as usize == n
+                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
+                {
+                    return Some(idx);
+                }
+            }
+        }
+        None
     }
 
-    let mut line_state = 0u8;
-    let mut i = 0usize;
-    while i < content_len {
-        if line_state == 0 {
-            while i < content_len && (content[i] == b' ' || content[i] == b'\t' || content[i] == b'\r') {
-                i += 1;
-            }
-            if i >= content_len {
-                break;
-            }
-            if content[i] == b'\n' {
-                acc.blank_lines += 1;
-                acc.lines_processed += 1;
-                i += 1;
-                continue;
-            }
-        }
-
-        if TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
-            line_state |= STATE_CODE;
-            i += 1;
-            if i < content_len && TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
-                i = skip_non_tokens_avx2(content, i);
-            }
-            if i >= content_len {
-                break;
-            }
-        }
-
-        match TOKEN_KIND[content[i] as usize] {
-            TOK_NL => {
-                if (line_state & STATE_CODE) != 0 {
-                    acc.code_lines += 1;
-                } else if (line_state & STATE_COMMENT) != 0 {
-                    acc.comment_lines += 1;
-                } else {
-                    acc.blank_lines += 1;
-                }
-                acc.lines_processed += 1;
-                line_state = 0;
-                i += 1;
-            }
-            TOK_IDENT => {
-                line_state |= STATE_CODE;
-                let start = i;
-                i = skip_ident_cont_avx2(content, i + 1);
-                debug_assert!(i > start && i <= content_len);
-                let n = i - start;
-                if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-                    let h = kw_hash(content[start], content[i - 1], n);
-                    let id = KW_TABLE[h];
-                    if id != KW_EMPTY {
-                        let idx = id as usize;
-                        debug_assert!(idx < KEYWORD_COUNT);
-                        if KEYWORD_LENS[idx] as usize == n
-                            && kw_match_2_to_16(
-                                &content[start..i],
-                                KEYWORD_NAMES[idx].as_bytes(),
-                            )
-                        {
-                            acc.keyword_counts[idx] += 1;
-                            acc.total_keywords += 1;
-                        }
-                    }
-                }
-            }
+    #[inline(always)]
+    fn handle_special(
+        kind: u8,
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let content_len = content.len();
+        match kind {
             TOK_SLASH => {
                 if i + 1 < content_len {
                     let next_b = content[i + 1];
                     if next_b == b'/' {
-                        line_state |= STATE_COMMENT;
+                        *line_state |= STATE_COMMENT;
                         let mut j = i + 2;
                         while j < content_len {
                             let Some(pos) = find_byte_avx2(&content[j..], b'\n') else {
@@ -234,31 +197,30 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                                 check -= 1;
                             }
                             let is_spliced = check > j && content[check - 1] == b'\\';
-                            if (line_state & STATE_CODE) != 0 {
+                            if (*line_state & STATE_CODE) != 0 {
                                 acc.code_lines += 1;
-                            } else if (line_state & STATE_COMMENT) != 0 {
+                            } else if (*line_state & STATE_COMMENT) != 0 {
                                 acc.comment_lines += 1;
                             } else {
                                 acc.blank_lines += 1;
                             }
                             acc.lines_processed += 1;
                             if is_spliced {
-                                line_state = STATE_COMMENT;
+                                *line_state = STATE_COMMENT;
                                 j = nl_idx + 1;
                             } else {
-                                line_state = 0;
+                                *line_state = 0;
                                 j = nl_idx + 1;
                                 break;
                             }
                         }
-                        i = j;
-                        continue;
+                        return j;
                     } else if next_b == b'*' {
-                        line_state |= STATE_COMMENT;
+                        *line_state |= STATE_COMMENT;
                         if let Some(pos) = find_star_slash(&content[i + 2..]) {
                             let star_slash_pos = i + 2 + pos;
                             if let Some(first_nl) = find_byte_avx2(&content[i + 2..star_slash_pos], b'\n') {
-                                if (line_state & STATE_CODE) != 0 {
+                                if (*line_state & STATE_CODE) != 0 {
                                     acc.code_lines += 1;
                                 } else {
                                     acc.comment_lines += 1;
@@ -268,12 +230,12 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                                 let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..star_slash_pos]);
                                 acc.comment_lines += inter_nls as i64;
                                 acc.lines_processed += inter_nls as i64;
-                                line_state = STATE_COMMENT;
+                                *line_state = STATE_COMMENT;
                             }
-                            i = star_slash_pos + 2;
+                            return star_slash_pos + 2;
                         } else {
                             if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
-                                if (line_state & STATE_CODE) != 0 {
+                                if (*line_state & STATE_CODE) != 0 {
                                     acc.code_lines += 1;
                                 } else {
                                     acc.comment_lines += 1;
@@ -283,52 +245,54 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                                 let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
                                 acc.comment_lines += rem_nls as i64;
                                 acc.lines_processed += rem_nls as i64;
-                                line_state = STATE_COMMENT;
+                                *line_state = STATE_COMMENT;
                             }
-                            i = content_len;
+                            return content_len;
                         }
-                        continue;
                     }
                 }
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
             TOK_QUOTE => {
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 let end_i = skip_literal(content, i + 1, b'"');
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
-                i = end_i;
+                end_i
             }
             TOK_APOSTROPHE => {
                 if i > 0 && i + 1 < content_len {
                     let prev = content[i - 1];
                     let next = content[i + 1];
                     if IDENT_CONT[prev as usize] != 0 && IDENT_CONT[next as usize] != 0 {
-                        line_state |= STATE_CODE;
-                        i += 1;
-                        continue;
+                        *line_state |= STATE_CODE;
+                        return i + 1;
                     }
                 }
-                line_state |= STATE_CODE;
+                *line_state |= STATE_CODE;
                 let end_i = skip_literal(content, i + 1, b'\'');
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
-                i = end_i;
+                end_i
             }
             _ => {
-                line_state |= STATE_CODE;
-                i += 1;
+                *line_state |= STATE_CODE;
+                i + 1
             }
         }
     }
-    finish_trailing_line(content, line_state, acc);
+}
+
+#[inline(always)]
+pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
+    unified_parse_into::<KEYWORD_COUNT, CLexer>(content, acc);
 }
 
 #[cfg(test)]
@@ -451,7 +415,7 @@ mod tests {
         for b in 0..=255u8 {
             let mut block = [b' '; 64];
             block[19] = b;
-            let pos = skip_non_tokens_avx2(&block, 0);
+            let pos = skip_non_tokens_with_lut_avx2(&block, 0, &TOKEN_KIND, &TOKEN_LUT_LO);
             if TOKEN_KIND[b as usize] > TOK_CODE || b == b'\n' {
                 assert_eq!(pos, 19);
             } else {
