@@ -1,5 +1,6 @@
 pub mod c;
 pub mod cpp;
+pub mod go;
 pub mod perl;
 pub mod python;
 pub mod rust;
@@ -12,14 +13,16 @@ pub enum LangId {
     Rust = 2,
     Python = 3,
     Perl = 4,
+    Go = 5,
 }
 
-pub const LANG_COUNT: usize = 5;
+pub const LANG_COUNT: usize = 6;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
 pub const LANG_PYTHON_MASK: u32 = 1 << (LangId::Python as u32);
 pub const LANG_PERL_MASK: u32 = 1 << (LangId::Perl as u32);
+pub const LANG_GO_MASK: u32 = 1 << (LangId::Go as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -28,6 +31,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Rust,
     LangId::Python,
     LangId::Perl,
+    LangId::Go,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -42,6 +46,7 @@ impl LangId {
             Self::Rust => "Rust",
             Self::Python => "Python",
             Self::Perl => "Perl",
+            Self::Go => "Go",
         }
     }
 
@@ -63,6 +68,8 @@ impl LangId {
             b"-pl" | b"--pl" | b"-PL" | b"--PL" | b"-perl" | b"--perl" | b"-PERL" | b"--PERL" => {
                 Some(Self::Perl)
             }
+            b"-go" | b"--go" | b"-GO" | b"--GO" | b"-golang" | b"--golang" | b"-GOLANG"
+            | b"--GOLANG" => Some(Self::Go),
             _ => None,
         }
     }
@@ -112,6 +119,7 @@ pub struct LangStats {
     pub rust: ParseResult<{ rust::KEYWORD_COUNT }>,
     pub python: ParseResult<{ python::KEYWORD_COUNT }>,
     pub perl: ParseResult<{ perl::KEYWORD_COUNT }>,
+    pub go: ParseResult<{ go::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -122,6 +130,7 @@ impl LangStats {
         self.rust.add(&other.rust);
         self.python.add(&other.python);
         self.perl.add(&other.perl);
+        self.go.add(&other.go);
     }
 
     #[inline(always)]
@@ -132,6 +141,7 @@ impl LangStats {
             LangId::Rust => self.rust.lines_processed,
             LangId::Python => self.python.lines_processed,
             LangId::Perl => self.perl.lines_processed,
+            LangId::Go => self.go.lines_processed,
         }
     }
 
@@ -143,6 +153,7 @@ impl LangStats {
             LangId::Rust => self.rust.code_lines,
             LangId::Python => self.python.code_lines,
             LangId::Perl => self.perl.code_lines,
+            LangId::Go => self.go.code_lines,
         }
     }
 
@@ -154,6 +165,7 @@ impl LangStats {
             LangId::Rust => self.rust.comment_lines,
             LangId::Python => self.python.comment_lines,
             LangId::Perl => self.perl.comment_lines,
+            LangId::Go => self.go.comment_lines,
         }
     }
 
@@ -165,6 +177,7 @@ impl LangStats {
             LangId::Rust => self.rust.blank_lines,
             LangId::Python => self.python.blank_lines,
             LangId::Perl => self.perl.blank_lines,
+            LangId::Go => self.go.blank_lines,
         }
     }
 
@@ -176,6 +189,7 @@ impl LangStats {
             LangId::Rust => self.rust.total_keywords,
             LangId::Python => self.python.total_keywords,
             LangId::Perl => self.perl.total_keywords,
+            LangId::Go => self.go.total_keywords,
         }
     }
 
@@ -187,6 +201,7 @@ impl LangStats {
             LangId::Rust => &rust::KEYWORD_NAMES,
             LangId::Python => &python::KEYWORD_NAMES,
             LangId::Perl => &perl::KEYWORD_NAMES,
+            LangId::Go => &go::KEYWORD_NAMES,
         }
     }
 
@@ -198,6 +213,7 @@ impl LangStats {
             LangId::Rust => &self.rust.keyword_counts,
             LangId::Python => &self.python.keyword_counts,
             LangId::Perl => &self.perl.keyword_counts,
+            LangId::Go => &self.go.keyword_counts,
         }
     }
 }
@@ -219,6 +235,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
     if (enabled_mask & LANG_PERL_MASK) != 0 && perl::is_perl_extension(name) {
         return Some(LangId::Perl);
     }
+    if (enabled_mask & LANG_GO_MASK) != 0 && go::is_go_extension(name) {
+        return Some(LangId::Go);
+    }
     None
 }
 
@@ -230,6 +249,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Rust => rust::parse_into(content, &mut stats.rust),
         LangId::Python => python::parse_into(content, &mut stats.python),
         LangId::Perl => perl::parse_into(content, &mut stats.perl),
+        LangId::Go => go::parse_into(content, &mut stats.go),
     }
 }
 
@@ -483,6 +503,10 @@ mod tests {
             detect_language(b"foo.t", LANG_ALL_MASK),
             Some(LangId::Perl)
         );
+        assert_eq!(
+            detect_language(b"foo.go", LANG_ALL_MASK),
+            Some(LangId::Go)
+        );
         assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
@@ -491,6 +515,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.hpp", LANG_C_MASK), None);
         assert_eq!(detect_language(b"foo.py", LANG_C_MASK), None);
         assert_eq!(detect_language(b"foo.pl", LANG_C_MASK), None);
+        assert_eq!(detect_language(b"foo.go", LANG_C_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", LANG_CPP_MASK), None);
         assert_eq!(detect_language(b"foo.h", LANG_CPP_MASK), Some(LangId::Cpp));
@@ -505,6 +530,7 @@ mod tests {
         );
         assert_eq!(detect_language(b"foo.py", LANG_CPP_MASK), None);
         assert_eq!(detect_language(b"foo.pl", LANG_CPP_MASK), None);
+        assert_eq!(detect_language(b"foo.go", LANG_CPP_MASK), None);
 
         assert_eq!(detect_language(b"foo.py", LANG_PYTHON_MASK), Some(LangId::Python));
         assert_eq!(detect_language(b"foo.c", LANG_PYTHON_MASK), None);
@@ -513,6 +539,9 @@ mod tests {
         assert_eq!(detect_language(b"foo.pm", LANG_PERL_MASK), Some(LangId::Perl));
         assert_eq!(detect_language(b"foo.t", LANG_PERL_MASK), Some(LangId::Perl));
         assert_eq!(detect_language(b"foo.c", LANG_PERL_MASK), None);
+
+        assert_eq!(detect_language(b"foo.go", LANG_GO_MASK), Some(LangId::Go));
+        assert_eq!(detect_language(b"foo.c", LANG_GO_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", 0), None);
         assert_eq!(detect_language(b"foo.h", 0), None);
