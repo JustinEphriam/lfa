@@ -524,6 +524,9 @@ fn print_detailed_results(
     let files_found = totals.files_found[idx];
     let files_processed = totals.files_processed[idx];
     let lines = totals.lang_stats.lines(lang);
+    let code = totals.lang_stats.code_lines(lang);
+    let comments = totals.lang_stats.comment_lines(lang);
+    let blanks = totals.lang_stats.blank_lines(lang);
     let total_kw = totals.lang_stats.total_keywords(lang);
     let kw_names = LangStats::keyword_names(lang);
     let kw_counts = totals.lang_stats.keyword_counts(lang);
@@ -542,7 +545,14 @@ fn print_detailed_results(
         lang.name()
     );
     let _ = writeln!(out, "Files processed: {}", format_number(files_processed));
-    let _ = writeln!(out, "Total lines: {}", format_number(lines));
+    let _ = writeln!(
+        out,
+        "Lines: {} (Code: {}, Comments: {}, Blanks: {})",
+        format_number(lines),
+        format_number(code),
+        format_number(comments),
+        format_number(blanks)
+    );
     let _ = writeln!(out, "Total keywords: {}", format_number(total_kw));
     let _ = writeln!(out, "Processing time: {:.3} seconds", processing_time);
 
@@ -592,20 +602,23 @@ fn print_summary_results(
     cpu_count: usize,
 ) {
     let mut out = String::with_capacity(4096);
-    let rule = "===============================================================================";
-    let dash = "-------------------------------------------------------------------------------";
+    let rule = "========================================================================================================";
+    let dash = "--------------------------------------------------------------------------------------------------------";
 
     let _ = writeln!(out, "{}", rule);
     let _ = writeln!(
         out,
-        " {:<22} {:>14} {:>18} {:>20}",
-        "Language", "Files", "Lines", "Keywords"
+        " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
+        "Language", "Files", "Lines", "Code", "Comments", "Blanks", "Keywords"
     );
     let _ = writeln!(out, "{}", rule);
 
-    let mut rows: Vec<(LangId, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
+    let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
     let mut total_files = 0i64;
     let mut total_lines = 0i64;
+    let mut total_code = 0i64;
+    let mut total_comments = 0i64;
+    let mut total_blanks = 0i64;
     let mut total_keywords = 0i64;
 
     for lang in ALL_LANGS {
@@ -613,23 +626,32 @@ fn print_summary_results(
         let files = totals.files_processed[idx];
         if files > 0 {
             let lines = totals.lang_stats.lines(lang);
+            let code = totals.lang_stats.code_lines(lang);
+            let comments = totals.lang_stats.comment_lines(lang);
+            let blanks = totals.lang_stats.blank_lines(lang);
             let kws = totals.lang_stats.total_keywords(lang);
             total_files += files;
             total_lines += lines;
+            total_code += code;
+            total_comments += comments;
+            total_blanks += blanks;
             total_keywords += kws;
-            rows.push((lang, files, lines, kws));
+            rows.push((lang, files, lines, code, comments, blanks, kws));
         }
     }
 
-    rows.sort_unstable_by(|a, b| b.3.cmp(&a.3).then_with(|| a.0.name().cmp(b.0.name())));
+    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
 
-    for (lang, files, lines, kws) in rows {
+    for (lang, files, lines, code, comments, blanks, kws) in rows {
         let _ = writeln!(
             out,
-            " {:<22} {:>14} {:>18} {:>20}",
+            " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
             lang.name(),
             format_number(files),
             format_number(lines),
+            format_number(code),
+            format_number(comments),
+            format_number(blanks),
             format_number(kws),
         );
     }
@@ -637,10 +659,13 @@ fn print_summary_results(
     let _ = writeln!(out, "{}", dash);
     let _ = writeln!(
         out,
-        " {:<22} {:>14} {:>18} {:>20}",
+        " {:<18} {:>10} {:>14} {:>14} {:>14} {:>14} {:>14}",
         "Total",
         format_number(total_files),
         format_number(total_lines),
+        format_number(total_code),
+        format_number(total_comments),
+        format_number(total_blanks),
         format_number(total_keywords),
     );
     let _ = writeln!(out, "{}", rule);

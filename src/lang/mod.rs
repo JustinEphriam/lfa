@@ -65,6 +65,9 @@ pub struct ParseResult<const N: usize> {
     pub keyword_counts: [i64; N],
     pub total_keywords: i64,
     pub lines_processed: i64,
+    pub code_lines: i64,
+    pub comment_lines: i64,
+    pub blank_lines: i64,
 }
 
 impl<const N: usize> Default for ParseResult<N> {
@@ -73,6 +76,9 @@ impl<const N: usize> Default for ParseResult<N> {
             keyword_counts: [0; N],
             total_keywords: 0,
             lines_processed: 0,
+            code_lines: 0,
+            comment_lines: 0,
+            blank_lines: 0,
         }
     }
 }
@@ -85,6 +91,9 @@ impl<const N: usize> ParseResult<N> {
         }
         self.total_keywords += other.total_keywords;
         self.lines_processed += other.lines_processed;
+        self.code_lines += other.code_lines;
+        self.comment_lines += other.comment_lines;
+        self.blank_lines += other.blank_lines;
     }
 }
 
@@ -112,6 +121,36 @@ impl LangStats {
             LangId::Cpp => self.cpp.lines_processed,
             LangId::Rust => self.rust.lines_processed,
             LangId::Python => self.python.lines_processed,
+        }
+    }
+
+    #[inline(always)]
+    pub fn code_lines(&self, lang: LangId) -> i64 {
+        match lang {
+            LangId::C => self.c.code_lines,
+            LangId::Cpp => self.cpp.code_lines,
+            LangId::Rust => self.rust.code_lines,
+            LangId::Python => self.python.code_lines,
+        }
+    }
+
+    #[inline(always)]
+    pub fn comment_lines(&self, lang: LangId) -> i64 {
+        match lang {
+            LangId::C => self.c.comment_lines,
+            LangId::Cpp => self.cpp.comment_lines,
+            LangId::Rust => self.rust.comment_lines,
+            LangId::Python => self.python.comment_lines,
+        }
+    }
+
+    #[inline(always)]
+    pub fn blank_lines(&self, lang: LangId) -> i64 {
+        match lang {
+            LangId::C => self.c.blank_lines,
+            LangId::Cpp => self.cpp.blank_lines,
+            LangId::Rust => self.rust.blank_lines,
+            LangId::Python => self.python.blank_lines,
         }
     }
 
@@ -273,6 +312,7 @@ pub fn find_star_slash(slice: &[u8]) -> Option<usize> {
     }
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 pub fn skip_line_comment(content: &[u8], start_i: usize) -> usize {
     debug_assert!(start_i <= content.len());

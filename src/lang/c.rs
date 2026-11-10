@@ -1,5 +1,5 @@
 use super::{
-    count_newlines_avx2, find_star_slash, skip_line_comment, skip_literal, ParseResult,
+    count_newlines_avx2, find_byte_avx2, find_star_slash, skip_literal, ParseResult,
 };
 
 pub const KEYWORD_COUNT: usize = 59;
@@ -77,11 +77,16 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = [
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
 
-const TOK_NONE: u8 = 0;
-const TOK_IDENT: u8 = 1;
-const TOK_SLASH: u8 = 2;
-const TOK_QUOTE: u8 = 3;
-const TOK_APOSTROPHE: u8 = 4;
+const TOK_WS: u8 = 0;
+const TOK_NL: u8 = 1;
+const TOK_CODE: u8 = 2;
+const TOK_IDENT: u8 = 3;
+const TOK_SLASH: u8 = 4;
+const TOK_QUOTE: u8 = 5;
+const TOK_APOSTROPHE: u8 = 6;
+
+const STATE_CODE: u8 = 1;
+const STATE_COMMENT: u8 = 2;
 
 #[inline(always)]
 const fn kw_hash(first: u8, last: u8, len: usize) -> usize {
@@ -108,7 +113,13 @@ const KW_TABLE: [u8; 256] = {
 };
 
 const TOKEN_KIND: [u8; 256] = {
-    let mut table = [TOK_NONE; 256];
+    let mut table = [TOK_CODE; 256];
+    table[b' ' as usize] = TOK_WS;
+    table[b'\t' as usize] = TOK_WS;
+    table[b'\r' as usize] = TOK_WS;
+    table[0x0b as usize] = TOK_WS;
+    table[0x0c as usize] = TOK_WS;
+    table[b'\n' as usize] = TOK_NL;
     let mut c = b'a';
     while c <= b'z' {
         table[c as usize] = TOK_IDENT;
@@ -179,12 +190,12 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     {
         use safe_arch::*;
         let lut_lo = m256i::from([
-            2_i8, 3, 11, 3, 3, 3, 3, 11, 3, 3, 3, 1, 1, 1, 1, 13, 2, 3, 11, 3, 3, 3, 3, 11, 3, 3,
-            3, 1, 1, 1, 1, 13,
+            2_i8, 3, 11, 3, 3, 3, 3, 11, 3, 3, 19, 1, 1, 1, 1, 13, 2, 3, 11, 3, 3, 3, 3, 11, 3, 3,
+            19, 1, 1, 1, 1, 13,
         ]);
         let lut_hi = m256i::from([
-            0_i8, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
+            16_i8, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0,
+            0, 0, 0, 0, 0,
         ]);
         let mask_0f = set_splat_i8_m256i(0x0F);
         let zero = zeroed_m256i();
@@ -204,7 +215,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
             i += 32;
         }
     }
-    while i < ptr.len() && TOKEN_KIND[ptr[i] as usize] == TOK_NONE {
+    while i < ptr.len() && TOKEN_KIND[ptr[i] as usize] <= TOK_CODE && ptr[i] != b'\n' {
         i += 1;
     }
     i
@@ -270,13 +281,28 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         return;
     }
 
-    acc.lines_processed += count_newlines_avx2(content) as i64;
-
+    let mut line_state = 0u8;
     let mut i = 0usize;
     while i < content_len {
-        if TOKEN_KIND[content[i] as usize] == TOK_NONE {
+        if line_state == 0 {
+            while i < content_len && (content[i] == b' ' || content[i] == b'\t' || content[i] == b'\r') {
+                i += 1;
+            }
+            if i >= content_len {
+                break;
+            }
+            if content[i] == b'\n' {
+                acc.blank_lines += 1;
+                acc.lines_processed += 1;
+                i += 1;
+                continue;
+            }
+        }
+
+        if TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
+            line_state |= STATE_CODE;
             i += 1;
-            if i < content_len && TOKEN_KIND[content[i] as usize] == TOK_NONE {
+            if i < content_len && TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
                 i = skip_non_tokens_avx2(content, i);
             }
             if i >= content_len {
@@ -285,7 +311,20 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         }
 
         match TOKEN_KIND[content[i] as usize] {
+            TOK_NL => {
+                if (line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else if (line_state & STATE_COMMENT) != 0 {
+                    acc.comment_lines += 1;
+                } else {
+                    acc.blank_lines += 1;
+                }
+                acc.lines_processed += 1;
+                line_state = 0;
+                i += 1;
+            }
             TOK_IDENT => {
+                line_state |= STATE_CODE;
                 let start = i;
                 i = skip_ident_cont_avx2(content, i + 1);
                 debug_assert!(i > start && i <= content_len);
@@ -312,34 +351,108 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 if i + 1 < content_len {
                     let next_b = content[i + 1];
                     if next_b == b'/' {
-                        i = skip_line_comment(content, i + 2);
+                        line_state |= STATE_COMMENT;
+                        let mut j = i + 2;
+                        while j < content_len {
+                            let Some(pos) = find_byte_avx2(&content[j..], b'\n') else {
+                                j = content_len;
+                                break;
+                            };
+                            let nl_idx = j + pos;
+                            let mut check = nl_idx;
+                            if check > j && content[check - 1] == b'\r' {
+                                check -= 1;
+                            }
+                            let is_spliced = check > j && content[check - 1] == b'\\';
+                            if (line_state & STATE_CODE) != 0 {
+                                acc.code_lines += 1;
+                            } else if (line_state & STATE_COMMENT) != 0 {
+                                acc.comment_lines += 1;
+                            } else {
+                                acc.blank_lines += 1;
+                            }
+                            acc.lines_processed += 1;
+                            if is_spliced {
+                                line_state = STATE_COMMENT;
+                                j = nl_idx + 1;
+                            } else {
+                                line_state = 0;
+                                j = nl_idx + 1;
+                                break;
+                            }
+                        }
+                        i = j;
                         continue;
                     } else if next_b == b'*' {
+                        line_state |= STATE_COMMENT;
                         if let Some(pos) = find_star_slash(&content[i + 2..]) {
-                            i += 2 + pos + 2;
+                            let star_slash_pos = i + 2 + pos;
+                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..star_slash_pos], b'\n') {
+                                if (line_state & STATE_CODE) != 0 {
+                                    acc.code_lines += 1;
+                                } else {
+                                    acc.comment_lines += 1;
+                                }
+                                acc.lines_processed += 1;
+                                let first_nl_abs = i + 2 + first_nl;
+                                let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..star_slash_pos]);
+                                acc.comment_lines += inter_nls as i64;
+                                acc.lines_processed += inter_nls as i64;
+                                line_state = STATE_COMMENT;
+                            }
+                            i = star_slash_pos + 2;
                         } else {
+                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
+                                if (line_state & STATE_CODE) != 0 {
+                                    acc.code_lines += 1;
+                                } else {
+                                    acc.comment_lines += 1;
+                                }
+                                acc.lines_processed += 1;
+                                let first_nl_abs = i + 2 + first_nl;
+                                let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
+                                acc.comment_lines += rem_nls as i64;
+                                acc.lines_processed += rem_nls as i64;
+                            }
                             i = content_len;
                         }
                         continue;
                     }
                 }
+                line_state |= STATE_CODE;
                 i += 1;
             }
             TOK_QUOTE => {
-                i = skip_literal(content, i + 1, b'"');
+                line_state |= STATE_CODE;
+                let end_i = skip_literal(content, i + 1, b'"');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                i = end_i;
             }
             TOK_APOSTROPHE => {
                 if i > 0 && i + 1 < content_len {
                     let prev = content[i - 1];
                     let next = content[i + 1];
                     if IDENT_CONT[prev as usize] != 0 && IDENT_CONT[next as usize] != 0 {
+                        line_state |= STATE_CODE;
                         i += 1;
                         continue;
                     }
                 }
-                i = skip_literal(content, i + 1, b'\'');
+                line_state |= STATE_CODE;
+                let end_i = skip_literal(content, i + 1, b'\'');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                i = end_i;
             }
             _ => {
+                line_state |= STATE_CODE;
                 i += 1;
             }
         }
@@ -467,7 +580,7 @@ mod tests {
             let mut block = [b' '; 64];
             block[19] = b;
             let pos = skip_non_tokens_avx2(&block, 0);
-            if TOKEN_KIND[b as usize] != TOK_NONE {
+            if TOKEN_KIND[b as usize] > TOK_CODE || b == b'\n' {
                 assert_eq!(pos, 19);
             } else {
                 assert_eq!(pos, block.len());
@@ -650,5 +763,27 @@ mod tests {
         assert_eq!(res.keyword_counts[find_kw_id("for")], 1);
         assert_eq!(res.keyword_counts[find_kw_id("int")], 1);
         assert_eq!(res.lines_processed, 1);
+    }
+
+    #[test]
+    fn test_c_lines_code_comments_blanks() {
+        let src = concat!(
+            "// comment only\n",
+            "\n",
+            "   \t  \r\n",
+            "int a = 1; // code and comment\n",
+            "/* block comment\n",
+            "   span line 2\n",
+            "   span line 3 */\n",
+            "/* block */ int b = 2;\n",
+            "int c = 3; /* inline block */\n",
+            "return a + b + c;\n"
+        );
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+        assert_eq!(res.lines_processed, 10);
+        assert_eq!(res.blank_lines, 2);
+        assert_eq!(res.comment_lines, 4);
+        assert_eq!(res.code_lines, 4);
     }
 }
