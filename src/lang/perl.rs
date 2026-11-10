@@ -1,5 +1,6 @@
 use super::{
-    count_newlines_avx2, find_byte_avx2, skip_ident_cont_avx2, skip_literal, ParseResult,
+    count_newlines_avx2, find_byte_avx2, kw_match_2_to_16, skip_ident_cont_avx2, skip_literal,
+    ParseResult,
 };
 
 pub const KEYWORD_COUNT: usize = 73;
@@ -83,11 +84,15 @@ pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "UNITCHECK",
 ];
 
-pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = [
-    2, 5, 4, 6, 5, 5, 3, 7, 2, 8, 4, 4, 4, 4, 6, 3, 2, 3, 5, 5, 3, 2, 7, 7, 4, 3, 4, 4, 5, 4, 7,
-    3, 2, 3, 3, 2, 2, 2, 2, 2, 2, 3, 5, 7, 5, 3, 5, 6, 3, 3, 4, 4, 5, 4, 4, 3, 5, 7, 6, 4, 6, 4,
-    6, 6, 4, 5, 4, 5, 5, 3, 5, 4, 9,
-];
+pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = {
+    let mut lens = [0u8; KEYWORD_COUNT];
+    let mut i = 0;
+    while i < KEYWORD_COUNT {
+        lens[i] = KEYWORD_NAMES[i].len() as u8;
+        i += 1;
+    }
+    lens
+};
 
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
@@ -156,28 +161,6 @@ const TOKEN_KIND: [u8; 256] = {
     table
 };
 
-#[inline(always)]
-fn kw_match_len_2_to_9(cand: &[u8], kw: &[u8]) -> bool {
-    let n = cand.len();
-    if n != kw.len() || !(2..=KW_MAX_LEN).contains(&n) {
-        return false;
-    }
-    if n >= 8 {
-        let a1 = u64::from_ne_bytes(cand[..8].try_into().unwrap());
-        let b1 = u64::from_ne_bytes(kw[..8].try_into().unwrap());
-        a1 == b1 && cand[n - 1] == kw[n - 1]
-    } else if n >= 4 {
-        let a1 = u32::from_ne_bytes(cand[..4].try_into().unwrap());
-        let b1 = u32::from_ne_bytes(kw[..4].try_into().unwrap());
-        let a2 = u32::from_ne_bytes(cand[n - 4..n].try_into().unwrap());
-        let b2 = u32::from_ne_bytes(kw[n - 4..n].try_into().unwrap());
-        ((a1 ^ b1) | (a2 ^ b2)) == 0
-    } else {
-        let a1 = u16::from_ne_bytes(cand[..2].try_into().unwrap());
-        let b1 = u16::from_ne_bytes(kw[..2].try_into().unwrap());
-        a1 == b1 && cand[n - 1] == kw[n - 1]
-    }
-}
 
 #[inline(always)]
 fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
@@ -358,7 +341,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                         let idx = id as usize;
                         debug_assert!(idx < KEYWORD_COUNT);
                         if KEYWORD_LENS[idx] as usize == n
-                            && kw_match_len_2_to_9(cand, KEYWORD_NAMES[idx].as_bytes())
+                            && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
                         {
                             acc.keyword_counts[idx] += 1;
                             acc.total_keywords += 1;
