@@ -435,6 +435,89 @@ pub const STATE_NONE: u8 = 0;
 pub const STATE_CODE: u8 = 1;
 pub const STATE_COMMENT: u8 = 2;
 
+pub const TMPL_MAX_DEPTH: usize = 32;
+
+pub struct TemplateStack {
+    pub depths: [u32; TMPL_MAX_DEPTH],
+    pub len: usize,
+}
+
+impl TemplateStack {
+    #[inline(always)]
+    pub const fn new() -> Self {
+        Self {
+            depths: [0; TMPL_MAX_DEPTH],
+            len: 0,
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline(always)]
+    pub fn open_brace(&mut self) {
+        if self.len > 0 {
+            self.depths[self.len - 1] += 1;
+        }
+    }
+
+    #[inline(always)]
+    pub fn close_brace(&mut self) -> bool {
+        if self.len == 0 {
+            return false;
+        }
+        let top = &mut self.depths[self.len - 1];
+        if *top == 0 {
+            self.len -= 1;
+            true
+        } else {
+            *top -= 1;
+            false
+        }
+    }
+}
+
+#[inline(always)]
+fn scan_template_chunk(content: &[u8], mut i: usize) -> (usize, bool) {
+    let len = content.len();
+    while i < len {
+        let Some(pos) = memchr::memchr3(b'`', b'\\', b'$', &content[i..]) else {
+            return (len, false);
+        };
+        let p = i + pos;
+        match content[p] {
+            b'`' => return (p + 1, false),
+            b'\\' => i = p + 2,
+            _ => {
+                if p + 1 < len && content[p + 1] == b'{' {
+                    return (p + 2, true);
+                }
+                i = p + 1;
+            }
+        }
+    }
+    (len, false)
+}
+
+#[inline(always)]
+pub fn skip_template(content: &[u8], start: usize, stack: &mut TemplateStack) -> usize {
+    let mut i = start;
+    loop {
+        let (end, interp) = scan_template_chunk(content, i);
+        if !interp {
+            return end.min(content.len());
+        }
+        if stack.len < TMPL_MAX_DEPTH {
+            stack.depths[stack.len] = 0;
+            stack.len += 1;
+            return end;
+        }
+        i = end;
+    }
+}
+
 #[inline(always)]
 pub fn finish_trailing_line<const N: usize>(
     content: &[u8],

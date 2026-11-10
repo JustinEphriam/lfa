@@ -1,7 +1,8 @@
 use super::{
-    finish_trailing_line, STATE_CODE, STATE_COMMENT, STATE_NONE, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_js_ident_cont_avx2,
-    skip_literal, skip_non_tokens_with_lut_avx2, ParseResult, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    find_byte_avx2, find_star_slash, finish_trailing_line, kw_match_2_to_16, make_token_lut_lo,
+    skip_js_ident_cont_avx2, skip_literal, skip_non_tokens_with_lut_avx2, skip_template,
+    ParseResult, TemplateStack, STATE_CODE, STATE_COMMENT, STATE_NONE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 41;
@@ -64,6 +65,8 @@ const TOK_SLASH: u8 = 4;
 const TOK_QUOTE: u8 = 5;
 const TOK_APOSTROPHE: u8 = 6;
 const TOK_BACKTICK: u8 = 7;
+const TOK_LBRACE: u8 = 8;
+const TOK_RBRACE: u8 = 9;
 
 
 #[inline(always)]
@@ -121,6 +124,15 @@ pub const TOKEN_KIND: [u8; 256] = {
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
+const TOKEN_KIND_INTERP: [u8; 256] = {
+    let mut table = TOKEN_KIND;
+    table[b'{' as usize] = TOK_LBRACE;
+    table[b'}' as usize] = TOK_RBRACE;
+    table
+};
+
+const TOKEN_INTERP_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND_INTERP);
+
 #[inline(always)]
 fn skip_non_tokens_avx2(ptr: &[u8], i: usize) -> usize {
     skip_non_tokens_with_lut_avx2(ptr, i, &TOKEN_KIND, &TOKEN_LUT_LO)
@@ -138,6 +150,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         return;
     }
 
+    let mut tmpl = TemplateStack::new();
     let mut line_state = STATE_NONE;
     let mut i = 0usize;
     while i < content_len {
@@ -158,14 +171,22 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             }
         }
 
-        if TOKEN_KIND[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
+        let in_interp = !tmpl.is_empty();
+        let kinds = if in_interp {
+            &TOKEN_KIND_INTERP
+        } else {
+            &TOKEN_KIND
+        };
+
+        if kinds[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
             line_state |= STATE_CODE;
             i += 1;
-            if i < content_len
-                && TOKEN_KIND[content[i] as usize] <= TOK_CODE
-                && content[i] != b'\n'
-            {
-                i = skip_non_tokens_avx2(content, i);
+            if i < content_len && kinds[content[i] as usize] <= TOK_CODE && content[i] != b'\n' {
+                i = if in_interp {
+                    skip_non_tokens_with_lut_avx2(content, i, &TOKEN_KIND_INTERP, &TOKEN_INTERP_LUT_LO)
+                } else {
+                    skip_non_tokens_avx2(content, i)
+                };
             }
             if i >= content_len {
                 break;
@@ -173,7 +194,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         }
 
         let b = content[i];
-        let kind = TOKEN_KIND[b as usize];
+        let kind = kinds[b as usize];
         match kind {
             TOK_NL => {
                 if (line_state & STATE_CODE) != 0 {
@@ -286,13 +307,32 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             }
             TOK_BACKTICK => {
                 line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'`');
+                let end_i = skip_template(content, i + 1, &mut tmpl);
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
                     acc.lines_processed += nl as i64;
                 }
                 i = end_i;
+            }
+            TOK_LBRACE => {
+                line_state |= STATE_CODE;
+                tmpl.open_brace();
+                i += 1;
+            }
+            TOK_RBRACE => {
+                line_state |= STATE_CODE;
+                if tmpl.close_brace() {
+                    let end_i = skip_template(content, i + 1, &mut tmpl);
+                    let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                    if nl > 0 {
+                        acc.code_lines += nl as i64;
+                        acc.lines_processed += nl as i64;
+                    }
+                    i = end_i;
+                } else {
+                    i += 1;
+                }
             }
             _ => {
                 line_state |= STATE_CODE;
@@ -385,6 +425,62 @@ mod tests {
         assert_eq!(res.total_keywords, 2);
         assert_eq!(res.lines_processed, 4);
         assert_eq!(res.code_lines, 4);
+
+        let interp_src = b"const s = `a ${ x ? new Foo() : null } b`;\nif (z) {}\n";
+        let mut res2 = ParseResult::default();
+        parse_into(interp_src, &mut res2);
+        assert_eq!(res2.keyword_counts[find_kw_id("const")], 1);
+        assert_eq!(res2.keyword_counts[find_kw_id("new")], 1);
+        assert_eq!(res2.keyword_counts[find_kw_id("null")], 1);
+        assert_eq!(res2.keyword_counts[find_kw_id("if")], 1);
+        assert_eq!(res2.total_keywords, 4);
+        assert_eq!(res2.lines_processed, 2);
+        assert_eq!(res2.code_lines, 2);
+
+        let nested_src = b"let s = `a ${ `in ${ typeof y }` } b`;\nreturn 1;\n";
+        let mut res3 = ParseResult::default();
+        parse_into(nested_src, &mut res3);
+        assert_eq!(res3.keyword_counts[find_kw_id("let")], 1);
+        assert_eq!(res3.keyword_counts[find_kw_id("typeof")], 1);
+        assert_eq!(res3.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res3.total_keywords, 3);
+
+        let braces_src = b"`${ (() => { return { a: 1 }; })() }`; while (1) {}\n";
+        let mut res4 = ParseResult::default();
+        parse_into(braces_src, &mut res4);
+        assert_eq!(res4.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res4.keyword_counts[find_kw_id("while")], 1);
+        assert_eq!(res4.total_keywords, 2);
+
+        let escape_src = b"`\\${not_interp} \\` still text`; for (;;) {}\n";
+        let mut res5 = ParseResult::default();
+        parse_into(escape_src, &mut res5);
+        assert_eq!(res5.keyword_counts[find_kw_id("for")], 1);
+        assert_eq!(res5.total_keywords, 1);
+
+        let dollar_src = b"`cost: $5 ${ void 0 }`;\n";
+        let mut res6 = ParseResult::default();
+        parse_into(dollar_src, &mut res6);
+        assert_eq!(res6.keyword_counts[find_kw_id("void")], 1);
+        assert_eq!(res6.total_keywords, 1);
+
+        let cmt_interp = b"`${ /* if */ x // while\n }`;\n";
+        let mut res7 = ParseResult::default();
+        parse_into(cmt_interp, &mut res7);
+        assert_eq!(res7.keyword_counts[find_kw_id("if")], 0);
+        assert_eq!(res7.keyword_counts[find_kw_id("while")], 0);
+        assert_eq!(res7.total_keywords, 0);
+
+        let mut pad = vec![b'a'; 40];
+        pad.extend_from_slice(b"`${ return }`\n");
+        let mut res8 = ParseResult::default();
+        parse_into(&pad, &mut res8);
+        assert_eq!(res8.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res8.total_keywords, 1);
+
+        let mut res_unterm = ParseResult::default();
+        parse_into(b"`abc ${ if", &mut res_unterm);
+        assert_eq!(res_unterm.keyword_counts[find_kw_id("if")], 1);
     }
 
     #[test]
