@@ -632,10 +632,17 @@ fn print_summary_results(
     cpu_count: usize,
 ) {
     let color = should_color();
-    let (c_bold, c_cyan, c_gray, c_reset) = if color {
-        ("\x1b[1m", "\x1b[36m", "\x1b[90m", "\x1b[0m")
+    let (c_bold, c_cyan, c_white, c_green, c_gray, c_reset) = if color {
+        (
+            "\x1b[1m",
+            "\x1b[36m",
+            "\x1b[1;37m",
+            "\x1b[1;32m",
+            "\x1b[90m",
+            "\x1b[0m",
+        )
     } else {
-        ("", "", "", "")
+        ("", "", "", "", "", "")
     };
 
     let mut out = String::with_capacity(4096);
@@ -647,13 +654,13 @@ fn print_summary_results(
     let _ = writeln!(
         out,
         "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
-        c_gray, c_bold, "Language",
-        c_gray, c_bold, "Files",
-        c_gray, c_bold, "Lines",
-        c_gray, c_bold, "Code",
-        c_gray, c_bold, "Comments",
-        c_gray, c_bold, "Blanks",
-        c_gray, c_bold, "Keywords",
+        c_gray, c_white, "Language",
+        c_gray, c_white, "Files",
+        c_gray, c_white, "Lines",
+        c_gray, c_white, "Code",
+        c_gray, c_white, "Comments",
+        c_gray, c_white, "Blanks",
+        c_gray, c_white, "Keywords",
         c_gray
     );
     let _ = writeln!(out, "{}{}{}", c_gray, border_sep, c_reset);
@@ -706,7 +713,7 @@ fn print_summary_results(
     let _ = writeln!(
         out,
         "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
-        c_gray, c_bold, "Total",
+        c_gray, c_green, "Total",
         c_gray, c_bold, format_number(total_files),
         c_gray, c_bold, format_number(total_lines),
         c_gray, c_bold, format_number(total_code),
