@@ -1,10 +1,12 @@
 pub mod c;
 pub mod cpp;
 pub mod go;
+pub mod javascript;
 pub mod odin;
 pub mod perl;
 pub mod python;
 pub mod rust;
+pub mod typescript;
 pub mod zig;
 
 #[repr(u8)]
@@ -18,9 +20,11 @@ pub enum LangId {
     Go = 5,
     Zig = 6,
     Odin = 7,
+    JavaScript = 8,
+    TypeScript = 9,
 }
 
-pub const LANG_COUNT: usize = 8;
+pub const LANG_COUNT: usize = 10;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -29,6 +33,8 @@ pub const LANG_PERL_MASK: u32 = 1 << (LangId::Perl as u32);
 pub const LANG_GO_MASK: u32 = 1 << (LangId::Go as u32);
 pub const LANG_ZIG_MASK: u32 = 1 << (LangId::Zig as u32);
 pub const LANG_ODIN_MASK: u32 = 1 << (LangId::Odin as u32);
+pub const LANG_JAVASCRIPT_MASK: u32 = 1 << (LangId::JavaScript as u32);
+pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -40,6 +46,8 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Go,
     LangId::Zig,
     LangId::Odin,
+    LangId::JavaScript,
+    LangId::TypeScript,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -57,6 +65,8 @@ impl LangId {
             Self::Go => "Go",
             Self::Zig => "Zig",
             Self::Odin => "Odin",
+            Self::JavaScript => "JavaScript",
+            Self::TypeScript => "TypeScript",
         }
     }
 
@@ -82,6 +92,10 @@ impl LangId {
             | b"--GOLANG" => Some(Self::Go),
             b"-zig" | b"--zig" | b"-ZIG" | b"--ZIG" => Some(Self::Zig),
             b"-odin" | b"--odin" | b"-ODIN" | b"--ODIN" => Some(Self::Odin),
+            b"-js" | b"--js" | b"-JS" | b"--JS" | b"-javascript" | b"--javascript"
+            | b"-JAVASCRIPT" | b"--JAVASCRIPT" => Some(Self::JavaScript),
+            b"-ts" | b"--ts" | b"-TS" | b"--TS" | b"-typescript" | b"--typescript"
+            | b"-TYPESCRIPT" | b"--TYPESCRIPT" => Some(Self::TypeScript),
             _ => None,
         }
     }
@@ -134,6 +148,8 @@ pub struct LangStats {
     pub go: ParseResult<{ go::KEYWORD_COUNT }>,
     pub zig: ParseResult<{ zig::KEYWORD_COUNT }>,
     pub odin: ParseResult<{ odin::KEYWORD_COUNT }>,
+    pub javascript: ParseResult<{ javascript::KEYWORD_COUNT }>,
+    pub typescript: ParseResult<{ typescript::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -147,6 +163,8 @@ impl LangStats {
         self.go.add(&other.go);
         self.zig.add(&other.zig);
         self.odin.add(&other.odin);
+        self.javascript.add(&other.javascript);
+        self.typescript.add(&other.typescript);
     }
 
     #[inline(always)]
@@ -160,6 +178,8 @@ impl LangStats {
             LangId::Go => self.go.lines_processed,
             LangId::Zig => self.zig.lines_processed,
             LangId::Odin => self.odin.lines_processed,
+            LangId::JavaScript => self.javascript.lines_processed,
+            LangId::TypeScript => self.typescript.lines_processed,
         }
     }
 
@@ -174,6 +194,8 @@ impl LangStats {
             LangId::Go => self.go.code_lines,
             LangId::Zig => self.zig.code_lines,
             LangId::Odin => self.odin.code_lines,
+            LangId::JavaScript => self.javascript.code_lines,
+            LangId::TypeScript => self.typescript.code_lines,
         }
     }
 
@@ -188,6 +210,8 @@ impl LangStats {
             LangId::Go => self.go.comment_lines,
             LangId::Zig => self.zig.comment_lines,
             LangId::Odin => self.odin.comment_lines,
+            LangId::JavaScript => self.javascript.comment_lines,
+            LangId::TypeScript => self.typescript.comment_lines,
         }
     }
 
@@ -202,6 +226,8 @@ impl LangStats {
             LangId::Go => self.go.blank_lines,
             LangId::Zig => self.zig.blank_lines,
             LangId::Odin => self.odin.blank_lines,
+            LangId::JavaScript => self.javascript.blank_lines,
+            LangId::TypeScript => self.typescript.blank_lines,
         }
     }
 
@@ -216,6 +242,8 @@ impl LangStats {
             LangId::Go => self.go.total_keywords,
             LangId::Zig => self.zig.total_keywords,
             LangId::Odin => self.odin.total_keywords,
+            LangId::JavaScript => self.javascript.total_keywords,
+            LangId::TypeScript => self.typescript.total_keywords,
         }
     }
 
@@ -230,6 +258,8 @@ impl LangStats {
             LangId::Go => &go::KEYWORD_NAMES,
             LangId::Zig => &zig::KEYWORD_NAMES,
             LangId::Odin => &odin::KEYWORD_NAMES,
+            LangId::JavaScript => &javascript::KEYWORD_NAMES,
+            LangId::TypeScript => &typescript::KEYWORD_NAMES,
         }
     }
 
@@ -244,6 +274,8 @@ impl LangStats {
             LangId::Go => &self.go.keyword_counts,
             LangId::Zig => &self.zig.keyword_counts,
             LangId::Odin => &self.odin.keyword_counts,
+            LangId::JavaScript => &self.javascript.keyword_counts,
+            LangId::TypeScript => &self.typescript.keyword_counts,
         }
     }
 }
@@ -296,6 +328,18 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"go" if (enabled_mask & LANG_GO_MASK) != 0 && len >= 4 => {
                 return Some(LangId::Go);
             }
+            b"js" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && len >= 4 => {
+                let prev = name[len - 4];
+                if prev != b'/' && prev != b'\\' {
+                    return Some(LangId::JavaScript);
+                }
+            }
+            b"ts" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 && len >= 4 => {
+                let prev = name[len - 4];
+                if prev != b'/' && prev != b'\\' {
+                    return Some(LangId::TypeScript);
+                }
+            }
             _ => {}
         }
         return None;
@@ -317,6 +361,12 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             }
             b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 && len >= 5 => {
                 return Some(LangId::Zig);
+            }
+            b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && len >= 5 => {
+                return Some(LangId::JavaScript);
+            }
+            b"mts" | b"cts" | b"tsx" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 && len >= 5 => {
+                return Some(LangId::TypeScript);
             }
             _ => {}
         }
@@ -507,6 +557,8 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Go => go::parse_into(content, &mut stats.go),
         LangId::Zig => zig::parse_into(content, &mut stats.zig),
         LangId::Odin => odin::parse_into(content, &mut stats.odin),
+        LangId::JavaScript => javascript::parse_into(content, &mut stats.javascript),
+        LangId::TypeScript => typescript::parse_into(content, &mut stats.typescript),
     }
 }
 
@@ -775,6 +827,38 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.odin", LANG_ALL_MASK),
             Some(LangId::Odin)
+        );
+        assert_eq!(
+            detect_language(b"foo.js", LANG_ALL_MASK),
+            Some(LangId::JavaScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.mjs", LANG_ALL_MASK),
+            Some(LangId::JavaScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.cjs", LANG_ALL_MASK),
+            Some(LangId::JavaScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.jsx", LANG_ALL_MASK),
+            Some(LangId::JavaScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.ts", LANG_ALL_MASK),
+            Some(LangId::TypeScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.mts", LANG_ALL_MASK),
+            Some(LangId::TypeScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.cts", LANG_ALL_MASK),
+            Some(LangId::TypeScript)
+        );
+        assert_eq!(
+            detect_language(b"foo.tsx", LANG_ALL_MASK),
+            Some(LangId::TypeScript)
         );
         assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), None);
 

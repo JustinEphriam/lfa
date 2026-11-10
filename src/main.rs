@@ -693,7 +693,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies",
         prog
     );
     process::exit(1);
@@ -1156,6 +1156,30 @@ mod tests {
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Odin.mask());
             assert_eq!(detailed, vec![LangId::Odin]);
+        }
+
+        for flag in ["-js", "--js", "-javascript", "--javascript"] {
+            let args_js = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_js);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, LangId::JavaScript.mask());
+            assert_eq!(detailed, vec![LangId::JavaScript]);
+        }
+
+        for flag in ["-ts", "--ts", "-typescript", "--typescript"] {
+            let args_ts = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_ts);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, LangId::TypeScript.mask());
+            assert_eq!(detailed, vec![LangId::TypeScript]);
         }
 
         let args_multi = vec![
