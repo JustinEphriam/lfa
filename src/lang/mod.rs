@@ -431,6 +431,29 @@ pub const TOK_WS: u8 = 0;
 pub const TOK_NL: u8 = 1;
 pub const TOK_CODE: u8 = 2;
 
+pub const STATE_NONE: u8 = 0;
+pub const STATE_CODE: u8 = 1;
+pub const STATE_COMMENT: u8 = 2;
+
+#[inline(always)]
+pub fn finish_trailing_line<const N: usize>(
+    content: &[u8],
+    line_state: u8,
+    acc: &mut ParseResult<N>,
+) {
+    if content.last().is_none_or(|&b| b == b'\n') {
+        return;
+    }
+    if (line_state & STATE_CODE) != 0 {
+        acc.code_lines += 1;
+    } else if (line_state & STATE_COMMENT) != 0 {
+        acc.comment_lines += 1;
+    } else {
+        acc.blank_lines += 1;
+    }
+    acc.lines_processed += 1;
+}
+
 pub const fn compute_keyword_lens<const N: usize>(names: &[&str; N]) -> [u8; N] {
     assert!(N > 0 && N < 255);
     let mut lens = [0u8; N];
@@ -932,6 +955,65 @@ pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn line_metrics(lang: LangId, content: &[u8]) -> [i64; 4] {
+        let mut stats = LangStats::default();
+        parse_into(lang, content, &mut stats);
+        [
+            stats.lines(lang),
+            stats.code_lines(lang),
+            stats.comment_lines(lang),
+            stats.blank_lines(lang),
+        ]
+    }
+
+    #[test]
+    fn test_final_line_without_newline_all_languages() {
+        for lang in ALL_LANGS {
+            let cmt: &str = match lang {
+                LangId::Python | LangId::Perl => "#",
+                _ => "//",
+            };
+            let mut samples: Vec<String> = vec![
+                "a\nb".to_string(),
+                format!("a\n{cmt} c"),
+                format!("a\nb {cmt} c"),
+                "a\n\nb".to_string(),
+                "\"x\ny\"".to_string(),
+                "a\n   ".to_string(),
+                "a".to_string(),
+                format!("{cmt} c"),
+            ];
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig) {
+                samples.push("a\n/* x\ny */".to_string());
+                samples.push("a /* x\ny".to_string());
+                samples.push("a\n/* x */ b".to_string());
+            }
+            if lang == LangId::Perl {
+                samples.push("a\n=pod\nx\ny".to_string());
+                samples.push("a\n__END__\nx\ny".to_string());
+            }
+            for s in &samples {
+                let without = line_metrics(lang, s.as_bytes());
+                let with = line_metrics(lang, format!("{s}\n").as_bytes());
+                assert_eq!(without, with, "{} sample {:?}", lang.name(), s);
+                assert_eq!(
+                    without[0],
+                    without[1] + without[2] + without[3],
+                    "{} sample {:?}",
+                    lang.name(),
+                    s
+                );
+            }
+            assert_eq!(line_metrics(lang, b"a\nb"), [2, 2, 0, 0], "{}", lang.name());
+            assert_eq!(
+                line_metrics(lang, format!("a\n{cmt} c").as_bytes()),
+                [2, 1, 1, 0],
+                "{}",
+                lang.name()
+            );
+        }
+    }
 
     #[test]
     fn test_count_newlines_saturation_and_boundaries() {

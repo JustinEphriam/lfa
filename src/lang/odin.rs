@@ -1,5 +1,5 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    finish_trailing_line, STATE_CODE, STATE_COMMENT, STATE_NONE, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
     find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2, skip_literal,
     skip_nested_block_comment, skip_non_tokens_with_lut_avx2, skip_triple_literal, ParseResult,
     TOK_CODE, TOK_NL, TOK_WS,
@@ -58,9 +58,6 @@ pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
 
-const STATE_NONE: u8 = 0;
-const STATE_CODE: u8 = 1;
-const STATE_COMMENT: u8 = 2;
 
 #[inline(always)]
 const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
@@ -305,6 +302,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             }
         }
     }
+    finish_trailing_line(content, line_state, acc);
 }
 
 #[cfg(test)]
@@ -420,7 +418,7 @@ mod tests {
         let mut res3 = ParseResult::default();
         parse_into(b"// unclosed line comment at eof", &mut res3);
         assert_eq!(res3.total_keywords, 0);
-        assert_eq!(res3.comment_lines, 0);
-        assert_eq!(res3.lines_processed, 0);
+        assert_eq!(res3.comment_lines, 1);
+        assert_eq!(res3.lines_processed, 1);
     }
 }

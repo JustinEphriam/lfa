@@ -1,5 +1,5 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    finish_trailing_line, STATE_CODE, STATE_COMMENT, compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
     find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2,
     skip_literal, skip_non_tokens_with_lut_avx2, ParseResult, IDENT_CONT, TOK_CODE, TOK_NL, TOK_WS,
 };
@@ -120,8 +120,6 @@ const TOK_SLASH: u8 = 4;
 const TOK_QUOTE: u8 = 5;
 const TOK_APOSTROPHE: u8 = 6;
 
-const STATE_CODE: u8 = 1;
-const STATE_COMMENT: u8 = 2;
 
 #[inline(always)]
 const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
@@ -386,6 +384,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                                 let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
                                 acc.comment_lines += rem_nls as i64;
                                 acc.lines_processed += rem_nls as i64;
+                                line_state = STATE_COMMENT;
                             }
                             i = content_len;
                         }
@@ -441,6 +440,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             }
         }
     }
+    finish_trailing_line(content, line_state, acc);
 }
 
 #[cfg(test)]
@@ -472,7 +472,7 @@ mod tests {
             parse_into(bytes, &mut res);
             assert_eq!(res.total_keywords, 1);
             assert_eq!(res.keyword_counts[i], 1);
-            assert_eq!(res.lines_processed, 0);
+            assert_eq!(res.lines_processed, 1);
         }
 
         let non_keywords = [
