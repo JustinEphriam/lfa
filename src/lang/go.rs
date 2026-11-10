@@ -1,4 +1,7 @@
-use super::{count_newlines_avx2, find_byte_avx2, find_star_slash, skip_literal, ParseResult};
+use super::{
+    count_newlines_avx2, find_byte_avx2, find_star_slash, kw_match_2_to_16, skip_ident_cont_avx2,
+    skip_literal, ParseResult,
+};
 
 pub const KEYWORD_COUNT: usize = 25;
 const KW_SLOT_MASK: usize = 255;
@@ -84,18 +87,6 @@ pub const TOKEN_KIND: [u8; 256] = [
     TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
 ];
 
-pub const IDENT_CONT: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
-    0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
 pub const KW_SLOT: [u8; 256] = [
     255, 255, 255, 255, 255, 255, 20, 255, 255, 255, 255, 6, 255, 255, 255, 255,
     255, 255, 255, 255, 16, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -162,44 +153,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     i
 }
 
-#[inline(always)]
-fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = move_mask_i8_m256i(is_non_ident) as u32;
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
-        i += 1;
-    }
-    i
-}
-
+#[cfg(test)]
 #[inline(always)]
 pub fn is_go_extension(name: &[u8]) -> bool {
     let len = name.len();
@@ -259,10 +213,12 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         let kind = TOKEN_KIND[b as usize];
         match kind {
             TOK_NL => {
-                match line_state {
-                    STATE_NONE => acc.blank_lines += 1,
-                    STATE_COMMENT => acc.comment_lines += 1,
-                    _ => acc.code_lines += 1,
+                if (line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else if (line_state & STATE_COMMENT) != 0 {
+                    acc.comment_lines += 1;
+                } else {
+                    acc.blank_lines += 1;
                 }
                 acc.lines_processed += 1;
                 line_state = STATE_NONE;
@@ -274,7 +230,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 let end = skip_ident_cont_avx2(content, i + 1);
                 i = end;
                 let len = end - start;
-                if (2..=KW_MAX_LEN).contains(&len) {
+                if len.wrapping_sub(2) <= KW_MAX_LEN - 2 {
                     let first = content[start];
                     let second = content[start + 1];
                     let last = content[end - 1];
@@ -283,7 +239,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     if slot != KW_EMPTY {
                         let idx = slot as usize;
                         if len == KEYWORD_LENS[idx] as usize
-                            && &content[start..end] == KEYWORD_NAMES[idx].as_bytes()
+                            && kw_match_2_to_16(&content[start..end], KEYWORD_NAMES[idx].as_bytes())
                         {
                             acc.keyword_counts[idx] += 1;
                             acc.total_keywords += 1;
@@ -320,21 +276,36 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                         i = nl_idx + 1;
                         continue;
                     } else if next_b == b'*' {
-                        if line_state == STATE_NONE {
-                            line_state = STATE_COMMENT;
-                        }
-                        let block_start = i + 2;
-                        if let Some(pos) = find_star_slash(&content[block_start..]) {
-                            let end_i = block_start + pos + 2;
-                            let nls = count_newlines_avx2(&content[block_start..end_i - 2]);
-                            if nls > 0 {
-                                acc.comment_lines += nls as i64;
-                                acc.lines_processed += nls as i64;
+                        line_state |= STATE_COMMENT;
+                        if let Some(pos) = find_star_slash(&content[i + 2..]) {
+                            let star_slash_pos = i + 2 + pos;
+                            if let Some(first_nl) =
+                                find_byte_avx2(&content[i + 2..star_slash_pos], b'\n')
+                            {
+                                if (line_state & STATE_CODE) != 0 {
+                                    acc.code_lines += 1;
+                                } else {
+                                    acc.comment_lines += 1;
+                                }
+                                acc.lines_processed += 1;
+                                let first_nl_abs = i + 2 + first_nl;
+                                let inter_nls =
+                                    count_newlines_avx2(&content[first_nl_abs + 1..star_slash_pos]);
+                                acc.comment_lines += inter_nls as i64;
+                                acc.lines_processed += inter_nls as i64;
+                                line_state = STATE_COMMENT;
                             }
-                            i = end_i;
+                            i = star_slash_pos + 2;
                         } else {
-                            let rem_nls = count_newlines_avx2(&content[block_start..]);
-                            if rem_nls > 0 {
+                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
+                                if (line_state & STATE_CODE) != 0 {
+                                    acc.code_lines += 1;
+                                } else {
+                                    acc.comment_lines += 1;
+                                }
+                                acc.lines_processed += 1;
+                                let first_nl_abs = i + 2 + first_nl;
+                                let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
                                 acc.comment_lines += rem_nls as i64;
                                 acc.lines_processed += rem_nls as i64;
                             }
@@ -476,13 +447,13 @@ mod tests {
 
     #[test]
     fn test_go_lines_code_comments_blanks() {
-        let src = b"// Copyright\n\npackage main\n\nfunc main() {\n\n}\n";
+        let src = b"// Copyright\n\npackage main\n\nfunc main() { /* start\nend */\n\n}\n";
         let mut res = ParseResult::default();
         parse_into(src, &mut res);
 
-        assert_eq!(res.lines_processed, 7);
+        assert_eq!(res.lines_processed, 8);
         assert_eq!(res.code_lines, 3);
-        assert_eq!(res.comment_lines, 1);
+        assert_eq!(res.comment_lines, 2);
         assert_eq!(res.blank_lines, 3);
     }
 

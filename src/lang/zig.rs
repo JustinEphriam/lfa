@@ -1,4 +1,7 @@
-use super::{count_newlines_avx2, find_byte_avx2, skip_literal, ParseResult};
+use super::{
+    count_newlines_avx2, find_byte_avx2, kw_match_2_to_16, skip_ident_cont_avx2, skip_literal,
+    ParseResult,
+};
 
 pub const KEYWORD_COUNT: usize = 46;
 const KW_SLOT_MASK: usize = 255;
@@ -106,18 +109,6 @@ pub const TOKEN_KIND: [u8; 256] = [
     TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
 ];
 
-pub const IDENT_CONT: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
-    0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
 pub const KW_SLOT: [u8; 256] = [
     255, 255, 255, 23, 255, 255, 17, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 13, 40, 255, 31, 255, 16, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -153,8 +144,8 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     {
         use safe_arch::*;
         let lut_lo = m256i::from([
-            3_i8, 3, 11, 11, 3, 3, 3, 11, 3, 3, 19, 1, 1, 1, 1, 13, 3, 3, 11, 11, 3, 3, 3, 11, 3,
-            3, 19, 1, 1, 1, 1, 13,
+            3_i8, 3, 11, 11, 3, 3, 3, 11, 3, 3, 19, 1, 5, 1, 1, 13, 3, 3, 11, 11, 3, 3, 3, 11, 3,
+            3, 19, 1, 5, 1, 1, 13,
         ]);
         let lut_hi = m256i::from([
             16_i8, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0,
@@ -184,44 +175,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     i
 }
 
-#[inline(always)]
-fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = move_mask_i8_m256i(is_non_ident) as u32;
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
-        i += 1;
-    }
-    i
-}
-
+#[cfg(test)]
 #[inline(always)]
 pub fn is_zig_extension(name: &[u8]) -> bool {
     let len = name.len();
@@ -289,10 +243,12 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         let kind = TOKEN_KIND[b as usize];
         match kind {
             TOK_NL => {
-                match line_state {
-                    STATE_NONE => acc.blank_lines += 1,
-                    STATE_COMMENT => acc.comment_lines += 1,
-                    _ => acc.code_lines += 1,
+                if (line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else if (line_state & STATE_COMMENT) != 0 {
+                    acc.comment_lines += 1;
+                } else {
+                    acc.blank_lines += 1;
                 }
                 acc.lines_processed += 1;
                 line_state = STATE_NONE;
@@ -304,7 +260,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 let end = skip_ident_cont_avx2(content, i + 1);
                 i = end;
                 let len = end - start;
-                if (2..=KW_MAX_LEN).contains(&len) {
+                if len.wrapping_sub(2) <= KW_MAX_LEN - 2 {
                     let first = content[start];
                     let mid = content[start + len / 2];
                     let last = content[end - 1];
@@ -313,7 +269,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     if slot != KW_EMPTY {
                         let idx = slot as usize;
                         if len == KEYWORD_LENS[idx] as usize
-                            && &content[start..end] == KEYWORD_NAMES[idx].as_bytes()
+                            && kw_match_2_to_16(&content[start..end], KEYWORD_NAMES[idx].as_bytes())
                         {
                             acc.keyword_counts[idx] += 1;
                             acc.total_keywords += 1;
@@ -473,6 +429,14 @@ mod tests {
         assert_eq!(res.total_keywords, 1);
         assert_eq!(res.lines_processed, 4);
         assert_eq!(res.code_lines, 4);
+
+        let mut wide = b"const s = ".to_vec();
+        wide.extend(std::iter::repeat_n(b' ', 40));
+        wide.extend_from_slice(b"\\\\fn pub const\n;\n");
+        let mut res2 = ParseResult::default();
+        parse_into(&wide, &mut res2);
+        assert_eq!(res2.total_keywords, 1);
+        assert_eq!(res2.keyword_counts[find_kw_id("const")], 1);
     }
 
     #[test]

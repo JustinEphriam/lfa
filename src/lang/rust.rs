@@ -1,5 +1,6 @@
 use super::{
-    count_newlines_avx2, find_byte_avx2, find_star_slash, skip_literal, ParseResult,
+    count_newlines_avx2, find_byte_avx2, skip_ident_cont_avx2, skip_literal,
+    skip_nested_block_comment, ParseResult, IDENT_CONT,
 };
 
 pub const KEYWORD_COUNT: usize = 55;
@@ -135,27 +136,6 @@ const TOKEN_KIND: [u8; 256] = {
     table
 };
 
-const IDENT_CONT: [u8; 256] = {
-    let mut table = [0u8; 256];
-    let mut c = b'a';
-    while c <= b'z' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    let mut c = b'A';
-    while c <= b'Z' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    let mut c = b'0';
-    while c <= b'9' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    table[b'_' as usize] = 1;
-    table
-};
-
 #[inline(always)]
 fn kw_match_len_2_to_11(cand: &[u8], kw: &[u8]) -> bool {
     let n = cand.len();
@@ -220,44 +200,6 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
 }
 
 #[inline(always)]
-fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = move_mask_i8_m256i(is_non_ident) as u32;
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
-        i += 1;
-    }
-    i
-}
-
-#[inline(always)]
 fn skip_rust_raw_string(content: &[u8], start_i: usize, hashes: usize) -> usize {
     let content_len = content.len();
     let mut i = start_i;
@@ -285,47 +227,7 @@ fn skip_rust_raw_string(content: &[u8], start_i: usize, hashes: usize) -> usize 
     content_len
 }
 
-#[inline(always)]
-fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
-    let content_len = content.len();
-    let Some(first_close) = find_star_slash(&content[start_i..]) else {
-        return content_len;
-    };
-    let mut i = start_i;
-    let first_end = start_i + first_close;
-    let mut has_nested = false;
-    let mut k = start_i;
-    while k + 1 < first_end {
-        if content[k] == b'/' && content[k + 1] == b'*' {
-            has_nested = true;
-            break;
-        }
-        k += 1;
-    }
-    if !has_nested {
-        return first_end + 2;
-    }
-
-    let mut depth = 1usize;
-    while i + 1 < content_len {
-        let b0 = content[i];
-        let b1 = content[i + 1];
-        if b0 == b'/' && b1 == b'*' {
-            depth += 1;
-            i += 2;
-        } else if b0 == b'*' && b1 == b'/' {
-            depth -= 1;
-            i += 2;
-            if depth == 0 {
-                return i;
-            }
-        } else {
-            i += 1;
-        }
-    }
-    content_len
-}
-
+#[cfg(test)]
 #[inline(always)]
 pub fn is_rust_extension(name: &[u8]) -> bool {
     let len = name.len();

@@ -250,31 +250,250 @@ impl LangStats {
 
 #[inline(always)]
 pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
-    if (enabled_mask & LANG_C_MASK) != 0 && c::is_c_extension(name) {
-        return Some(LangId::C);
+    let len = name.len();
+    if len < 2 {
+        return None;
     }
-    if (enabled_mask & LANG_RUST_MASK) != 0 && rust::is_rust_extension(name) {
-        return Some(LangId::Rust);
+    if name[len - 2] == b'.' {
+        match name[len - 1] | 0x20 {
+            b'c' if (enabled_mask & LANG_C_MASK) != 0 => return Some(LangId::C),
+            b'h' => {
+                if (enabled_mask & LANG_C_MASK) != 0 {
+                    return Some(LangId::C);
+                }
+                if (enabled_mask & LANG_CPP_MASK) != 0 {
+                    return Some(LangId::Cpp);
+                }
+            }
+            b't' if (enabled_mask & LANG_PERL_MASK) != 0 && len >= 3 => {
+                let prev = name[len - 3];
+                if prev != b'/' && prev != b'\\' {
+                    return Some(LangId::Perl);
+                }
+            }
+            _ => {}
+        }
+        return None;
     }
-    if (enabled_mask & LANG_CPP_MASK) != 0 && (cpp::is_cpp_extension(name) || c::is_h_extension(name)) {
-        return Some(LangId::Cpp);
+    if len >= 3 && name[len - 3] == b'.' {
+        let ext = [name[len - 2] | 0x20, name[len - 1] | 0x20];
+        match &ext {
+            b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 && len >= 4 => {
+                return Some(LangId::Rust);
+            }
+            b"cc" | b"hh" if (enabled_mask & LANG_CPP_MASK) != 0 => {
+                return Some(LangId::Cpp);
+            }
+            b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
+                return Some(LangId::Python);
+            }
+            b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 && len >= 4 => {
+                let prev = name[len - 4];
+                if prev != b'/' && prev != b'\\' {
+                    return Some(LangId::Perl);
+                }
+            }
+            b"go" if (enabled_mask & LANG_GO_MASK) != 0 && len >= 4 => {
+                return Some(LangId::Go);
+            }
+            _ => {}
+        }
+        return None;
     }
-    if (enabled_mask & LANG_PYTHON_MASK) != 0 && python::is_python_extension(name) {
-        return Some(LangId::Python);
+    if len >= 4 && name[len - 4] == b'.' {
+        let ext = [
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        match &ext {
+            b"cpp" | b"cxx" | b"c++" | b"hpp" | b"hxx" | b"h++" | b"ipp" | b"inl" | b"ixx"
+                if (enabled_mask & LANG_CPP_MASK) != 0 =>
+            {
+                return Some(LangId::Cpp);
+            }
+            b"pyi" | b"pyw" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
+                return Some(LangId::Python);
+            }
+            b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 && len >= 5 => {
+                return Some(LangId::Zig);
+            }
+            _ => {}
+        }
+        return None;
     }
-    if (enabled_mask & LANG_PERL_MASK) != 0 && perl::is_perl_extension(name) {
-        return Some(LangId::Perl);
-    }
-    if (enabled_mask & LANG_GO_MASK) != 0 && go::is_go_extension(name) {
-        return Some(LangId::Go);
-    }
-    if (enabled_mask & LANG_ZIG_MASK) != 0 && zig::is_zig_extension(name) {
-        return Some(LangId::Zig);
-    }
-    if (enabled_mask & LANG_ODIN_MASK) != 0 && odin::is_odin_extension(name) {
-        return Some(LangId::Odin);
+    if len >= 5 && name[len - 5] == b'.' {
+        let ext = [
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        match &ext {
+            b"odin" if (enabled_mask & LANG_ODIN_MASK) != 0 && len >= 6 => {
+                return Some(LangId::Odin);
+            }
+            b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => {
+                return Some(LangId::Cpp);
+            }
+            _ => {}
+        }
     }
     None
+}
+
+pub const IDENT_CONT: [u8; 256] = {
+    let mut table = [0u8; 256];
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    let mut c = b'0';
+    while c <= b'9' {
+        table[c as usize] = 1;
+        c += 1;
+    }
+    table[b'_' as usize] = 1;
+    table
+};
+
+#[inline(always)]
+pub fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
+    debug_assert!(i <= ptr.len());
+    #[cfg(target_feature = "avx2")]
+    {
+        use safe_arch::*;
+        let lut_lo = m256i::from([
+            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
+            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
+        ]);
+        let lut_hi = m256i::from([
+            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
+            0, 0, 0, 0,
+        ]);
+        let mask_0f = set_splat_i8_m256i(0x0F);
+        let zero = zeroed_m256i();
+
+        let (chunks, _) = ptr[i..].as_chunks::<32>();
+        for &chunk in chunks {
+            let v = m256i::from(chunk);
+            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
+            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
+            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
+            let hit = m_lo & m_hi;
+            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
+            let mask = move_mask_i8_m256i(is_non_ident) as u32;
+            if mask != 0 {
+                return i + mask.trailing_zeros() as usize;
+            }
+            i += 32;
+        }
+    }
+    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
+        i += 1;
+    }
+    i
+}
+
+#[inline(always)]
+pub fn kw_match_2_to_16(cand: &[u8], kw: &[u8]) -> bool {
+    let n = cand.len();
+    if n != kw.len() || !(2..=16).contains(&n) {
+        return false;
+    }
+    if n >= 8 {
+        let a1 = u64::from_ne_bytes(cand[..8].try_into().unwrap());
+        let b1 = u64::from_ne_bytes(kw[..8].try_into().unwrap());
+        let a2 = u64::from_ne_bytes(cand[n - 8..n].try_into().unwrap());
+        let b2 = u64::from_ne_bytes(kw[n - 8..n].try_into().unwrap());
+        ((a1 ^ b1) | (a2 ^ b2)) == 0
+    } else if n >= 4 {
+        let a1 = u32::from_ne_bytes(cand[..4].try_into().unwrap());
+        let b1 = u32::from_ne_bytes(kw[..4].try_into().unwrap());
+        let a2 = u32::from_ne_bytes(cand[n - 4..n].try_into().unwrap());
+        let b2 = u32::from_ne_bytes(kw[n - 4..n].try_into().unwrap());
+        ((a1 ^ b1) | (a2 ^ b2)) == 0
+    } else {
+        let a1 = u16::from_ne_bytes(cand[..2].try_into().unwrap());
+        let b1 = u16::from_ne_bytes(kw[..2].try_into().unwrap());
+        a1 == b1 && cand[n - 1] == kw[n - 1]
+    }
+}
+
+#[inline(always)]
+pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
+    let content_len = content.len();
+    let Some(first_close) = find_star_slash(&content[start_i..]) else {
+        return content_len;
+    };
+    let mut i = start_i;
+    let first_end = start_i + first_close;
+    let mut has_nested = false;
+    let mut k = start_i;
+    while k + 1 < first_end {
+        let Some(pos) = find_byte_avx2(&content[k..first_end - 1], b'/') else {
+            break;
+        };
+        if content[k + pos + 1] == b'*' {
+            has_nested = true;
+            break;
+        }
+        k += pos + 1;
+    }
+    if !has_nested {
+        return first_end + 2;
+    }
+
+    let mut depth = 1usize;
+    while i + 1 < content_len {
+        let b0 = content[i];
+        let b1 = content[i + 1];
+        if b0 == b'/' && b1 == b'*' {
+            depth += 1;
+            i += 2;
+        } else if b0 == b'*' && b1 == b'/' {
+            depth -= 1;
+            i += 2;
+            if depth == 0 {
+                return i;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    content_len
+}
+
+#[inline(always)]
+pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
+    debug_assert!(start_i <= content.len());
+    let content_len = content.len();
+    let mut i = start_i;
+    while i + 2 < content_len {
+        let Some(pos) = find_byte_avx2(&content[i..content_len - 2], quote) else {
+            return content_len;
+        };
+        let q_idx = i + pos;
+        if content[q_idx + 1] == quote && content[q_idx + 2] == quote {
+            let mut escapes = 0usize;
+            let mut j = q_idx;
+            while j > start_i && content[j - 1] == b'\\' {
+                escapes += 1;
+                j -= 1;
+            }
+            if (escapes & 1) == 0 {
+                return q_idx + 3;
+            }
+        }
+        i = q_idx + 1;
+    }
+    content_len
 }
 
 #[inline(always)]

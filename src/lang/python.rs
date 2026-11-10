@@ -1,4 +1,7 @@
-use super::{count_newlines_avx2, find_byte_avx2, skip_literal, ParseResult};
+use super::{
+    count_newlines_avx2, find_byte_avx2, skip_ident_cont_avx2, skip_literal, skip_triple_literal,
+    ParseResult,
+};
 
 pub const KEYWORD_COUNT: usize = 37;
 const KW_SLOT_MASK: usize = 255;
@@ -113,27 +116,6 @@ const TOKEN_KIND: [u8; 256] = {
     table
 };
 
-const IDENT_CONT: [u8; 256] = {
-    let mut table = [0u8; 256];
-    let mut c = b'a';
-    while c <= b'z' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    let mut c = b'A';
-    while c <= b'Z' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    let mut c = b'0';
-    while c <= b'9' {
-        table[c as usize] = 1;
-        c += 1;
-    }
-    table[b'_' as usize] = 1;
-    table
-};
-
 #[inline(always)]
 fn kw_match_len_2_to_8(cand: &[u8], kw: &[u8]) -> bool {
     let n = cand.len();
@@ -195,70 +177,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     i
 }
 
-#[inline(always)]
-fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = move_mask_i8_m256i(is_non_ident) as u32;
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
-        i += 1;
-    }
-    i
-}
-
-#[inline(always)]
-fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
-    debug_assert!(start_i <= content.len());
-    let content_len = content.len();
-    let mut i = start_i;
-    while i + 2 < content_len {
-        let Some(pos) = find_byte_avx2(&content[i..content_len - 2], quote) else {
-            return content_len;
-        };
-        let q_idx = i + pos;
-        if content[q_idx + 1] == quote && content[q_idx + 2] == quote {
-            let mut escapes = 0usize;
-            let mut j = q_idx;
-            while j > start_i && content[j - 1] == b'\\' {
-                escapes += 1;
-                j -= 1;
-            }
-            if (escapes & 1) == 0 {
-                return q_idx + 3;
-            }
-        }
-        i = q_idx + 1;
-    }
-    content_len
-}
-
+#[cfg(test)]
 #[inline(always)]
 pub fn is_python_extension(name: &[u8]) -> bool {
     let len = name.len();
@@ -402,6 +321,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lang::IDENT_CONT;
 
     pub fn find_kw_id(name: &str) -> usize {
         KEYWORD_NAMES.iter().position(|&kw| kw == name).unwrap()

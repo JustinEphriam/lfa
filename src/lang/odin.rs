@@ -1,4 +1,7 @@
-use super::{count_newlines_avx2, find_byte_avx2, skip_literal, ParseResult};
+use super::{
+    count_newlines_avx2, find_byte_avx2, kw_match_2_to_16, skip_ident_cont_avx2, skip_literal,
+    skip_nested_block_comment, skip_triple_literal, ParseResult,
+};
 
 pub const KEYWORD_COUNT: usize = 39;
 const KW_SLOT_MASK: usize = 255;
@@ -99,18 +102,6 @@ pub const TOKEN_KIND: [u8; 256] = [
     TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE, TOK_CODE,
 ];
 
-pub const IDENT_CONT: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0,
-    0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-];
-
 pub const KW_SLOT: [u8; 256] = [
     1, 13, 255, 255, 255, 255, 255, 32, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 17, 255, 255, 255, 255, 255, 9, 255, 255, 29, 255, 255,
@@ -177,67 +168,7 @@ fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
     i
 }
 
-#[inline(always)]
-fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_non_ident = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = move_mask_i8_m256i(is_non_ident) as u32;
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
-        i += 1;
-    }
-    i
-}
-
-#[inline(always)]
-fn skip_nested_block_comment(content: &[u8], mut i: usize) -> (usize, usize) {
-    let content_len = content.len();
-    let mut depth = 1usize;
-    let mut newlines = 0usize;
-    while i < content_len && depth > 0 {
-        let b = content[i];
-        if b == b'\n' {
-            newlines += 1;
-            i += 1;
-        } else if b == b'/' && i + 1 < content_len && content[i + 1] == b'*' {
-            depth += 1;
-            i += 2;
-        } else if b == b'*' && i + 1 < content_len && content[i + 1] == b'/' {
-            depth -= 1;
-            i += 2;
-        } else {
-            i += 1;
-        }
-    }
-    (i, newlines)
-}
-
+#[cfg(test)]
 #[inline(always)]
 pub fn is_odin_extension(name: &[u8]) -> bool {
     let len = name.len();
@@ -299,10 +230,12 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
         let kind = TOKEN_KIND[b as usize];
         match kind {
             TOK_NL => {
-                match line_state {
-                    STATE_NONE => acc.blank_lines += 1,
-                    STATE_COMMENT => acc.comment_lines += 1,
-                    _ => acc.code_lines += 1,
+                if (line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else if (line_state & STATE_COMMENT) != 0 {
+                    acc.comment_lines += 1;
+                } else {
+                    acc.blank_lines += 1;
                 }
                 acc.lines_processed += 1;
                 line_state = STATE_NONE;
@@ -314,7 +247,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 let end = skip_ident_cont_avx2(content, i + 1);
                 i = end;
                 let len = end - start;
-                if (2..=KW_MAX_LEN).contains(&len) {
+                if len.wrapping_sub(2) <= KW_MAX_LEN - 2 {
                     let first = content[start];
                     let mid = content[start + len / 2];
                     let last = content[end - 1];
@@ -323,7 +256,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                     if slot != KW_EMPTY {
                         let idx = slot as usize;
                         if len == KEYWORD_LENS[idx] as usize
-                            && &content[start..end] == KEYWORD_NAMES[idx].as_bytes()
+                            && kw_match_2_to_16(&content[start..end], KEYWORD_NAMES[idx].as_bytes())
                         {
                             acc.keyword_counts[idx] += 1;
                             acc.total_keywords += 1;
@@ -360,13 +293,20 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                         i = nl_idx + 1;
                         continue;
                     } else if next_b == b'*' {
-                        if line_state == STATE_NONE {
+                        line_state |= STATE_COMMENT;
+                        let end_i = skip_nested_block_comment(content, i + 2);
+                        if let Some(first_nl) = find_byte_avx2(&content[i + 2..end_i], b'\n') {
+                            if (line_state & STATE_CODE) != 0 {
+                                acc.code_lines += 1;
+                            } else {
+                                acc.comment_lines += 1;
+                            }
+                            acc.lines_processed += 1;
+                            let first_nl_abs = i + 2 + first_nl;
+                            let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..end_i]);
+                            acc.comment_lines += inter_nls as i64;
+                            acc.lines_processed += inter_nls as i64;
                             line_state = STATE_COMMENT;
-                        }
-                        let (end_i, nls) = skip_nested_block_comment(content, i + 2);
-                        if nls > 0 {
-                            acc.comment_lines += nls as i64;
-                            acc.lines_processed += nls as i64;
                         }
                         i = end_i;
                         continue;
@@ -378,29 +318,13 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
             TOK_QUOTE => {
                 line_state |= STATE_CODE;
                 if i + 2 < content_len && content[i + 1] == b'"' && content[i + 2] == b'"' {
-                    let mut j = i + 3;
-                    let mut found = false;
-                    while j + 2 < content_len {
-                        if content[j] == b'"' && content[j + 1] == b'"' && content[j + 2] == b'"' {
-                            let nls = count_newlines_avx2(&content[i + 3..j]);
-                            if nls > 0 {
-                                acc.code_lines += nls as i64;
-                                acc.lines_processed += nls as i64;
-                            }
-                            i = j + 3;
-                            found = true;
-                            break;
-                        }
-                        j += 1;
+                    let end_i = skip_triple_literal(content, i + 3, b'"');
+                    let nl = count_newlines_avx2(&content[i + 3..end_i]);
+                    if nl > 0 {
+                        acc.code_lines += nl as i64;
+                        acc.lines_processed += nl as i64;
                     }
-                    if !found {
-                        let rem = count_newlines_avx2(&content[i + 3..]);
-                        if rem > 0 {
-                            acc.code_lines += rem as i64;
-                            acc.lines_processed += rem as i64;
-                        }
-                        i = content_len;
-                    }
+                    i = end_i;
                     continue;
                 }
                 let end_i = skip_literal(content, i + 1, b'"');
@@ -508,6 +432,13 @@ mod tests {
         assert_eq!(res.code_lines, 9);
         assert_eq!(res.comment_lines, 2);
         assert_eq!(res.blank_lines, 2);
+
+        let mut res_mixed = ParseResult::default();
+        parse_into(b"main :: proc() { /* nested /* \n */ end */\n}\n", &mut res_mixed);
+        assert_eq!(res_mixed.lines_processed, 3);
+        assert_eq!(res_mixed.code_lines, 2);
+        assert_eq!(res_mixed.comment_lines, 1);
+        assert_eq!(res_mixed.blank_lines, 0);
     }
 
     #[test]

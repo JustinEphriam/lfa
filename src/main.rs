@@ -347,6 +347,10 @@ fn process_single_path<Fd: AsFd>(
     if read_file_into(dirfd, path, fb) {
         res.files_processed[idx] += 1;
         parse_into(lang, fb, &mut res.lang_stats);
+        if fb.capacity() > 524_288 {
+            fb.clear();
+            fb.shrink_to(131_072);
+        }
     }
 }
 
