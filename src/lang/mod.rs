@@ -2,6 +2,7 @@ pub mod c;
 pub mod cpp;
 pub mod go;
 pub mod javascript;
+pub mod lua;
 pub mod odin;
 pub mod perl;
 pub mod python;
@@ -22,9 +23,10 @@ pub enum LangId {
     Odin = 7,
     JavaScript = 8,
     TypeScript = 9,
+    Lua = 10,
 }
 
-pub const LANG_COUNT: usize = 10;
+pub const LANG_COUNT: usize = 11;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -35,6 +37,7 @@ pub const LANG_ZIG_MASK: u32 = 1 << (LangId::Zig as u32);
 pub const LANG_ODIN_MASK: u32 = 1 << (LangId::Odin as u32);
 pub const LANG_JAVASCRIPT_MASK: u32 = 1 << (LangId::JavaScript as u32);
 pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
+pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -48,6 +51,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Odin,
     LangId::JavaScript,
     LangId::TypeScript,
+    LangId::Lua,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -67,6 +71,7 @@ impl LangId {
             Self::Odin => "Odin",
             Self::JavaScript => "JavaScript",
             Self::TypeScript => "TypeScript",
+            Self::Lua => "Lua",
         }
     }
 
@@ -96,6 +101,7 @@ impl LangId {
             | b"-JAVASCRIPT" | b"--JAVASCRIPT" => Some(Self::JavaScript),
             b"-ts" | b"--ts" | b"-TS" | b"--TS" | b"-typescript" | b"--typescript"
             | b"-TYPESCRIPT" | b"--TYPESCRIPT" => Some(Self::TypeScript),
+            b"-lua" | b"--lua" | b"-LUA" | b"--LUA" => Some(Self::Lua),
             _ => None,
         }
     }
@@ -150,6 +156,7 @@ pub struct LangStats {
     pub odin: ParseResult<{ odin::KEYWORD_COUNT }>,
     pub javascript: ParseResult<{ javascript::KEYWORD_COUNT }>,
     pub typescript: ParseResult<{ typescript::KEYWORD_COUNT }>,
+    pub lua: ParseResult<{ lua::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -165,6 +172,7 @@ impl LangStats {
         self.odin.add(&other.odin);
         self.javascript.add(&other.javascript);
         self.typescript.add(&other.typescript);
+        self.lua.add(&other.lua);
     }
 
     #[inline(always)]
@@ -180,6 +188,7 @@ impl LangStats {
             LangId::Odin => self.odin.lines_processed,
             LangId::JavaScript => self.javascript.lines_processed,
             LangId::TypeScript => self.typescript.lines_processed,
+            LangId::Lua => self.lua.lines_processed,
         }
     }
 
@@ -196,6 +205,7 @@ impl LangStats {
             LangId::Odin => self.odin.code_lines,
             LangId::JavaScript => self.javascript.code_lines,
             LangId::TypeScript => self.typescript.code_lines,
+            LangId::Lua => self.lua.code_lines,
         }
     }
 
@@ -212,6 +222,7 @@ impl LangStats {
             LangId::Odin => self.odin.comment_lines,
             LangId::JavaScript => self.javascript.comment_lines,
             LangId::TypeScript => self.typescript.comment_lines,
+            LangId::Lua => self.lua.comment_lines,
         }
     }
 
@@ -228,6 +239,7 @@ impl LangStats {
             LangId::Odin => self.odin.blank_lines,
             LangId::JavaScript => self.javascript.blank_lines,
             LangId::TypeScript => self.typescript.blank_lines,
+            LangId::Lua => self.lua.blank_lines,
         }
     }
 
@@ -244,6 +256,7 @@ impl LangStats {
             LangId::Odin => self.odin.total_keywords,
             LangId::JavaScript => self.javascript.total_keywords,
             LangId::TypeScript => self.typescript.total_keywords,
+            LangId::Lua => self.lua.total_keywords,
         }
     }
 
@@ -260,6 +273,7 @@ impl LangStats {
             LangId::Odin => &odin::KEYWORD_NAMES,
             LangId::JavaScript => &javascript::KEYWORD_NAMES,
             LangId::TypeScript => &typescript::KEYWORD_NAMES,
+            LangId::Lua => &lua::KEYWORD_NAMES,
         }
     }
 
@@ -276,6 +290,7 @@ impl LangStats {
             LangId::Odin => &self.odin.keyword_counts,
             LangId::JavaScript => &self.javascript.keyword_counts,
             LangId::TypeScript => &self.typescript.keyword_counts,
+            LangId::Lua => &self.lua.keyword_counts,
         }
     }
 
@@ -292,6 +307,7 @@ impl LangStats {
             LangId::Odin => &odin::KEYWORD_LENS,
             LangId::JavaScript => &javascript::KEYWORD_LENS,
             LangId::TypeScript => &typescript::KEYWORD_LENS,
+            LangId::Lua => &lua::KEYWORD_LENS,
         }
     }
 
@@ -308,6 +324,7 @@ impl LangStats {
             LangId::Odin => (odin::KW_MIN_LEN, odin::KW_MAX_LEN),
             LangId::JavaScript => (javascript::KW_MIN_LEN, javascript::KW_MAX_LEN),
             LangId::TypeScript => (typescript::KW_MIN_LEN, typescript::KW_MAX_LEN),
+            LangId::Lua => (lua::KW_MIN_LEN, lua::KW_MAX_LEN),
         }
     }
 
@@ -324,6 +341,7 @@ impl LangStats {
             LangId::Odin => (&odin::TOKEN_KIND, &odin::TOKEN_LUT_LO),
             LangId::JavaScript => (&javascript::TOKEN_KIND, &javascript::TOKEN_LUT_LO),
             LangId::TypeScript => (&typescript::TOKEN_KIND, &typescript::TOKEN_LUT_LO),
+            LangId::Lua => (&lua::TOKEN_KIND, &lua::TOKEN_LUT_LO),
         }
     }
 }
@@ -397,6 +415,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"pyi" | b"pyw" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
                 return Some(LangId::Python);
             }
+            b"lua" if (enabled_mask & LANG_LUA_MASK) != 0 => return Some(LangId::Lua),
             b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 => return Some(LangId::Zig),
             b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
                 return Some(LangId::JavaScript);
@@ -1070,6 +1089,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Odin => odin::parse_into(content, &mut stats.odin),
         LangId::JavaScript => javascript::parse_into(content, &mut stats.javascript),
         LangId::TypeScript => typescript::parse_into(content, &mut stats.typescript),
+        LangId::Lua => lua::parse_into(content, &mut stats.lua),
     }
 }
 
@@ -1242,6 +1262,7 @@ mod tests {
         for lang in ALL_LANGS {
             let cmt: &str = match lang {
                 LangId::Python | LangId::Perl => "#",
+                LangId::Lua => "--",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -1254,10 +1275,15 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
+            }
+            if lang == LangId::Lua {
+                samples.push("a\n--[[ x\ny ]]".to_string());
+                samples.push("a --[[ x\ny".to_string());
+                samples.push("a\n--[[ x ]] b".to_string());
             }
             if lang == LangId::Perl {
                 samples.push("a\n=pod\nx\ny".to_string());

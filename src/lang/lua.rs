@@ -1,0 +1,355 @@
+use super::{
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE,
+    TOK_NL, TOK_WS,
+};
+
+#[cfg(test)]
+use super::{skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2};
+
+pub const KEYWORD_COUNT: usize = 22;
+const KW_SLOT_MASK: usize = 255;
+const KW_EMPTY: u8 = 255;
+
+pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
+    "and",
+    "break",
+    "do",
+    "else",
+    "elseif",
+    "end",
+    "false",
+    "for",
+    "function",
+    "goto",
+    "if",
+    "in",
+    "local",
+    "nil",
+    "not",
+    "or",
+    "repeat",
+    "return",
+    "then",
+    "true",
+    "until",
+    "while",
+];
+
+pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAMES);
+pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
+pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
+
+const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
+const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
+
+const TOK_IDENT: u8 = 3;
+const TOK_MINUS: u8 = 4;
+const TOK_QUOTE: u8 = 5;
+const TOK_APOSTROPHE: u8 = 6;
+const TOK_LBRACKET: u8 = 7;
+
+#[inline(always)]
+const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
+    let val = (first as usize)
+        .wrapping_add(mid as usize)
+        .wrapping_add(last as usize)
+        .wrapping_add(len.wrapping_mul(47));
+    (val ^ (val >> 5)) & KW_SLOT_MASK
+}
+
+const KW_TABLE: [u8; 256] = {
+    let mut table = [KW_EMPTY; 256];
+    let mut i = 0;
+    while i < KEYWORD_COUNT {
+        let name = KEYWORD_NAMES[i].as_bytes();
+        let len = KEYWORD_LENS[i] as usize;
+        assert!(name.len() == len);
+        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
+        let h = kw_hash(name[0], name[len / 2], name[len - 1], len);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+};
+
+pub const TOKEN_KIND: [u8; 256] = {
+    let mut table = [TOK_CODE; 256];
+    table[b' ' as usize] = TOK_WS;
+    table[b'\t' as usize] = TOK_WS;
+    table[b'\r' as usize] = TOK_WS;
+    table[0x0b_usize] = TOK_WS;
+    table[0x0c_usize] = TOK_WS;
+    table[b'\n' as usize] = TOK_NL;
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = TOK_IDENT;
+        c += 1;
+    }
+    table[b'_' as usize] = TOK_IDENT;
+    table[b'-' as usize] = TOK_MINUS;
+    table[b'"' as usize] = TOK_QUOTE;
+    table[b'\'' as usize] = TOK_APOSTROPHE;
+    table[b'[' as usize] = TOK_LBRACKET;
+    table
+};
+
+pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
+
+#[inline(always)]
+fn skip_lua_long_bracket(content: &[u8], start_bracket: usize) -> Option<usize> {
+    let content_len = content.len();
+    let mut eq_count = 0;
+    let mut p = start_bracket + 1;
+    while p < content_len && content[p] == b'=' {
+        eq_count += 1;
+        p += 1;
+    }
+    if p >= content_len || content[p] != b'[' {
+        return None;
+    }
+    p += 1;
+    while p < content_len {
+        let Some(pos) = find_byte_avx2(&content[p..], b']') else {
+            return Some(content_len);
+        };
+        let close_bracket = p + pos;
+        let mut close_p = close_bracket + 1;
+        let mut close_eq = 0;
+        while close_p < content_len && content[close_p] == b'=' {
+            close_eq += 1;
+            close_p += 1;
+        }
+        if close_eq == eq_count && close_p < content_len && content[close_p] == b']' {
+            return Some(close_p + 1);
+        }
+        p = close_bracket + 1;
+    }
+    Some(content_len)
+}
+
+#[cfg(test)]
+#[inline(always)]
+pub fn is_lua_extension(name: &[u8]) -> bool {
+    super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::Lua)
+}
+
+pub struct LuaLexer;
+
+impl LangLexer<KEYWORD_COUNT> for LuaLexer {
+    const TOKEN_KIND: [u8; 256] = TOKEN_KIND;
+    const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
+    const HAS_DOLLAR_IDENT: bool = false;
+    const SUPPORTS_TEMPLATES: bool = false;
+
+    #[inline(always)]
+    fn match_keyword(cand: &[u8]) -> Option<usize> {
+        let n = cand.len();
+        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
+            let h = kw_hash(cand[0], cand[n / 2], cand[n - 1], n);
+            let slot = KW_TABLE[h];
+            if slot != KW_EMPTY {
+                let idx = slot as usize;
+                if n == KEYWORD_LENS[idx] as usize
+                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
+                {
+                    return Some(idx);
+                }
+            }
+        }
+        None
+    }
+
+    #[inline(always)]
+    fn handle_special(
+        kind: u8,
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let content_len = content.len();
+        let b = content[i];
+        match kind {
+            TOK_MINUS => {
+                if i + 1 < content_len && content[i + 1] == b'-' {
+                    *line_state |= STATE_COMMENT;
+                    if i + 2 < content_len
+                        && content[i + 2] == b'['
+                        && let Some(end_i) = skip_lua_long_bracket(content, i + 2)
+                    {
+                        if let Some(first_nl) = find_byte_avx2(&content[i + 2..end_i], b'\n') {
+                            if (*line_state & STATE_CODE) != 0 {
+                                acc.code_lines += 1;
+                            } else {
+                                acc.comment_lines += 1;
+                            }
+                            acc.lines_processed += 1;
+                            let first_nl_abs = i + 2 + first_nl;
+                            let inter_nls =
+                                count_newlines_avx2(&content[first_nl_abs + 1..end_i]);
+                            acc.comment_lines += inter_nls as i64;
+                            acc.lines_processed += inter_nls as i64;
+                            *line_state = STATE_COMMENT;
+                        }
+                        return end_i;
+                    }
+                    let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
+                        return content_len;
+                    };
+                    let nl_idx = i + 2 + pos;
+                    if (*line_state & STATE_CODE) != 0 {
+                        acc.code_lines += 1;
+                    } else if (*line_state & STATE_COMMENT) != 0 {
+                        acc.comment_lines += 1;
+                    } else {
+                        acc.blank_lines += 1;
+                    }
+                    acc.lines_processed += 1;
+                    *line_state = 0;
+                    return nl_idx + 1;
+                }
+                *line_state |= STATE_CODE;
+                i + 1
+            }
+            TOK_LBRACKET => {
+                *line_state |= STATE_CODE;
+                if let Some(end_i) = skip_lua_long_bracket(content, i) {
+                    let nl = count_newlines_avx2(&content[i..end_i]);
+                    if nl > 0 {
+                        acc.code_lines += nl as i64;
+                        acc.lines_processed += nl as i64;
+                    }
+                    return end_i;
+                }
+                i + 1
+            }
+            TOK_QUOTE | TOK_APOSTROPHE => {
+                *line_state |= STATE_CODE;
+                let end_i = skip_literal(content, i + 1, b);
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
+            }
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
+        }
+    }
+}
+
+pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
+    unified_parse_into::<KEYWORD_COUNT, LuaLexer>(content, acc);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn find_kw_id(name: &str) -> usize {
+        KEYWORD_NAMES.iter().position(|&kw| kw == name).unwrap()
+    }
+
+    #[test]
+    fn test_lua_extensions() {
+        assert!(is_lua_extension(b"main.lua"));
+        assert!(is_lua_extension(b"path/to/script.LUA"));
+        assert!(!is_lua_extension(b"main.py"));
+        assert!(!is_lua_extension(b".lua"));
+    }
+
+    #[test]
+    fn test_lua_keyword_table_and_mph() {
+        assert_eq!(KEYWORD_COUNT, 22);
+        let mut seen = [false; 256];
+        for i in 0..KEYWORD_COUNT {
+            let kw = KEYWORD_NAMES[i];
+            let len = kw.len();
+            assert_eq!(len, KEYWORD_LENS[i] as usize);
+            assert!((2..=KW_MAX_LEN).contains(&len));
+
+            let bytes = kw.as_bytes();
+            let first = bytes[0];
+            let mid = bytes[len / 2];
+            let last = bytes[len - 1];
+
+            let h = kw_hash(first, mid, last, len);
+            assert!(!seen[h], "collision at slot {} for kw {}", h, kw);
+            seen[h] = true;
+            assert_eq!(KW_TABLE[h], i as u8);
+        }
+
+        let non_keywords = ["functionality", "fore", "els", "whiles", "locale", "nilify"];
+        for s in non_keywords {
+            let mut res = ParseResult::default();
+            parse_into(s.as_bytes(), &mut res);
+            assert_eq!(res.total_keywords, 0, "False positive on: {}", s);
+        }
+
+        for b in 0..=255u8 {
+            let mut block = [b' '; 64];
+            block[19] = b;
+            let pos = skip_non_tokens_with_lut_avx2(&block, 0, &TOKEN_KIND, &TOKEN_LUT_LO);
+            if TOKEN_KIND[b as usize] > TOK_CODE || b == b'\n' {
+                assert_eq!(pos, 19);
+            } else {
+                assert_eq!(pos, block.len());
+            }
+
+            let mut block = [b'a'; 64];
+            block[19] = b;
+            let id_pos = skip_ident_cont_avx2(&block, 0);
+            if super::super::IDENT_CONT[b as usize] == 0 {
+                assert_eq!(id_pos, 19);
+            } else {
+                assert_eq!(id_pos, block.len());
+            }
+        }
+    }
+
+    #[test]
+    fn test_lua_comments_and_strings() {
+        let src = concat!(
+            "local x = 10 -- short comment\n",
+            "--[[ multi\n",
+            "     line\n",
+            "     comment ]] local y = 20\n",
+            "--[==[ level 2\n",
+            "       comment ]==]\n",
+            "local s = [[ long\n",
+            "string ]]\n",
+            "if x > 5 then return end\n"
+        );
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+        assert_eq!(res.keyword_counts[find_kw_id("local")], 3);
+        assert_eq!(res.keyword_counts[find_kw_id("if")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("then")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("return")], 1);
+        assert_eq!(res.keyword_counts[find_kw_id("end")], 1);
+        assert_eq!(res.lines_processed, 9);
+        assert_eq!(res.lines_processed, res.code_lines + res.comment_lines + res.blank_lines);
+    }
+
+    #[test]
+    fn test_lua_lines_code_comments_blanks() {
+        let src = "local a = 1\n\n-- comment\n\nreturn a\n";
+        let mut res = ParseResult::default();
+        parse_into(src.as_bytes(), &mut res);
+        assert_eq!(res.lines_processed, 5);
+        assert_eq!(res.code_lines, 2);
+        assert_eq!(res.comment_lines, 1);
+        assert_eq!(res.blank_lines, 2);
+    }
+}
