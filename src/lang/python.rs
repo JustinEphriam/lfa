@@ -1,11 +1,11 @@
 use super::{
-    count_newlines_avx2, find_byte_avx2, kw_match_2_to_16, skip_ident_cont_avx2, skip_literal,
-    skip_triple_literal, ParseResult,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2, skip_literal,
+    skip_non_tokens_with_lut_avx2, skip_triple_literal, ParseResult, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 37;
 const KW_SLOT_MASK: usize = 255;
-const KW_MAX_LEN: usize = 8;
 const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
@@ -48,22 +48,13 @@ pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "yield",
 ];
 
-pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = {
-    let mut lens = [0u8; KEYWORD_COUNT];
-    let mut i = 0;
-    while i < KEYWORD_COUNT {
-        lens[i] = KEYWORD_NAMES[i].len() as u8;
-        i += 1;
-    }
-    lens
-};
+pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAMES);
+pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
+pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 
 const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
 const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
 
-const TOK_WS: u8 = 0;
-const TOK_NL: u8 = 1;
-const TOK_CODE: u8 = 2;
 const TOK_IDENT: u8 = 3;
 const TOK_HASH: u8 = 4;
 const TOK_QUOTE: u8 = 5;
@@ -87,7 +78,7 @@ const KW_TABLE: [u8; 256] = {
         let name = KEYWORD_NAMES[i].as_bytes();
         let len = KEYWORD_LENS[i] as usize;
         assert!(name.len() == len);
-        assert!(len >= 2 && len <= KW_MAX_LEN);
+        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
         let h = kw_hash(name[0], name[len - 1], len);
         assert!(table[h] == KW_EMPTY);
         table[h] = i as u8;
@@ -96,7 +87,7 @@ const KW_TABLE: [u8; 256] = {
     table
 };
 
-const TOKEN_KIND: [u8; 256] = {
+pub const TOKEN_KIND: [u8; 256] = {
     let mut table = [TOK_CODE; 256];
     table[b' ' as usize] = TOK_WS;
     table[b'\t' as usize] = TOK_WS;
@@ -121,61 +112,17 @@ const TOKEN_KIND: [u8; 256] = {
     table
 };
 
+pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
 #[inline(always)]
-fn skip_non_tokens_avx2(ptr: &[u8], mut i: usize) -> usize {
-    debug_assert!(i <= ptr.len());
-    #[cfg(target_feature = "avx2")]
-    {
-        use safe_arch::*;
-        let lut_lo = m256i::from([
-            2_i8, 3, 11, 11, 3, 3, 3, 11, 3, 3, 19, 1, 1, 1, 1, 5, 2, 3, 11, 11, 3, 3, 3, 11, 3,
-            3, 19, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            16_i8, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 16, 0, 8, 0, 1, 6, 1, 2, 0, 0, 0,
-            0, 0, 0, 0, 0,
-        ]);
-        let mask_0f = set_splat_i8_m256i(0x0F);
-        let zero = zeroed_m256i();
-
-        let (chunks, _) = ptr[i..].as_chunks::<32>();
-        for &chunk in chunks {
-            let v = m256i::from(chunk);
-            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
-            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
-            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
-            let hit = m_lo & m_hi;
-            let is_zero = cmp_eq_mask_i8_m256i(hit, zero);
-            let mask = !(move_mask_i8_m256i(is_zero) as u32);
-            if mask != 0 {
-                return i + mask.trailing_zeros() as usize;
-            }
-            i += 32;
-        }
-    }
-    while i < ptr.len() && TOKEN_KIND[ptr[i] as usize] <= TOK_CODE && ptr[i] != b'\n' {
-        i += 1;
-    }
-    i
+fn skip_non_tokens_avx2(ptr: &[u8], i: usize) -> usize {
+    skip_non_tokens_with_lut_avx2(ptr, i, &TOKEN_KIND, &TOKEN_LUT_LO)
 }
 
 #[cfg(test)]
 #[inline(always)]
 pub fn is_python_extension(name: &[u8]) -> bool {
-    let len = name.len();
-    if len >= 3 && name[len - 3] == b'.' {
-        let p = name[len - 2] | 0x20;
-        let y = name[len - 1] | 0x20;
-        return p == b'p' && y == b'y';
-    }
-    if len >= 4 && name[len - 4] == b'.' {
-        let p = name[len - 3] | 0x20;
-        let y = name[len - 2] | 0x20;
-        let ext = name[len - 1] | 0x20;
-        return p == b'p' && y == b'y' && (ext == b'i' || ext == b'w');
-    }
-    false
+    super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::Python)
 }
 
 pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
@@ -232,7 +179,7 @@ pub fn parse_into(content: &[u8], acc: &mut ParseResult<KEYWORD_COUNT>) {
                 i = skip_ident_cont_avx2(content, i + 1);
                 debug_assert!(i > start && i <= content_len);
                 let n = i - start;
-                if n.wrapping_sub(2) <= KW_MAX_LEN - 2 {
+                if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
                     let h = kw_hash(content[start], content[i - 1], n);
                     let id = KW_TABLE[h];
                     if id != KW_EMPTY {

@@ -278,15 +278,71 @@ impl LangStats {
             LangId::TypeScript => &self.typescript.keyword_counts,
         }
     }
+
+    #[cfg(test)]
+    pub fn keyword_lens(lang: LangId) -> &'static [u8] {
+        match lang {
+            LangId::C => &c::KEYWORD_LENS,
+            LangId::Cpp => &cpp::KEYWORD_LENS,
+            LangId::Rust => &rust::KEYWORD_LENS,
+            LangId::Python => &python::KEYWORD_LENS,
+            LangId::Perl => &perl::KEYWORD_LENS,
+            LangId::Go => &go::KEYWORD_LENS,
+            LangId::Zig => &zig::KEYWORD_LENS,
+            LangId::Odin => &odin::KEYWORD_LENS,
+            LangId::JavaScript => &javascript::KEYWORD_LENS,
+            LangId::TypeScript => &typescript::KEYWORD_LENS,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn kw_min_max(lang: LangId) -> (usize, usize) {
+        match lang {
+            LangId::C => (c::KW_MIN_LEN, c::KW_MAX_LEN),
+            LangId::Cpp => (cpp::KW_MIN_LEN, cpp::KW_MAX_LEN),
+            LangId::Rust => (rust::KW_MIN_LEN, rust::KW_MAX_LEN),
+            LangId::Python => (python::KW_MIN_LEN, python::KW_MAX_LEN),
+            LangId::Perl => (perl::KW_MIN_LEN, perl::KW_MAX_LEN),
+            LangId::Go => (go::KW_MIN_LEN, go::KW_MAX_LEN),
+            LangId::Zig => (zig::KW_MIN_LEN, zig::KW_MAX_LEN),
+            LangId::Odin => (odin::KW_MIN_LEN, odin::KW_MAX_LEN),
+            LangId::JavaScript => (javascript::KW_MIN_LEN, javascript::KW_MAX_LEN),
+            LangId::TypeScript => (typescript::KW_MIN_LEN, typescript::KW_MAX_LEN),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn token_kind_and_lut(lang: LangId) -> (&'static [u8; 256], &'static [i8; 32]) {
+        match lang {
+            LangId::C => (&c::TOKEN_KIND, &c::TOKEN_LUT_LO),
+            LangId::Cpp => (&cpp::TOKEN_KIND, &cpp::TOKEN_LUT_LO),
+            LangId::Rust => (&rust::TOKEN_KIND, &rust::TOKEN_LUT_LO),
+            LangId::Python => (&python::TOKEN_KIND, &python::TOKEN_LUT_LO),
+            LangId::Perl => (&perl::TOKEN_KIND, &perl::TOKEN_LUT_LO),
+            LangId::Go => (&go::TOKEN_KIND, &go::TOKEN_LUT_LO),
+            LangId::Zig => (&zig::TOKEN_KIND, &zig::TOKEN_LUT_LO),
+            LangId::Odin => (&odin::TOKEN_KIND, &odin::TOKEN_LUT_LO),
+            LangId::JavaScript => (&javascript::TOKEN_KIND, &javascript::TOKEN_LUT_LO),
+            LangId::TypeScript => (&typescript::TOKEN_KIND, &typescript::TOKEN_LUT_LO),
+        }
+    }
+}
+
+#[inline(always)]
+fn has_stem(name: &[u8], dot_idx: usize) -> bool {
+    dot_idx > 0 && name[dot_idx - 1] != b'/' && name[dot_idx - 1] != b'\\'
 }
 
 #[inline(always)]
 pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
     let len = name.len();
-    if len < 2 {
+    if len < 3 {
         return None;
     }
     if name[len - 2] == b'.' {
+        if !has_stem(name, len - 2) {
+            return None;
+        }
         match name[len - 1] | 0x20 {
             b'c' if (enabled_mask & LANG_C_MASK) != 0 => return Some(LangId::C),
             b'h' => {
@@ -297,54 +353,36 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
                     return Some(LangId::Cpp);
                 }
             }
-            b't' if (enabled_mask & LANG_PERL_MASK) != 0 && len >= 3 => {
-                let prev = name[len - 3];
-                if prev != b'/' && prev != b'\\' {
-                    return Some(LangId::Perl);
-                }
-            }
+            b't' if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
             _ => {}
         }
         return None;
     }
-    if len >= 3 && name[len - 3] == b'.' {
+    if len >= 4 && name[len - 3] == b'.' {
+        if !has_stem(name, len - 3) {
+            return None;
+        }
         let ext = [name[len - 2] | 0x20, name[len - 1] | 0x20];
         match &ext {
-            b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 && len >= 4 => {
-                return Some(LangId::Rust);
+            b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 => return Some(LangId::Rust),
+            b"cc" | b"hh" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
+            b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => return Some(LangId::Python),
+            b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
+            b"go" if (enabled_mask & LANG_GO_MASK) != 0 => return Some(LangId::Go),
+            b"js" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
+                return Some(LangId::JavaScript);
             }
-            b"cc" | b"hh" if (enabled_mask & LANG_CPP_MASK) != 0 => {
-                return Some(LangId::Cpp);
-            }
-            b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
-                return Some(LangId::Python);
-            }
-            b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 && len >= 4 => {
-                let prev = name[len - 4];
-                if prev != b'/' && prev != b'\\' {
-                    return Some(LangId::Perl);
-                }
-            }
-            b"go" if (enabled_mask & LANG_GO_MASK) != 0 && len >= 4 => {
-                return Some(LangId::Go);
-            }
-            b"js" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && len >= 4 => {
-                let prev = name[len - 4];
-                if prev != b'/' && prev != b'\\' {
-                    return Some(LangId::JavaScript);
-                }
-            }
-            b"ts" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 && len >= 4 => {
-                let prev = name[len - 4];
-                if prev != b'/' && prev != b'\\' {
-                    return Some(LangId::TypeScript);
-                }
+            b"ts" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
+                return Some(LangId::TypeScript);
             }
             _ => {}
         }
         return None;
     }
-    if len >= 4 && name[len - 4] == b'.' {
+    if len >= 5 && name[len - 4] == b'.' {
+        if !has_stem(name, len - 4) {
+            return None;
+        }
         let ext = [
             name[len - 3] | 0x20,
             name[len - 2] | 0x20,
@@ -359,20 +397,21 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"pyi" | b"pyw" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
                 return Some(LangId::Python);
             }
-            b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 && len >= 5 => {
-                return Some(LangId::Zig);
-            }
-            b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && len >= 5 => {
+            b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 => return Some(LangId::Zig),
+            b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
                 return Some(LangId::JavaScript);
             }
-            b"mts" | b"cts" | b"tsx" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 && len >= 5 => {
+            b"mts" | b"cts" | b"tsx" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
                 return Some(LangId::TypeScript);
             }
             _ => {}
         }
         return None;
     }
-    if len >= 5 && name[len - 5] == b'.' {
+    if len >= 6 && name[len - 5] == b'.' {
+        if !has_stem(name, len - 5) {
+            return None;
+        }
         let ext = [
             name[len - 4] | 0x20,
             name[len - 3] | 0x20,
@@ -380,16 +419,139 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             name[len - 1] | 0x20,
         ];
         match &ext {
-            b"odin" if (enabled_mask & LANG_ODIN_MASK) != 0 && len >= 6 => {
-                return Some(LangId::Odin);
-            }
-            b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => {
-                return Some(LangId::Cpp);
-            }
+            b"odin" if (enabled_mask & LANG_ODIN_MASK) != 0 => return Some(LangId::Odin),
+            b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
             _ => {}
         }
     }
     None
+}
+
+pub const TOK_WS: u8 = 0;
+pub const TOK_NL: u8 = 1;
+pub const TOK_CODE: u8 = 2;
+
+pub const fn compute_keyword_lens<const N: usize>(names: &[&str; N]) -> [u8; N] {
+    assert!(N > 0 && N < 255);
+    let mut lens = [0u8; N];
+    let mut i = 0;
+    while i < N {
+        let a = names[i].as_bytes();
+        assert!(a.len() >= 2 && a.len() <= 16);
+        lens[i] = a.len() as u8;
+        let mut j = i + 1;
+        while j < N {
+            let b = names[j].as_bytes();
+            if a.len() == b.len() {
+                let mut eq = true;
+                let mut k = 0;
+                while k < a.len() {
+                    if a[k] != b[k] {
+                        eq = false;
+                        break;
+                    }
+                    k += 1;
+                }
+                assert!(!eq);
+            }
+            j += 1;
+        }
+        i += 1;
+    }
+    lens
+}
+
+pub const fn compute_kw_min_len<const N: usize>(names: &[&str; N]) -> usize {
+    let mut min = usize::MAX;
+    let mut i = 0;
+    while i < N {
+        let len = names[i].len();
+        if len < min {
+            min = len;
+        }
+        i += 1;
+    }
+    assert!(min >= 2);
+    min
+}
+
+pub const fn compute_kw_max_len<const N: usize>(names: &[&str; N]) -> usize {
+    let mut max = 0;
+    let mut i = 0;
+    while i < N {
+        let len = names[i].len();
+        if len > max {
+            max = len;
+        }
+        i += 1;
+    }
+    assert!(max >= 2 && max <= 16);
+    max
+}
+
+pub const AVX2_ASCII_LUT_HI: [i8; 32] = [
+    1, 2, 4, 8, 16, 32, 64, -128, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 4, 8, 16, 32, 64, -128, 0, 0, 0,
+    0, 0, 0, 0, 0,
+];
+
+pub const fn make_token_lut_lo(token_kind: &[u8; 256]) -> [i8; 32] {
+    let mut lo16 = [0u8; 16];
+    let mut b = 0usize;
+    while b < 256 {
+        let is_token = token_kind[b] > TOK_CODE || b == b'\n' as usize;
+        if is_token {
+            assert!(b < 128);
+            lo16[b & 0x0F] |= 1u8 << (b >> 4);
+        }
+        b += 1;
+    }
+    let mut out = [0i8; 32];
+    let mut i = 0usize;
+    while i < 16 {
+        out[i] = lo16[i] as i8;
+        out[i + 16] = lo16[i] as i8;
+        i += 1;
+    }
+    let mut check = 0usize;
+    while check < 256 {
+        let is_token = token_kind[check] > TOK_CODE || check == b'\n' as usize;
+        let lo = if check < 128 { out[check & 0x0F] } else { 0 };
+        let hi = AVX2_ASCII_LUT_HI[check >> 4];
+        let hit = (lo & hi) != 0;
+        assert!(hit == is_token);
+        check += 1;
+    }
+    out
+}
+
+pub const fn make_ident_lut_lo(ident_cont: &[u8; 256]) -> [i8; 32] {
+    let mut lo16 = [0u8; 16];
+    let mut b = 0usize;
+    while b < 256 {
+        let is_ident = ident_cont[b] != 0;
+        if is_ident {
+            assert!(b < 128);
+            lo16[b & 0x0F] |= 1u8 << (b >> 4);
+        }
+        b += 1;
+    }
+    let mut out = [0i8; 32];
+    let mut i = 0usize;
+    while i < 16 {
+        out[i] = lo16[i] as i8;
+        out[i + 16] = lo16[i] as i8;
+        i += 1;
+    }
+    let mut check = 0usize;
+    while check < 256 {
+        let is_ident = ident_cont[check] != 0;
+        let lo = if check < 128 { out[check & 0x0F] } else { 0 };
+        let hi = AVX2_ASCII_LUT_HI[check >> 4];
+        let hit = (lo & hi) != 0;
+        assert!(hit == is_ident);
+        check += 1;
+    }
+    out
 }
 
 pub const IDENT_CONT: [u8; 256] = {
@@ -413,20 +575,66 @@ pub const IDENT_CONT: [u8; 256] = {
     table
 };
 
+pub const IDENT_LUT_LO: [i8; 32] = make_ident_lut_lo(&IDENT_CONT);
+
+pub const JS_IDENT_CONT: [u8; 256] = {
+    let mut table = IDENT_CONT;
+    table[b'$' as usize] = 1;
+    table
+};
+
+pub const JS_IDENT_LUT_LO: [i8; 32] = make_ident_lut_lo(&JS_IDENT_CONT);
+
 #[inline(always)]
-pub fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
+pub fn skip_non_tokens_with_lut_avx2(
+    ptr: &[u8],
+    mut i: usize,
+    token_kind: &[u8; 256],
+    lut_lo_arr: &[i8; 32],
+) -> usize {
     debug_assert!(i <= ptr.len());
     #[cfg(target_feature = "avx2")]
     {
         use safe_arch::*;
-        let lut_lo = m256i::from([
-            10_i8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 3, 1, 1, 1, 1, 5, 10, 11, 11, 11, 11, 11,
-            11, 11, 11, 11, 3, 1, 1, 1, 1, 5,
-        ]);
-        let lut_hi = m256i::from([
-            0_i8, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1, 6, 1, 2, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ]);
+        let lut_lo = m256i::from(*lut_lo_arr);
+        let lut_hi = m256i::from(AVX2_ASCII_LUT_HI);
+        let mask_0f = set_splat_i8_m256i(0x0F);
+        let zero = zeroed_m256i();
+
+        let (chunks, _) = ptr[i..].as_chunks::<32>();
+        for &chunk in chunks {
+            let v = m256i::from(chunk);
+            let hi = shr_imm_u16_m256i::<4>(v) & mask_0f;
+            let m_lo = shuffle_av_i8z_half_m256i(lut_lo, v);
+            let m_hi = shuffle_av_i8z_half_m256i(lut_hi, hi);
+            let hit = m_lo & m_hi;
+            let is_zero = cmp_eq_mask_i8_m256i(hit, zero);
+            let mask = !(move_mask_i8_m256i(is_zero) as u32);
+            if mask != 0 {
+                return i + mask.trailing_zeros() as usize;
+            }
+            i += 32;
+        }
+    }
+    while i < ptr.len() && token_kind[ptr[i] as usize] <= TOK_CODE && ptr[i] != b'\n' {
+        i += 1;
+    }
+    i
+}
+
+#[inline(always)]
+pub fn skip_ident_cont_with_lut_avx2(
+    ptr: &[u8],
+    mut i: usize,
+    ident_cont: &[u8; 256],
+    lut_lo_arr: &[i8; 32],
+) -> usize {
+    debug_assert!(i <= ptr.len());
+    #[cfg(target_feature = "avx2")]
+    {
+        use safe_arch::*;
+        let lut_lo = m256i::from(*lut_lo_arr);
+        let lut_hi = m256i::from(AVX2_ASCII_LUT_HI);
         let mask_0f = set_splat_i8_m256i(0x0F);
         let zero = zeroed_m256i();
 
@@ -445,10 +653,20 @@ pub fn skip_ident_cont_avx2(ptr: &[u8], mut i: usize) -> usize {
             i += 32;
         }
     }
-    while i < ptr.len() && IDENT_CONT[ptr[i] as usize] != 0 {
+    while i < ptr.len() && ident_cont[ptr[i] as usize] != 0 {
         i += 1;
     }
     i
+}
+
+#[inline(always)]
+pub fn skip_ident_cont_avx2(ptr: &[u8], i: usize) -> usize {
+    skip_ident_cont_with_lut_avx2(ptr, i, &IDENT_CONT, &IDENT_LUT_LO)
+}
+
+#[inline(always)]
+pub fn skip_js_ident_cont_avx2(ptr: &[u8], i: usize) -> usize {
+    skip_ident_cont_with_lut_avx2(ptr, i, &JS_IDENT_CONT, &JS_IDENT_LUT_LO)
 }
 
 #[inline(always)]
@@ -906,5 +1124,93 @@ mod tests {
         assert_eq!(detect_language(b"foo.c", 0), None);
         assert_eq!(detect_language(b"foo.h", 0), None);
         assert_eq!(detect_language(b"foo.cpp", 0), None);
+    }
+
+    #[test]
+    fn test_all_languages_compile_time_and_simd_invariants() {
+        for b in 0..=255u8 {
+            for pos in [0, 1, 15, 16, 19, 31, 32, 33] {
+                let mut block = [b'a'; 64];
+                block[pos] = b;
+                let id_pos = skip_ident_cont_avx2(&block, 0);
+                if IDENT_CONT[b as usize] == 0 {
+                    assert_eq!(id_pos, pos);
+                } else {
+                    assert_eq!(id_pos, block.len());
+                }
+
+                let js_id_pos = skip_js_ident_cont_avx2(&block, 0);
+                if JS_IDENT_CONT[b as usize] == 0 {
+                    assert_eq!(js_id_pos, pos);
+                } else {
+                    assert_eq!(js_id_pos, block.len());
+                }
+            }
+        }
+
+        for lang in ALL_LANGS {
+            let names = LangStats::keyword_names(lang);
+            let lens = LangStats::keyword_lens(lang);
+            let (min_len, max_len) = LangStats::kw_min_max(lang);
+            let (token_kind, token_lut_lo) = LangStats::token_kind_and_lut(lang);
+
+            assert_eq!(names.len(), lens.len());
+            assert!(min_len >= 2 && min_len <= max_len && max_len <= 16);
+
+            let actual_min = names.iter().map(|s| s.len()).min().unwrap();
+            let actual_max = names.iter().map(|s| s.len()).max().unwrap();
+            assert_eq!(min_len, actual_min);
+            assert_eq!(max_len, actual_max);
+
+            for b in 0..=255u8 {
+                for pos in [0, 1, 15, 16, 19, 31, 32, 33] {
+                    let mut block = [b' '; 64];
+                    block[pos] = b;
+                    let skipped =
+                        skip_non_tokens_with_lut_avx2(&block, 0, token_kind, token_lut_lo);
+                    if token_kind[b as usize] > TOK_CODE || b == b'\n' {
+                        assert_eq!(skipped, pos, "lang {:?} byte {}", lang, b);
+                    } else {
+                        assert_eq!(skipped, block.len(), "lang {:?} byte {}", lang, b);
+                    }
+                }
+            }
+
+            for (i, &kw) in names.iter().enumerate() {
+                assert_eq!(kw.len(), lens[i] as usize);
+                for (j, &other) in names.iter().enumerate() {
+                    if i != j {
+                        assert_ne!(kw, other);
+                    }
+                }
+
+                let mut avx_src = Vec::with_capacity(64);
+                avx_src.extend_from_slice(b"0                                    ");
+                avx_src.extend_from_slice(kw.as_bytes());
+                avx_src.push(b'\n');
+
+                let mut stats = LangStats::default();
+                parse_into(lang, &avx_src, &mut stats);
+                assert_eq!(stats.total_keywords(lang), 1, "lang {:?} kw {}", lang, kw);
+                assert_eq!(
+                    stats.keyword_counts(lang)[i],
+                    1,
+                    "lang {:?} kw {}",
+                    lang,
+                    kw
+                );
+                assert_eq!(stats.code_lines(lang), 1);
+
+                let mut prefixed = Vec::with_capacity(64);
+                prefixed.extend_from_slice(b"0                                    _");
+                prefixed.extend_from_slice(kw.as_bytes());
+                prefixed.push(b'_');
+                prefixed.push(b'\n');
+
+                let mut stats2 = LangStats::default();
+                parse_into(lang, &prefixed, &mut stats2);
+                assert_eq!(stats2.total_keywords(lang), 0, "lang {:?} kw {}", lang, kw);
+            }
+        }
     }
 }
