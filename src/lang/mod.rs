@@ -2,6 +2,7 @@ pub mod bash;
 pub mod c;
 pub mod cpp;
 pub mod csharp;
+pub mod dart;
 pub mod go;
 pub mod java;
 pub mod javascript;
@@ -40,9 +41,10 @@ pub enum LangId {
     Kotlin = 16,
     Bash = 17,
     Sql = 18,
+    Dart = 19,
 }
 
-pub const LANG_COUNT: usize = 19;
+pub const LANG_COUNT: usize = 20;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -62,6 +64,7 @@ pub const LANG_SWIFT_MASK: u32 = 1 << (LangId::Swift as u32);
 pub const LANG_KOTLIN_MASK: u32 = 1 << (LangId::Kotlin as u32);
 pub const LANG_BASH_MASK: u32 = 1 << (LangId::Bash as u32);
 pub const LANG_SQL_MASK: u32 = 1 << (LangId::Sql as u32);
+pub const LANG_DART_MASK: u32 = 1 << (LangId::Dart as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -84,6 +87,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Kotlin,
     LangId::Bash,
     LangId::Sql,
+    LangId::Dart,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -112,6 +116,7 @@ impl LangId {
             Self::Kotlin => "Kotlin",
             Self::Bash => "Bash",
             Self::Sql => "SQL",
+            Self::Dart => "Dart",
         }
     }
 
@@ -158,6 +163,7 @@ impl LangId {
                 Some(Self::Bash)
             }
             b"-sql" | b"--sql" | b"-SQL" | b"--SQL" => Some(Self::Sql),
+            b"-dart" | b"--dart" | b"-DART" | b"--DART" => Some(Self::Dart),
             _ => None,
         }
     }
@@ -221,6 +227,7 @@ pub struct LangStats {
     pub kotlin: ParseResult<{ kotlin::KEYWORD_COUNT }>,
     pub bash: ParseResult<{ bash::KEYWORD_COUNT }>,
     pub sql: ParseResult<{ sql::KEYWORD_COUNT }>,
+    pub dart: ParseResult<{ dart::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -245,6 +252,7 @@ impl LangStats {
         self.kotlin.add(&other.kotlin);
         self.bash.add(&other.bash);
         self.sql.add(&other.sql);
+        self.dart.add(&other.dart);
     }
 
     #[inline(always)]
@@ -269,6 +277,7 @@ impl LangStats {
             LangId::Kotlin => self.kotlin.lines_processed,
             LangId::Bash => self.bash.lines_processed,
             LangId::Sql => self.sql.lines_processed,
+            LangId::Dart => self.dart.lines_processed,
         }
     }
 
@@ -294,6 +303,7 @@ impl LangStats {
             LangId::Kotlin => self.kotlin.code_lines,
             LangId::Bash => self.bash.code_lines,
             LangId::Sql => self.sql.code_lines,
+            LangId::Dart => self.dart.code_lines,
         }
     }
 
@@ -319,6 +329,7 @@ impl LangStats {
             LangId::Kotlin => self.kotlin.comment_lines,
             LangId::Bash => self.bash.comment_lines,
             LangId::Sql => self.sql.comment_lines,
+            LangId::Dart => self.dart.comment_lines,
         }
     }
 
@@ -344,6 +355,7 @@ impl LangStats {
             LangId::Kotlin => self.kotlin.blank_lines,
             LangId::Bash => self.bash.blank_lines,
             LangId::Sql => self.sql.blank_lines,
+            LangId::Dart => self.dart.blank_lines,
         }
     }
 
@@ -369,6 +381,7 @@ impl LangStats {
             LangId::Kotlin => self.kotlin.total_keywords,
             LangId::Bash => self.bash.total_keywords,
             LangId::Sql => self.sql.total_keywords,
+            LangId::Dart => self.dart.total_keywords,
         }
     }
 
@@ -394,6 +407,7 @@ impl LangStats {
             LangId::Kotlin => &kotlin::KEYWORD_NAMES,
             LangId::Bash => &bash::KEYWORD_NAMES,
             LangId::Sql => &sql::KEYWORD_NAMES,
+            LangId::Dart => &dart::KEYWORD_NAMES,
         }
     }
 
@@ -419,6 +433,7 @@ impl LangStats {
             LangId::Kotlin => &self.kotlin.keyword_counts,
             LangId::Bash => &self.bash.keyword_counts,
             LangId::Sql => &self.sql.keyword_counts,
+            LangId::Dart => &self.dart.keyword_counts,
         }
     }
 
@@ -444,6 +459,7 @@ impl LangStats {
             LangId::Kotlin => &kotlin::KEYWORD_LENS,
             LangId::Bash => &bash::KEYWORD_LENS,
             LangId::Sql => &sql::KEYWORD_LENS,
+            LangId::Dart => &dart::KEYWORD_LENS,
         }
     }
 
@@ -469,6 +485,7 @@ impl LangStats {
             LangId::Kotlin => (kotlin::KW_MIN_LEN, kotlin::KW_MAX_LEN),
             LangId::Bash => (bash::KW_MIN_LEN, bash::KW_MAX_LEN),
             LangId::Sql => (sql::KW_MIN_LEN, sql::KW_MAX_LEN),
+            LangId::Dart => (dart::KW_MIN_LEN, dart::KW_MAX_LEN),
         }
     }
 
@@ -494,6 +511,7 @@ impl LangStats {
             LangId::Kotlin => (&kotlin::TOKEN_KIND, &kotlin::TOKEN_LUT_LO),
             LangId::Bash => (&bash::TOKEN_KIND, &bash::TOKEN_LUT_LO),
             LangId::Sql => (&sql::TOKEN_KIND, &sql::TOKEN_LUT_LO),
+            LangId::Dart => (&dart::TOKEN_KIND, &dart::TOKEN_LUT_LO),
         }
     }
 }
@@ -601,6 +619,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
             b"java" if (enabled_mask & LANG_JAVA_MASK) != 0 => return Some(LangId::Java),
             b"bash" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
+            b"dart" if (enabled_mask & LANG_DART_MASK) != 0 => return Some(LangId::Dart),
             _ => {}
         }
         return None;
@@ -1278,6 +1297,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Kotlin => kotlin::parse_into(content, &mut stats.kotlin),
         LangId::Bash => bash::parse_into(content, &mut stats.bash),
         LangId::Sql => sql::parse_into(content, &mut stats.sql),
+        LangId::Dart => dart::parse_into(content, &mut stats.dart),
     }
 }
 
@@ -1673,6 +1693,10 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.sql", LANG_ALL_MASK),
             Some(LangId::Sql)
+        );
+        assert_eq!(
+            detect_language(b"foo.dart", LANG_ALL_MASK),
+            Some(LangId::Dart)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
