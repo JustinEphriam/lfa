@@ -4,6 +4,7 @@ pub mod cpp;
 pub mod csharp;
 pub mod d;
 pub mod dart;
+pub mod fortran;
 pub mod gleam;
 pub mod go;
 pub mod haskell;
@@ -54,9 +55,10 @@ pub enum LangId {
     Gleam = 23,
     D = 24,
     Nim = 25,
+    Fortran = 26,
 }
 
-pub const LANG_COUNT: usize = 26;
+pub const LANG_COUNT: usize = 27;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -83,6 +85,7 @@ pub const LANG_OCAML_MASK: u32 = 1 << (LangId::OCaml as u32);
 pub const LANG_GLEAM_MASK: u32 = 1 << (LangId::Gleam as u32);
 pub const LANG_D_MASK: u32 = 1 << (LangId::D as u32);
 pub const LANG_NIM_MASK: u32 = 1 << (LangId::Nim as u32);
+pub const LANG_FORTRAN_MASK: u32 = 1 << (LangId::Fortran as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -112,6 +115,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Gleam,
     LangId::D,
     LangId::Nim,
+    LangId::Fortran,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -147,6 +151,7 @@ impl LangId {
             Self::Gleam => "Gleam",
             Self::D => "D",
             Self::Nim => "Nim",
+            Self::Fortran => "Fortran",
         }
     }
 
@@ -184,6 +189,7 @@ impl LangId {
             Self::Gleam => &["-gleam", "--gleam"],
             Self::D => &["-d", "--d"],
             Self::Nim => &["-nim", "--nim"],
+            Self::Fortran => &["-f", "--f", "-fortran", "--fortran"],
         }
     }
 
@@ -234,6 +240,8 @@ impl LangId {
             b"-gleam" | b"--gleam" | b"-GLEAM" | b"--GLEAM" => Some(Self::Gleam),
             b"-d" | b"--d" | b"-D" => Some(Self::D),
             b"-nim" | b"--nim" | b"-NIM" | b"--NIM" => Some(Self::Nim),
+            b"-f" | b"--f" | b"-F" | b"--F" | b"-fortran" | b"--fortran" | b"-FORTRAN"
+            | b"--FORTRAN" => Some(Self::Fortran),
             _ => None,
         }
     }
@@ -304,6 +312,7 @@ pub struct LangStats {
     pub gleam: ParseResult<{ gleam::KEYWORD_COUNT }>,
     pub d: ParseResult<{ d::KEYWORD_COUNT }>,
     pub nim: ParseResult<{ nim::KEYWORD_COUNT }>,
+    pub fortran: ParseResult<{ fortran::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -335,6 +344,7 @@ impl LangStats {
         self.gleam.add(&other.gleam);
         self.d.add(&other.d);
         self.nim.add(&other.nim);
+        self.fortran.add(&other.fortran);
     }
 
     #[inline(always)]
@@ -366,6 +376,7 @@ impl LangStats {
             LangId::Gleam => self.gleam.lines_processed,
             LangId::D => self.d.lines_processed,
             LangId::Nim => self.nim.lines_processed,
+            LangId::Fortran => self.fortran.lines_processed,
         }
     }
 
@@ -398,6 +409,7 @@ impl LangStats {
             LangId::Gleam => self.gleam.code_lines,
             LangId::D => self.d.code_lines,
             LangId::Nim => self.nim.code_lines,
+            LangId::Fortran => self.fortran.code_lines,
         }
     }
 
@@ -430,6 +442,7 @@ impl LangStats {
             LangId::Gleam => self.gleam.comment_lines,
             LangId::D => self.d.comment_lines,
             LangId::Nim => self.nim.comment_lines,
+            LangId::Fortran => self.fortran.comment_lines,
         }
     }
 
@@ -462,6 +475,7 @@ impl LangStats {
             LangId::Gleam => self.gleam.blank_lines,
             LangId::D => self.d.blank_lines,
             LangId::Nim => self.nim.blank_lines,
+            LangId::Fortran => self.fortran.blank_lines,
         }
     }
 
@@ -494,6 +508,7 @@ impl LangStats {
             LangId::Gleam => self.gleam.total_keywords,
             LangId::D => self.d.total_keywords,
             LangId::Nim => self.nim.total_keywords,
+            LangId::Fortran => self.fortran.total_keywords,
         }
     }
 
@@ -526,6 +541,7 @@ impl LangStats {
             LangId::Gleam => &gleam::KEYWORD_NAMES,
             LangId::D => &d::KEYWORD_NAMES,
             LangId::Nim => &nim::KEYWORD_NAMES,
+            LangId::Fortran => &fortran::KEYWORD_NAMES,
         }
     }
 
@@ -558,6 +574,7 @@ impl LangStats {
             LangId::Gleam => &self.gleam.keyword_counts,
             LangId::D => &self.d.keyword_counts,
             LangId::Nim => &self.nim.keyword_counts,
+            LangId::Fortran => &self.fortran.keyword_counts,
         }
     }
 
@@ -590,6 +607,7 @@ impl LangStats {
             LangId::Gleam => &gleam::KEYWORD_LENS,
             LangId::D => &d::KEYWORD_LENS,
             LangId::Nim => &nim::KEYWORD_LENS,
+            LangId::Fortran => &fortran::KEYWORD_LENS,
         }
     }
 
@@ -622,6 +640,7 @@ impl LangStats {
             LangId::Gleam => (gleam::KW_MIN_LEN, gleam::KW_MAX_LEN),
             LangId::D => (d::KW_MIN_LEN, d::KW_MAX_LEN),
             LangId::Nim => (nim::KW_MIN_LEN, nim::KW_MAX_LEN),
+            LangId::Fortran => (fortran::KW_MIN_LEN, fortran::KW_MAX_LEN),
         }
     }
 
@@ -654,6 +673,7 @@ impl LangStats {
             LangId::Gleam => (&gleam::TOKEN_KIND, &gleam::TOKEN_LUT_LO),
             LangId::D => (&d::TOKEN_KIND, &d::TOKEN_LUT_LO),
             LangId::Nim => (&nim::TOKEN_KIND, &nim::TOKEN_LUT_LO),
+            LangId::Fortran => (&fortran::TOKEN_KIND, &fortran::TOKEN_LUT_LO),
         }
     }
 }
@@ -676,6 +696,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         match name[len - 1] | 0x20 {
             b'c' if (enabled_mask & LANG_C_MASK) != 0 => return Some(LangId::C),
             b'd' if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
+            b'f' if (enabled_mask & LANG_FORTRAN_MASK) != 0 => return Some(LangId::Fortran),
             b'h' => {
                 if (enabled_mask & LANG_C_MASK) != 0 {
                     return Some(LangId::C);
@@ -750,6 +771,11 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"kts" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
             b"sql" if (enabled_mask & LANG_SQL_MASK) != 0 => return Some(LangId::Sql),
             b"nim" if (enabled_mask & LANG_NIM_MASK) != 0 => return Some(LangId::Nim),
+            b"for" | b"f90" | b"f95" | b"f03" | b"f08"
+                if (enabled_mask & LANG_FORTRAN_MASK) != 0 =>
+            {
+                return Some(LangId::Fortran);
+            }
             _ => {}
         }
         return None;
@@ -1525,6 +1551,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Gleam => gleam::parse_into(content, &mut stats.gleam),
         LangId::D => d::parse_into(content, &mut stats.d),
         LangId::Nim => nim::parse_into(content, &mut stats.nim),
+        LangId::Fortran => fortran::parse_into(content, &mut stats.fortran),
     }
 }
 
@@ -1699,6 +1726,7 @@ mod tests {
                 LangId::Python | LangId::Perl | LangId::Ruby | LangId::Bash | LangId::Nim => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell => "--",
                 LangId::OCaml => "(*",
+                LangId::Fortran => "!",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -1711,7 +1739,7 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
