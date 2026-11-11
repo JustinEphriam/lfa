@@ -84,7 +84,9 @@ impl LangId {
     pub fn from_flag(arg: &[u8]) -> Option<Self> {
         match arg {
             b"-c" | b"--c" | b"-C" => Some(Self::C),
-            b"-cpp" | b"--cpp" | b"-CPP" | b"--CPP" => Some(Self::Cpp),
+            b"-cpp" | b"--cpp" | b"-CPP" | b"--CPP" | b"-c++" | b"--c++" | b"-C++" | b"--C++" => {
+                Some(Self::Cpp)
+            }
             b"-rs" | b"--rs" | b"-RS" | b"--RS" | b"-rust" | b"--rust" | b"-RUST" | b"--RUST" => {
                 Some(Self::Rust)
             }

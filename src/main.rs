@@ -532,10 +532,16 @@ fn print_detailed_results(
     cpu_count: usize,
 ) {
     let color = should_color();
-    let (c_bold, c_cyan, c_gray, c_reset) = if color {
-        ("\x1b[1m", "\x1b[36m", "\x1b[90m", "\x1b[0m")
+    let (c_cyan, c_white, c_green, c_gray, c_reset) = if color {
+        (
+            "\x1b[36m",
+            "\x1b[1;37m",
+            "\x1b[1;32m",
+            "\x1b[90m",
+            "\x1b[0m",
+        )
     } else {
-        ("", "", "", "")
+        ("", "", "", "", "")
     };
 
     let idx = lang as usize;
@@ -550,33 +556,38 @@ fn print_detailed_results(
     let kw_counts = totals.lang_stats.keyword_counts(lang);
 
     let mut out = String::with_capacity(8192);
+
+    let m_border_top = "┌────────────────────┬──────────┬──────────────┬──────────────┬──────────────┬──────────────┬──────────────┐";
+    let m_border_sep = "├────────────────────┼──────────┼──────────────┼──────────────┼──────────────┼──────────────┼──────────────┤";
+    let m_border_bot = "└────────────────────┴──────────┴──────────────┴──────────────┴──────────────┴──────────────┴──────────────┘";
+
+    let _ = writeln!(out, "{}{}{}", c_gray, m_border_top, c_reset);
     let _ = writeln!(
         out,
-        "{}Processed {} files with {} worker threads (CPU cores: {})...{}",
-        c_gray,
-        format_number(files_found),
-        num_workers,
-        cpu_count,
-        c_reset
+        "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+        c_gray, c_white, "Language",
+        c_gray, c_white, "Files",
+        c_gray, c_white, "Lines",
+        c_gray, c_white, "Code",
+        c_gray, c_white, "Comments",
+        c_gray, c_white, "Blanks",
+        c_gray, c_white, "Keywords",
+        c_gray
     );
+    let _ = writeln!(out, "{}{}{}", c_gray, m_border_sep, c_reset);
     let _ = writeln!(
         out,
-        "{}{}{} Keyword Analyzer (Unified Work-Stealing)",
-        c_bold,
-        lang.name(),
-        c_reset
+        "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+        c_gray, c_cyan, lang.name(),
+        c_gray, c_reset, format_number(files_processed),
+        c_gray, c_reset, format_number(lines),
+        c_gray, c_reset, format_number(code),
+        c_gray, c_reset, format_number(comments),
+        c_gray, c_reset, format_number(blanks),
+        c_gray, c_reset, format_number(total_kw),
+        c_gray
     );
-    let _ = writeln!(out, "Files processed: {}", format_number(files_processed));
-    let _ = writeln!(
-        out,
-        "Lines: {} (Code: {}, Comments: {}, Blanks: {})",
-        format_number(lines),
-        format_number(code),
-        format_number(comments),
-        format_number(blanks)
-    );
-    let _ = writeln!(out, "Total keywords: {}", format_number(total_kw));
-    let _ = writeln!(out, "Processing time: {:.3} seconds", processing_time);
+    let _ = writeln!(out, "{}{}{}", c_gray, m_border_bot, c_reset);
 
     let mut stats = Vec::with_capacity(kw_names.len());
     for (i, &c) in kw_counts.iter().enumerate() {
@@ -599,28 +610,55 @@ fn print_detailed_results(
         ord => ord,
     });
 
-    let _ = writeln!(out, "\n{}Keyword frequencies (most frequent first):{}", c_bold, c_reset);
+    let kw_border_top = "┌────────┬────────────────────┬──────────────┬───────────┐";
+    let kw_border_sep = "├────────┼────────────────────┼──────────────┼───────────┤";
+    let kw_border_bot = "└────────┴────────────────────┴──────────────┴───────────┘";
+
+    let _ = writeln!(out, "{}{}{}", c_gray, kw_border_top, c_reset);
     let _ = writeln!(
         out,
-        "{}{:>5}  {:<16} {:>10}  {:>7}{}",
-        c_cyan, "Rank", "Keyword", "Count", "Percent", c_reset
+        "{}│{} {:>6} {}│{} {:<18} {}│{} {:>12} {}│{} {:>9} {}│",
+        c_gray, c_white, "Rank",
+        c_gray, c_white, "Keyword",
+        c_gray, c_white, "Count",
+        c_gray, c_white, "Percent",
+        c_gray
     );
-    let _ = writeln!(
-        out,
-        "{}─────  ──────────────── ──────────  ───────{}",
-        c_gray, c_reset
-    );
+    let _ = writeln!(out, "{}{}{}", c_gray, kw_border_sep, c_reset);
 
     for (i, st) in stats.iter().enumerate() {
         let _ = writeln!(
             out,
-            "{:>5}  {:<16} {:>10}  {:6.2}%",
-            i + 1,
-            kw_names[st.keyword_id as usize],
-            format_number(st.count),
-            st.percentage
+            "{}│{} {:>6} {}│{} {:<18} {}│{} {:>12} {}│{} {:8.2}% {}│",
+            c_gray, c_reset, i + 1,
+            c_gray, c_cyan, kw_names[st.keyword_id as usize],
+            c_gray, c_reset, format_number(st.count),
+            c_gray, c_reset, st.percentage,
+            c_gray
         );
     }
+
+    let _ = writeln!(out, "{}{}{}", c_gray, kw_border_sep, c_reset);
+    let _ = writeln!(
+        out,
+        "{}│{} {:<6} {}│{} {:<18} {}│{} {:>12} {}│{} {:>9} {}│",
+        c_gray, c_green, "Total",
+        c_gray, c_reset, "",
+        c_gray, c_white, format_number(total_kw),
+        c_gray, c_white, "100.00%",
+        c_gray
+    );
+    let _ = writeln!(out, "{}{}{}", c_gray, kw_border_bot, c_reset);
+    let _ = writeln!(
+        out,
+        "{}Processed {} files with {} worker threads (CPU cores: {}) in {:.3}s{}",
+        c_gray,
+        format_number(files_found),
+        num_workers,
+        cpu_count,
+        processing_time,
+        c_reset
+    );
 
     let _ = write(stdout(), out.as_bytes());
 }
@@ -744,7 +782,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies\n  -lua        Show detailed Lua keyword frequencies",
         prog
     );
     process::exit(1);
@@ -1233,6 +1271,18 @@ mod tests {
             assert_eq!(detailed, vec![LangId::TypeScript]);
         }
 
+        for flag in ["-lua", "--lua", "-LUA", "--LUA"] {
+            let args_lua = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_lua);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, LangId::Lua.mask());
+            assert_eq!(detailed, vec![LangId::Lua]);
+        }
+
         let args_multi = vec![
             OsString::from("lfa"),
             OsString::from("-zig"),
@@ -1248,6 +1298,19 @@ mod tests {
             LangId::Zig.mask() | LangId::C.mask() | LangId::Odin.mask()
         );
         assert_eq!(detailed, vec![LangId::Zig, LangId::C, LangId::Odin]);
+
+        for lang in ALL_LANGS {
+            let flag = format!("-{}", lang.name().to_lowercase());
+            let args_lang = vec![
+                OsString::from("lfa"),
+                OsString::from(flag),
+                OsString::from("/tmp"),
+            ];
+            let (target, mask, detailed) = parse_cli_args(&args_lang);
+            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(mask, lang.mask());
+            assert_eq!(detailed, vec![lang]);
+        }
     }
 
     #[test]
