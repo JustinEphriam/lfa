@@ -780,22 +780,89 @@ fn get_cpu_count() -> usize {
         .unwrap_or(1)
 }
 
-fn print_usage(prog: &str) -> ! {
+fn print_version() {
+    let color = should_color();
+    let (c_bold, c_cyan, c_gray, c_reset) = if color {
+        ("\x1b[1m", "\x1b[36m", "\x1b[90m", "\x1b[0m")
+    } else {
+        ("", "", "", "")
+    };
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies\n  -lua        Show detailed Lua keyword frequencies\n  -java       Show detailed Java keyword frequencies\n  -cs, -csharp Show detailed C# keyword frequencies\n  -rb, -ruby  Show detailed Ruby keyword frequencies\n  -php        Show detailed PHP keyword frequencies\n  -swift      Show detailed Swift keyword frequencies\n  -kt, -kotlin Show detailed Kotlin keyword frequencies\n  -sh, -bash  Show detailed Bash/Shell keyword frequencies",
-        prog
+        "{}{}lfa{} {}v{}{}",
+        c_bold,
+        c_cyan,
+        c_reset,
+        c_gray,
+        env!("CARGO_PKG_VERSION"),
+        c_reset
     );
-    process::exit(1);
 }
 
-fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Vec<LangId>) {
-    let prog = args
-        .first()
-        .map(|s| s.to_string_lossy())
-        .unwrap_or_else(|| "lfa".into());
+fn print_usage(prog: &str) {
+    let color = should_color();
+    let (c_bold, c_cyan, c_yellow, c_gray, c_reset) = if color {
+        ("\x1b[1m", "\x1b[36m", "\x1b[33m", "\x1b[90m", "\x1b[0m")
+    } else {
+        ("", "", "", "", "")
+    };
 
+    println!(
+        "{}{}lfa{} {}v{}{}\nHigh-performance parallel source code keyword analyzer\n",
+        c_bold,
+        c_cyan,
+        c_reset,
+        c_gray,
+        env!("CARGO_PKG_VERSION"),
+        c_reset
+    );
+    println!(
+        "{c_bold}USAGE:{c_reset}\n    {prog} [OPTIONS] <PATH>\n"
+    );
+    println!("{c_bold}ARGUMENTS:{c_reset}");
+    println!(
+        "    {c_yellow}<PATH>{c_reset}\n            Source file or root directory to recursively analyze\n"
+    );
+    println!("{c_bold}OPTIONS:{c_reset}");
+    println!(
+        "    {c_cyan}-h{c_reset}, {c_cyan}--help{c_reset}\n            Print help information and supported languages\n"
+    );
+    println!(
+        "    {c_cyan}-V{c_reset}, {c_cyan}--version{c_reset}\n            Print version information\n"
+    );
+    println!("{c_bold}LANGUAGE FILTERS:{c_reset}");
+    println!("    Filter analysis and display breakdown table for specific language(s).\n");
+
+    for lang in ALL_LANGS {
+        let aliases = lang.flag_aliases();
+        let flags_str = aliases.join(", ");
+        println!(
+            "    {c_cyan}{:<28}{c_reset} Show detailed {} keyword frequencies",
+            flags_str,
+            lang.name()
+        );
+    }
+
+    println!("\n{c_bold}EXAMPLES:{c_reset}");
+    println!("    {c_gray}# Scan entire repository for all 24 supported languages{c_reset}");
+    println!("    {prog} .\n");
+    println!("    {c_gray}# Filter for Rust and C++ with frequency breakdown{c_reset}");
+    println!("    {prog} -rust -cpp /path/to/code");
+}
+
+enum CliResult<'a> {
+    Run {
+        target: &'a OsStr,
+        mask: u32,
+        selected_langs: Vec<LangId>,
+    },
+    Help,
+    Version,
+    Err(String),
+}
+
+fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     if args.len() < 2 {
-        print_usage(&prog);
+        return CliResult::Err("Missing target path <PATH>".to_string());
     }
 
     let mut target_os: Option<&'a OsStr> = None;
@@ -804,6 +871,13 @@ fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Vec<La
 
     for arg in &args[1..] {
         let bytes = arg.as_bytes();
+        if bytes == b"-h" || bytes == b"--help" {
+            return CliResult::Help;
+        }
+        if bytes == b"-V" || bytes == b"--version" {
+            return CliResult::Version;
+        }
+
         if bytes.starts_with(b"-") && bytes.len() > 1 {
             if let Some(lang) = LangId::from_flag(bytes) {
                 flag_mask |= lang.mask();
@@ -811,19 +885,17 @@ fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Vec<La
                     selected_langs.push(lang);
                 }
             } else {
-                eprintln!("Error: Unknown flag {}", arg.to_string_lossy());
-                print_usage(&prog);
+                return CliResult::Err(format!("Unknown flag '{}'", arg.to_string_lossy()));
             }
         } else if target_os.is_none() {
             target_os = Some(arg.as_os_str());
         } else {
-            eprintln!("Error: Unexpected argument {}", arg.to_string_lossy());
-            print_usage(&prog);
+            return CliResult::Err(format!("Unexpected argument '{}'", arg.to_string_lossy()));
         }
     }
 
     let Some(target) = target_os else {
-        print_usage(&prog);
+        return CliResult::Err("Missing target path <PATH>".to_string());
     };
 
     let enabled_mask = if flag_mask != 0 {
@@ -832,7 +904,50 @@ fn parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> (&'a OsStr, u32, Vec<La
         LANG_ALL_MASK
     };
 
-    (target, enabled_mask, selected_langs)
+    CliResult::Run {
+        target,
+        mask: enabled_mask,
+        selected_langs,
+    }
+}
+
+fn print_error_and_exit(prog: &str, msg: &str) -> ! {
+    let color = should_color();
+    let (c_bold_red, c_bold, c_cyan, c_reset) = if color {
+        ("\x1b[1;31m", "\x1b[1m", "\x1b[36m", "\x1b[0m")
+    } else {
+        ("", "", "", "")
+    };
+
+    eprintln!("{c_bold_red}error:{c_reset} {c_bold}{msg}{c_reset}\n");
+    eprintln!("For more information, try '{c_cyan}{prog} --help{c_reset}'.");
+    process::exit(2);
+}
+
+fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u32, Vec<LangId>) {
+    let prog = args
+        .first()
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_else(|| "lfa".into());
+
+    match try_parse_cli_args(args) {
+        CliResult::Run {
+            target,
+            mask,
+            selected_langs,
+        } => (target, mask, selected_langs),
+        CliResult::Help => {
+            print_usage(&prog);
+            process::exit(0);
+        }
+        CliResult::Version => {
+            print_version();
+            process::exit(0);
+        }
+        CliResult::Err(e) => {
+            print_error_and_exit(&prog, &e);
+        }
+    }
 }
 
 fn main() {
@@ -842,7 +957,17 @@ fn main() {
     let target_bytes = target_os.as_bytes();
 
     let Ok(stx) = statx(CWD, target_bytes, AtFlags::empty(), StatxFlags::TYPE) else {
-        eprintln!("Error: Cannot access {}", target_os.to_string_lossy());
+        let color = should_color();
+        let (c_bold_red, c_bold, c_yellow, c_reset) = if color {
+            ("\x1b[1;31m", "\x1b[1m", "\x1b[33m", "\x1b[0m")
+        } else {
+            ("", "", "", "")
+        };
+        eprintln!(
+            "{c_bold_red}error:{c_reset} {c_bold}Cannot access path {c_yellow}'{}'{c_reset}",
+            target_os.to_string_lossy()
+        );
+        eprintln!("Please check that the file or directory exists and you have permission to read it.");
         process::exit(1);
     };
 
@@ -1306,10 +1431,55 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_lang);
-            assert_eq!(target.as_bytes(), b"/tmp");
-            assert_eq!(mask, lang.mask());
-            assert_eq!(detailed, vec![lang]);
+            let res = try_parse_cli_args(&args_lang);
+            match res {
+                CliResult::Run { target, mask, selected_langs } => {
+                    assert_eq!(target.as_bytes(), b"/tmp");
+                    assert_eq!(mask, lang.mask());
+                    assert_eq!(selected_langs, vec![lang]);
+                }
+                _ => panic!("Expected CliResult::Run"),
+            }
+        }
+
+        assert!(matches!(
+            try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--help")]),
+            CliResult::Help
+        ));
+        assert!(matches!(
+            try_parse_cli_args(&[OsString::from("lfa"), OsString::from("-h")]),
+            CliResult::Help
+        ));
+        assert!(matches!(
+            try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--version")]),
+            CliResult::Version
+        ));
+        assert!(matches!(
+            try_parse_cli_args(&[OsString::from("lfa"), OsString::from("-V")]),
+            CliResult::Version
+        ));
+
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--unknown-flag"), OsString::from("/tmp")]) {
+            CliResult::Err(e) => {
+                assert!(e.contains("Unknown flag"));
+                assert!(e.contains("--unknown-flag"));
+            }
+            _ => panic!("Expected CliResult::Err"),
+        }
+
+        match try_parse_cli_args(&[OsString::from("lfa")]) {
+            CliResult::Err(e) => {
+                assert!(e.contains("Missing target path"));
+            }
+            _ => panic!("Expected CliResult::Err"),
+        }
+
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("path1"), OsString::from("path2")]) {
+            CliResult::Err(e) => {
+                assert!(e.contains("Unexpected argument"));
+                assert!(e.contains("path2"));
+            }
+            _ => panic!("Expected CliResult::Err"),
         }
     }
 

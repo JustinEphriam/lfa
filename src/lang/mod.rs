@@ -146,6 +146,36 @@ impl LangId {
     }
 
     #[inline(always)]
+    pub const fn flag_aliases(self) -> &'static [&'static str] {
+        match self {
+            Self::C => &["-c", "--c"],
+            Self::Cpp => &["-cpp", "--cpp", "-c++", "--c++"],
+            Self::Rust => &["-rs", "--rs", "-rust", "--rust"],
+            Self::Python => &["-py", "--py", "-python", "--python"],
+            Self::Perl => &["-pl", "--pl", "-perl", "--perl"],
+            Self::Go => &["-go", "--go", "-golang", "--golang"],
+            Self::Zig => &["-zig", "--zig"],
+            Self::Odin => &["-odin", "--odin"],
+            Self::JavaScript => &["-js", "--js", "-javascript", "--javascript"],
+            Self::TypeScript => &["-ts", "--ts", "-typescript", "--typescript"],
+            Self::Lua => &["-lua", "--lua"],
+            Self::Java => &["-java", "--java"],
+            Self::CSharp => &["-cs", "--cs", "-csharp", "--csharp", "-c#", "--c#"],
+            Self::Ruby => &["-rb", "--rb", "-ruby", "--ruby"],
+            Self::Php => &["-php", "--php"],
+            Self::Swift => &["-swift", "--swift"],
+            Self::Kotlin => &["-kt", "--kt", "-kotlin", "--kotlin"],
+            Self::Bash => &["-sh", "--sh", "-bash", "--bash"],
+            Self::Sql => &["-sql", "--sql"],
+            Self::Dart => &["-dart", "--dart"],
+            Self::Scala => &["-scala", "--scala"],
+            Self::Haskell => &["-hs", "--hs", "-haskell", "--haskell"],
+            Self::OCaml => &["-ml", "--ml", "-ocaml", "--ocaml"],
+            Self::Gleam => &["-gleam", "--gleam"],
+        }
+    }
+
+    #[inline(always)]
     pub fn from_flag(arg: &[u8]) -> Option<Self> {
         match arg {
             b"-c" | b"--c" | b"-C" => Some(Self::C),
