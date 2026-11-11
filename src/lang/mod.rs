@@ -1778,8 +1778,8 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             return Some(LangId::Groovy);
         }
     }
-    if len >= 8 && name[len - 7] == b'.' {
-        if !has_stem(name, len - 7) {
+    if len >= 9 && name[len - 8] == b'.' {
+        if !has_stem(name, len - 8) {
             return None;
         }
         let ext = [
@@ -2942,7 +2942,7 @@ mod tests {
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
             }
-            if lang == LangId::Scheme {
+            if lang == LangId::Scheme || lang == LangId::CommonLisp {
                 samples.push("a\n#| x\ny |#".to_string());
                 samples.push("a #| x\ny".to_string());
                 samples.push("a\n#| x |# b".to_string());
@@ -2952,10 +2952,25 @@ mod tests {
                 samples.push("a {- x\ny".to_string());
                 samples.push("a\n{- x -} b".to_string());
             }
-            if lang == LangId::OCaml || lang == LangId::FSharp {
+            if lang == LangId::OCaml || lang == LangId::FSharp || lang == LangId::Pascal {
                 samples.push("a\n(* x\ny *)".to_string());
                 samples.push("a (* x\ny".to_string());
                 samples.push("a\n(* x *) b".to_string());
+            }
+            if lang == LangId::Pascal {
+                samples.push("a\n{ x\ny }".to_string());
+                samples.push("a { x\ny".to_string());
+                samples.push("a\n{ x } b".to_string());
+            }
+            if lang == LangId::PowerShell {
+                samples.push("a\n<# x\ny #>".to_string());
+                samples.push("a <# x\ny".to_string());
+                samples.push("a\n<# x #> b".to_string());
+            }
+            if lang == LangId::Html || lang == LangId::Xml {
+                samples.push("a\n<!-- x\ny -->".to_string());
+                samples.push("a <!-- x\ny".to_string());
+                samples.push("a\n<!-- x --> b".to_string());
             }
             if lang == LangId::Lua {
                 samples.push("a\n--[[ x\ny ]]".to_string());
@@ -3448,6 +3463,39 @@ mod tests {
         assert_eq!(detect_shebang(b"hello world\n", LANG_ALL_MASK), None);
         assert_eq!(detect_shebang(b"#!", LANG_ALL_MASK), None);
         assert_eq!(detect_shebang(b"#!/bin/bash", LANG_PYTHON_MASK), None);
+
+        assert_eq!(detect_language(b"foo.v", LANG_ALL_MASK), Some(LangId::Verilog));
+        assert_eq!(detect_language(b"foo.v", LANG_V_MASK), Some(LangId::V));
+        assert_eq!(detect_language(b"foo.vsh", LANG_ALL_MASK), Some(LangId::V));
+        assert_eq!(detect_language(b"foo.lisp", LANG_ALL_MASK), Some(LangId::CommonLisp));
+        assert_eq!(detect_language(b"foo.lsp", LANG_ALL_MASK), Some(LangId::CommonLisp));
+        assert_eq!(detect_language(b"foo.cl", LANG_ALL_MASK), Some(LangId::CommonLisp));
+        assert_eq!(detect_language(b"foo.pas", LANG_ALL_MASK), Some(LangId::Pascal));
+        assert_eq!(detect_language(b"foo.pp", LANG_ALL_MASK), Some(LangId::Pascal));
+        assert_eq!(detect_language(b"foo.inc", LANG_ALL_MASK), None);
+        assert_eq!(detect_language(b"foo.ps1", LANG_ALL_MASK), Some(LangId::PowerShell));
+        assert_eq!(detect_language(b"foo.psm1", LANG_ALL_MASK), Some(LangId::PowerShell));
+        assert_eq!(detect_language(b"foo.psd1", LANG_ALL_MASK), Some(LangId::PowerShell));
+        assert_eq!(detect_language(b"foo.fish", LANG_ALL_MASK), Some(LangId::Fish));
+        assert_eq!(detect_language(b"foo.awk", LANG_ALL_MASK), Some(LangId::Awk));
+        assert_eq!(detect_language(b"foo.ha", LANG_ALL_MASK), Some(LangId::Hare));
+        assert_eq!(detect_language(b"foo.html", LANG_ALL_MASK), Some(LangId::Html));
+        assert_eq!(detect_language(b"foo.htm", LANG_ALL_MASK), Some(LangId::Html));
+        assert_eq!(detect_language(b"foo.xhtml", LANG_ALL_MASK), Some(LangId::Html));
+        assert_eq!(detect_language(b"foo.xml", LANG_ALL_MASK), Some(LangId::Xml));
+        assert_eq!(detect_language(b"foo.svg", LANG_ALL_MASK), Some(LangId::Xml));
+        assert_eq!(detect_language(b"foo.css", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.scss", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.sass", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.less", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.gql", LANG_ALL_MASK), Some(LangId::Graphql));
+        assert_eq!(detect_language(b"foo.graphql", LANG_ALL_MASK), Some(LangId::Graphql));
+        assert_eq!(detect_language(b"foo.proto", LANG_ALL_MASK), Some(LangId::Protobuf));
+        assert_eq!(detect_language(b"foo.cbl", LANG_ALL_MASK), Some(LangId::Cobol));
+        assert_eq!(detect_language(b"foo.cob", LANG_ALL_MASK), Some(LangId::Cobol));
+        assert_eq!(detect_language(b"foo.cpy", LANG_ALL_MASK), Some(LangId::Cobol));
+        assert_eq!(detect_language(b"foo.vhd", LANG_ALL_MASK), Some(LangId::Vhdl));
+        assert_eq!(detect_language(b"foo.vhdl", LANG_ALL_MASK), Some(LangId::Vhdl));
     }
 
     #[test]
@@ -3573,21 +3621,29 @@ mod tests {
                 | LangId::Yaml
                 | LangId::Dockerfile
                 | LangId::Makefile
-                | LangId::CMake => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada => "--",
+                | LangId::CMake
+                | LangId::Fish
+                | LangId::Awk
+                | LangId::PowerShell
+                | LangId::Graphql => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
                 LangId::Erlang | LangId::Matlab => "%",
-                LangId::Clojure | LangId::Scheme | LangId::Assembly => ";",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp => ";",
+                LangId::Cobol => "*>",
+                LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "",
                 _ => "//",
             };
 
             let block_open = match lang {
                 LangId::Haskell => "{-",
-                LangId::OCaml | LangId::FSharp => "(*",
+                LangId::OCaml | LangId::FSharp | LangId::Pascal => "(*",
                 LangId::Lua => "--[[",
-                LangId::Scheme => "#|",
+                LangId::Scheme | LangId::CommonLisp => "#|",
+                LangId::Html | LangId::Xml => "<!--",
+                LangId::PowerShell => "<#",
                 LangId::Fortran
                 | LangId::Bash
                 | LangId::Nim
@@ -3607,14 +3663,20 @@ mod tests {
                 | LangId::Yaml
                 | LangId::Dockerfile
                 | LangId::Makefile
-                | LangId::CMake => "",
+                | LangId::CMake
+                | LangId::Fish
+                | LangId::Awk
+                | LangId::Cobol
+                | LangId::Vhdl => "",
                 _ => "/*",
             };
             let block_close = match lang {
                 LangId::Haskell => "-}",
-                LangId::OCaml | LangId::FSharp => "*)",
+                LangId::OCaml | LangId::FSharp | LangId::Pascal => "*)",
                 LangId::Lua => "]]",
-                LangId::Scheme => "|#",
+                LangId::Scheme | LangId::CommonLisp => "|#",
+                LangId::Html | LangId::Xml => "-->",
+                LangId::PowerShell => "#>",
                 LangId::Fortran
                 | LangId::Bash
                 | LangId::Nim
@@ -3634,7 +3696,11 @@ mod tests {
                 | LangId::Yaml
                 | LangId::Dockerfile
                 | LangId::Makefile
-                | LangId::CMake => "",
+                | LangId::CMake
+                | LangId::Fish
+                | LangId::Awk
+                | LangId::Cobol
+                | LangId::Vhdl => "",
                 _ => "*/",
             };
 
