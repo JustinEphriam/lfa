@@ -8,6 +8,7 @@ pub mod lua;
 pub mod odin;
 pub mod perl;
 pub mod python;
+pub mod ruby;
 pub mod rust;
 pub mod typescript;
 pub mod zig;
@@ -28,9 +29,10 @@ pub enum LangId {
     Lua = 10,
     Java = 11,
     CSharp = 12,
+    Ruby = 13,
 }
 
-pub const LANG_COUNT: usize = 13;
+pub const LANG_COUNT: usize = 14;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -44,6 +46,7 @@ pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
 pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
 pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
 pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
+pub const LANG_RUBY_MASK: u32 = 1 << (LangId::Ruby as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -60,6 +63,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Lua,
     LangId::Java,
     LangId::CSharp,
+    LangId::Ruby,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -82,6 +86,7 @@ impl LangId {
             Self::Lua => "Lua",
             Self::Java => "Java",
             Self::CSharp => "C#",
+            Self::Ruby => "Ruby",
         }
     }
 
@@ -117,6 +122,9 @@ impl LangId {
             b"-java" | b"--java" | b"-JAVA" | b"--JAVA" => Some(Self::Java),
             b"-cs" | b"--cs" | b"-CS" | b"--CS" | b"-csharp" | b"--csharp" | b"-CSHARP"
             | b"--CSHARP" | b"-c#" | b"--c#" | b"-C#" | b"--C#" => Some(Self::CSharp),
+            b"-rb" | b"--rb" | b"-RB" | b"--RB" | b"-ruby" | b"--ruby" | b"-RUBY" | b"--RUBY" => {
+                Some(Self::Ruby)
+            }
             _ => None,
         }
     }
@@ -174,6 +182,7 @@ pub struct LangStats {
     pub lua: ParseResult<{ lua::KEYWORD_COUNT }>,
     pub java: ParseResult<{ java::KEYWORD_COUNT }>,
     pub csharp: ParseResult<{ csharp::KEYWORD_COUNT }>,
+    pub ruby: ParseResult<{ ruby::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -192,6 +201,7 @@ impl LangStats {
         self.lua.add(&other.lua);
         self.java.add(&other.java);
         self.csharp.add(&other.csharp);
+        self.ruby.add(&other.ruby);
     }
 
     #[inline(always)]
@@ -210,6 +220,7 @@ impl LangStats {
             LangId::Lua => self.lua.lines_processed,
             LangId::Java => self.java.lines_processed,
             LangId::CSharp => self.csharp.lines_processed,
+            LangId::Ruby => self.ruby.lines_processed,
         }
     }
 
@@ -229,6 +240,7 @@ impl LangStats {
             LangId::Lua => self.lua.code_lines,
             LangId::Java => self.java.code_lines,
             LangId::CSharp => self.csharp.code_lines,
+            LangId::Ruby => self.ruby.code_lines,
         }
     }
 
@@ -248,6 +260,7 @@ impl LangStats {
             LangId::Lua => self.lua.comment_lines,
             LangId::Java => self.java.comment_lines,
             LangId::CSharp => self.csharp.comment_lines,
+            LangId::Ruby => self.ruby.comment_lines,
         }
     }
 
@@ -267,6 +280,7 @@ impl LangStats {
             LangId::Lua => self.lua.blank_lines,
             LangId::Java => self.java.blank_lines,
             LangId::CSharp => self.csharp.blank_lines,
+            LangId::Ruby => self.ruby.blank_lines,
         }
     }
 
@@ -286,6 +300,7 @@ impl LangStats {
             LangId::Lua => self.lua.total_keywords,
             LangId::Java => self.java.total_keywords,
             LangId::CSharp => self.csharp.total_keywords,
+            LangId::Ruby => self.ruby.total_keywords,
         }
     }
 
@@ -305,6 +320,7 @@ impl LangStats {
             LangId::Lua => &lua::KEYWORD_NAMES,
             LangId::Java => &java::KEYWORD_NAMES,
             LangId::CSharp => &csharp::KEYWORD_NAMES,
+            LangId::Ruby => &ruby::KEYWORD_NAMES,
         }
     }
 
@@ -324,6 +340,7 @@ impl LangStats {
             LangId::Lua => &self.lua.keyword_counts,
             LangId::Java => &self.java.keyword_counts,
             LangId::CSharp => &self.csharp.keyword_counts,
+            LangId::Ruby => &self.ruby.keyword_counts,
         }
     }
 
@@ -343,6 +360,7 @@ impl LangStats {
             LangId::Lua => &lua::KEYWORD_LENS,
             LangId::Java => &java::KEYWORD_LENS,
             LangId::CSharp => &csharp::KEYWORD_LENS,
+            LangId::Ruby => &ruby::KEYWORD_LENS,
         }
     }
 
@@ -362,6 +380,7 @@ impl LangStats {
             LangId::Lua => (lua::KW_MIN_LEN, lua::KW_MAX_LEN),
             LangId::Java => (java::KW_MIN_LEN, java::KW_MAX_LEN),
             LangId::CSharp => (csharp::KW_MIN_LEN, csharp::KW_MAX_LEN),
+            LangId::Ruby => (ruby::KW_MIN_LEN, ruby::KW_MAX_LEN),
         }
     }
 
@@ -381,6 +400,7 @@ impl LangStats {
             LangId::Lua => (&lua::TOKEN_KIND, &lua::TOKEN_LUT_LO),
             LangId::Java => (&java::TOKEN_KIND, &java::TOKEN_LUT_LO),
             LangId::CSharp => (&csharp::TOKEN_KIND, &csharp::TOKEN_LUT_LO),
+            LangId::Ruby => (&ruby::TOKEN_KIND, &ruby::TOKEN_LUT_LO),
         }
     }
 }
@@ -433,6 +453,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
                 return Some(LangId::TypeScript);
             }
             b"cs" if (enabled_mask & LANG_CSHARP_MASK) != 0 => return Some(LangId::CSharp),
+            b"rb" if (enabled_mask & LANG_RUBY_MASK) != 0 => return Some(LangId::Ruby),
             _ => {}
         }
         return None;
@@ -1133,6 +1154,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Lua => lua::parse_into(content, &mut stats.lua),
         LangId::Java => java::parse_into(content, &mut stats.java),
         LangId::CSharp => csharp::parse_into(content, &mut stats.csharp),
+        LangId::Ruby => ruby::parse_into(content, &mut stats.ruby),
     }
 }
 
@@ -1304,7 +1326,7 @@ mod tests {
     fn test_final_line_without_newline_all_languages() {
         for lang in ALL_LANGS {
             let cmt: &str = match lang {
-                LangId::Python | LangId::Perl => "#",
+                LangId::Python | LangId::Perl | LangId::Ruby => "#",
                 LangId::Lua => "--",
                 _ => "//",
             };
@@ -1318,7 +1340,7 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
@@ -1499,7 +1521,7 @@ mod tests {
             detect_language(b"foo.tsx", LANG_ALL_MASK),
             Some(LangId::TypeScript)
         );
-        assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), None);
+        assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), Some(LangId::Ruby));
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
         assert_eq!(detect_language(b"foo.h", LANG_C_MASK), Some(LangId::C));
