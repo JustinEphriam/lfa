@@ -2,6 +2,7 @@ pub mod bash;
 pub mod c;
 pub mod cpp;
 pub mod csharp;
+pub mod d;
 pub mod dart;
 pub mod gleam;
 pub mod go;
@@ -50,9 +51,10 @@ pub enum LangId {
     Haskell = 21,
     OCaml = 22,
     Gleam = 23,
+    D = 24,
 }
 
-pub const LANG_COUNT: usize = 24;
+pub const LANG_COUNT: usize = 25;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -77,6 +79,7 @@ pub const LANG_SCALA_MASK: u32 = 1 << (LangId::Scala as u32);
 pub const LANG_HASKELL_MASK: u32 = 1 << (LangId::Haskell as u32);
 pub const LANG_OCAML_MASK: u32 = 1 << (LangId::OCaml as u32);
 pub const LANG_GLEAM_MASK: u32 = 1 << (LangId::Gleam as u32);
+pub const LANG_D_MASK: u32 = 1 << (LangId::D as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -104,6 +107,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Haskell,
     LangId::OCaml,
     LangId::Gleam,
+    LangId::D,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -137,6 +141,7 @@ impl LangId {
             Self::Haskell => "Haskell",
             Self::OCaml => "OCaml",
             Self::Gleam => "Gleam",
+            Self::D => "D",
         }
     }
 
@@ -172,6 +177,7 @@ impl LangId {
             Self::Haskell => &["-hs", "--hs", "-haskell", "--haskell"],
             Self::OCaml => &["-ml", "--ml", "-ocaml", "--ocaml"],
             Self::Gleam => &["-gleam", "--gleam"],
+            Self::D => &["-d", "--d"],
         }
     }
 
@@ -220,6 +226,7 @@ impl LangId {
             b"-ml" | b"--ml" | b"-ML" | b"--ML" | b"-ocaml" | b"--ocaml" | b"-OCAML"
             | b"--OCAML" => Some(Self::OCaml),
             b"-gleam" | b"--gleam" | b"-GLEAM" | b"--GLEAM" => Some(Self::Gleam),
+            b"-d" | b"--d" | b"-D" => Some(Self::D),
             _ => None,
         }
     }
@@ -288,6 +295,7 @@ pub struct LangStats {
     pub haskell: ParseResult<{ haskell::KEYWORD_COUNT }>,
     pub ocaml: ParseResult<{ ocaml::KEYWORD_COUNT }>,
     pub gleam: ParseResult<{ gleam::KEYWORD_COUNT }>,
+    pub d: ParseResult<{ d::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -317,6 +325,7 @@ impl LangStats {
         self.haskell.add(&other.haskell);
         self.ocaml.add(&other.ocaml);
         self.gleam.add(&other.gleam);
+        self.d.add(&other.d);
     }
 
     #[inline(always)]
@@ -346,6 +355,7 @@ impl LangStats {
             LangId::Haskell => self.haskell.lines_processed,
             LangId::OCaml => self.ocaml.lines_processed,
             LangId::Gleam => self.gleam.lines_processed,
+            LangId::D => self.d.lines_processed,
         }
     }
 
@@ -376,6 +386,7 @@ impl LangStats {
             LangId::Haskell => self.haskell.code_lines,
             LangId::OCaml => self.ocaml.code_lines,
             LangId::Gleam => self.gleam.code_lines,
+            LangId::D => self.d.code_lines,
         }
     }
 
@@ -406,6 +417,7 @@ impl LangStats {
             LangId::Haskell => self.haskell.comment_lines,
             LangId::OCaml => self.ocaml.comment_lines,
             LangId::Gleam => self.gleam.comment_lines,
+            LangId::D => self.d.comment_lines,
         }
     }
 
@@ -436,6 +448,7 @@ impl LangStats {
             LangId::Haskell => self.haskell.blank_lines,
             LangId::OCaml => self.ocaml.blank_lines,
             LangId::Gleam => self.gleam.blank_lines,
+            LangId::D => self.d.blank_lines,
         }
     }
 
@@ -466,6 +479,7 @@ impl LangStats {
             LangId::Haskell => self.haskell.total_keywords,
             LangId::OCaml => self.ocaml.total_keywords,
             LangId::Gleam => self.gleam.total_keywords,
+            LangId::D => self.d.total_keywords,
         }
     }
 
@@ -496,6 +510,7 @@ impl LangStats {
             LangId::Haskell => &haskell::KEYWORD_NAMES,
             LangId::OCaml => &ocaml::KEYWORD_NAMES,
             LangId::Gleam => &gleam::KEYWORD_NAMES,
+            LangId::D => &d::KEYWORD_NAMES,
         }
     }
 
@@ -526,6 +541,7 @@ impl LangStats {
             LangId::Haskell => &self.haskell.keyword_counts,
             LangId::OCaml => &self.ocaml.keyword_counts,
             LangId::Gleam => &self.gleam.keyword_counts,
+            LangId::D => &self.d.keyword_counts,
         }
     }
 
@@ -556,6 +572,7 @@ impl LangStats {
             LangId::Haskell => &haskell::KEYWORD_LENS,
             LangId::OCaml => &ocaml::KEYWORD_LENS,
             LangId::Gleam => &gleam::KEYWORD_LENS,
+            LangId::D => &d::KEYWORD_LENS,
         }
     }
 
@@ -586,6 +603,7 @@ impl LangStats {
             LangId::Haskell => (haskell::KW_MIN_LEN, haskell::KW_MAX_LEN),
             LangId::OCaml => (ocaml::KW_MIN_LEN, ocaml::KW_MAX_LEN),
             LangId::Gleam => (gleam::KW_MIN_LEN, gleam::KW_MAX_LEN),
+            LangId::D => (d::KW_MIN_LEN, d::KW_MAX_LEN),
         }
     }
 
@@ -616,6 +634,7 @@ impl LangStats {
             LangId::Haskell => (&haskell::TOKEN_KIND, &haskell::TOKEN_LUT_LO),
             LangId::OCaml => (&ocaml::TOKEN_KIND, &ocaml::TOKEN_LUT_LO),
             LangId::Gleam => (&gleam::TOKEN_KIND, &gleam::TOKEN_LUT_LO),
+            LangId::D => (&d::TOKEN_KIND, &d::TOKEN_LUT_LO),
         }
     }
 }
@@ -637,6 +656,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         }
         match name[len - 1] | 0x20 {
             b'c' if (enabled_mask & LANG_C_MASK) != 0 => return Some(LangId::C),
+            b'd' if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
             b'h' => {
                 if (enabled_mask & LANG_C_MASK) != 0 {
                     return Some(LangId::C);
@@ -674,6 +694,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"sh" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
             b"sc" if (enabled_mask & LANG_SCALA_MASK) != 0 => return Some(LangId::Scala),
             b"ml" if (enabled_mask & LANG_OCAML_MASK) != 0 => return Some(LangId::OCaml),
+            b"di" if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
             _ => {}
         }
         return None;
@@ -1365,6 +1386,30 @@ pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
 }
 
 #[inline(always)]
+pub fn skip_nested_plus_slash_comment(content: &[u8], start_i: usize) -> usize {
+    let content_len = content.len();
+    let mut i = start_i;
+    let mut depth = 1usize;
+    while i + 1 < content_len {
+        let b0 = content[i];
+        let b1 = content[i + 1];
+        if b0 == b'/' && b1 == b'+' {
+            depth += 1;
+            i += 2;
+        } else if b0 == b'+' && b1 == b'/' {
+            depth -= 1;
+            i += 2;
+            if depth == 0 {
+                return i;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    content_len
+}
+
+#[inline(always)]
 pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
     debug_assert!(start_i <= content.len());
     let content_len = content.len();
@@ -1417,6 +1462,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Haskell => haskell::parse_into(content, &mut stats.haskell),
         LangId::OCaml => ocaml::parse_into(content, &mut stats.ocaml),
         LangId::Gleam => gleam::parse_into(content, &mut stats.gleam),
+        LangId::D => d::parse_into(content, &mut stats.d),
     }
 }
 
