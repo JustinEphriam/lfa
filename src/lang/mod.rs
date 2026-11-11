@@ -5,6 +5,7 @@ pub mod csharp;
 pub mod d;
 pub mod dart;
 pub mod elixir;
+pub mod erlang;
 pub mod fortran;
 pub mod gleam;
 pub mod go;
@@ -58,9 +59,10 @@ pub enum LangId {
     Nim = 25,
     Fortran = 26,
     Elixir = 27,
+    Erlang = 28,
 }
 
-pub const LANG_COUNT: usize = 28;
+pub const LANG_COUNT: usize = 29;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -89,6 +91,7 @@ pub const LANG_D_MASK: u32 = 1 << (LangId::D as u32);
 pub const LANG_NIM_MASK: u32 = 1 << (LangId::Nim as u32);
 pub const LANG_FORTRAN_MASK: u32 = 1 << (LangId::Fortran as u32);
 pub const LANG_ELIXIR_MASK: u32 = 1 << (LangId::Elixir as u32);
+pub const LANG_ERLANG_MASK: u32 = 1 << (LangId::Erlang as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -120,6 +123,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Nim,
     LangId::Fortran,
     LangId::Elixir,
+    LangId::Erlang,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -157,6 +161,7 @@ impl LangId {
             Self::Nim => "Nim",
             Self::Fortran => "Fortran",
             Self::Elixir => "Elixir",
+            Self::Erlang => "Erlang",
         }
     }
 
@@ -196,6 +201,7 @@ impl LangId {
             Self::Nim => &["-nim", "--nim"],
             Self::Fortran => &["-f", "--f", "-fortran", "--fortran"],
             Self::Elixir => &["-ex", "--ex", "-elixir", "--elixir"],
+            Self::Erlang => &["-erl", "--erl", "-erlang", "--erlang"],
         }
     }
 
@@ -250,6 +256,8 @@ impl LangId {
             | b"--FORTRAN" => Some(Self::Fortran),
             b"-ex" | b"--ex" | b"-EX" | b"--EX" | b"-elixir" | b"--elixir" | b"-ELIXIR"
             | b"--ELIXIR" => Some(Self::Elixir),
+            b"-erl" | b"--erl" | b"-ERL" | b"--ERL" | b"-erlang" | b"--erlang" | b"-ERLANG"
+            | b"--ERLANG" => Some(Self::Erlang),
             _ => None,
         }
     }
@@ -322,6 +330,7 @@ pub struct LangStats {
     pub nim: ParseResult<{ nim::KEYWORD_COUNT }>,
     pub fortran: ParseResult<{ fortran::KEYWORD_COUNT }>,
     pub elixir: ParseResult<{ elixir::KEYWORD_COUNT }>,
+    pub erlang: ParseResult<{ erlang::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -355,6 +364,7 @@ impl LangStats {
         self.nim.add(&other.nim);
         self.fortran.add(&other.fortran);
         self.elixir.add(&other.elixir);
+        self.erlang.add(&other.erlang);
     }
 
     #[inline(always)]
@@ -388,6 +398,7 @@ impl LangStats {
             LangId::Nim => self.nim.lines_processed,
             LangId::Fortran => self.fortran.lines_processed,
             LangId::Elixir => self.elixir.lines_processed,
+            LangId::Erlang => self.erlang.lines_processed,
         }
     }
 
@@ -422,6 +433,7 @@ impl LangStats {
             LangId::Nim => self.nim.code_lines,
             LangId::Fortran => self.fortran.code_lines,
             LangId::Elixir => self.elixir.code_lines,
+            LangId::Erlang => self.erlang.code_lines,
         }
     }
 
@@ -456,6 +468,7 @@ impl LangStats {
             LangId::Nim => self.nim.comment_lines,
             LangId::Fortran => self.fortran.comment_lines,
             LangId::Elixir => self.elixir.comment_lines,
+            LangId::Erlang => self.erlang.comment_lines,
         }
     }
 
@@ -490,6 +503,7 @@ impl LangStats {
             LangId::Nim => self.nim.blank_lines,
             LangId::Fortran => self.fortran.blank_lines,
             LangId::Elixir => self.elixir.blank_lines,
+            LangId::Erlang => self.erlang.blank_lines,
         }
     }
 
@@ -524,6 +538,7 @@ impl LangStats {
             LangId::Nim => self.nim.total_keywords,
             LangId::Fortran => self.fortran.total_keywords,
             LangId::Elixir => self.elixir.total_keywords,
+            LangId::Erlang => self.erlang.total_keywords,
         }
     }
 
@@ -558,6 +573,7 @@ impl LangStats {
             LangId::Nim => &nim::KEYWORD_NAMES,
             LangId::Fortran => &fortran::KEYWORD_NAMES,
             LangId::Elixir => &elixir::KEYWORD_NAMES,
+            LangId::Erlang => &erlang::KEYWORD_NAMES,
         }
     }
 
@@ -592,6 +608,7 @@ impl LangStats {
             LangId::Nim => &self.nim.keyword_counts,
             LangId::Fortran => &self.fortran.keyword_counts,
             LangId::Elixir => &self.elixir.keyword_counts,
+            LangId::Erlang => &self.erlang.keyword_counts,
         }
     }
 
@@ -626,6 +643,7 @@ impl LangStats {
             LangId::Nim => &nim::KEYWORD_LENS,
             LangId::Fortran => &fortran::KEYWORD_LENS,
             LangId::Elixir => &elixir::KEYWORD_LENS,
+            LangId::Erlang => &erlang::KEYWORD_LENS,
         }
     }
 
@@ -660,6 +678,7 @@ impl LangStats {
             LangId::Nim => (nim::KW_MIN_LEN, nim::KW_MAX_LEN),
             LangId::Fortran => (fortran::KW_MIN_LEN, fortran::KW_MAX_LEN),
             LangId::Elixir => (elixir::KW_MIN_LEN, elixir::KW_MAX_LEN),
+            LangId::Erlang => (erlang::KW_MIN_LEN, erlang::KW_MAX_LEN),
         }
     }
 
@@ -694,6 +713,7 @@ impl LangStats {
             LangId::Nim => (&nim::TOKEN_KIND, &nim::TOKEN_LUT_LO),
             LangId::Fortran => (&fortran::TOKEN_KIND, &fortran::TOKEN_LUT_LO),
             LangId::Elixir => (&elixir::TOKEN_KIND, &elixir::TOKEN_LUT_LO),
+            LangId::Erlang => (&erlang::TOKEN_KIND, &erlang::TOKEN_LUT_LO),
         }
     }
 }
@@ -798,6 +818,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
                 return Some(LangId::Fortran);
             }
             b"exs" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
+            b"erl" | b"hrl" if (enabled_mask & LANG_ERLANG_MASK) != 0 => {
+                return Some(LangId::Erlang);
+            }
             _ => {}
         }
         return None;
@@ -1575,6 +1598,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Nim => nim::parse_into(content, &mut stats.nim),
         LangId::Fortran => fortran::parse_into(content, &mut stats.fortran),
         LangId::Elixir => elixir::parse_into(content, &mut stats.elixir),
+        LangId::Erlang => erlang::parse_into(content, &mut stats.erlang),
     }
 }
 
@@ -1750,6 +1774,7 @@ mod tests {
                 LangId::Lua | LangId::Sql | LangId::Haskell => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
+                LangId::Erlang => "%",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -1762,7 +1787,7 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
