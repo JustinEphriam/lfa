@@ -17,6 +17,7 @@ use std::cmp::Ordering;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
+use std::io::Write as _;
 use std::os::unix::ffi::OsStrExt;
 use std::process;
 use std::sync::{Condvar, Mutex};
@@ -63,9 +64,9 @@ impl Batch {
 
     #[inline(always)]
     fn append(&mut self, dir: &[u8], name: &[u8], lang: LangId, too_long: &mut bool) -> bool {
-        debug_assert!(!name.is_empty());
-        debug_assert!(self.count <= BATCH_SIZE);
-        debug_assert!(self.data_len <= BATCH_BUF_SIZE);
+        assert!(!name.is_empty());
+        assert!(self.count <= BATCH_SIZE);
+        assert!(self.data_len <= BATCH_BUF_SIZE);
         let dir_len = dir.len();
         let name_len = name.len();
         let has_slash = dir_len > 0 && dir[dir_len - 1] == b'/';
@@ -95,25 +96,29 @@ impl Batch {
         self.langs[self.count] = lang;
         self.data_len = off + needed;
         self.count += 1;
+        assert!(self.count <= BATCH_SIZE);
+        assert!(self.data_len <= BATCH_BUF_SIZE);
         true
     }
 
     #[inline(always)]
     fn get_path_cstr(&self, idx: usize) -> &CStr {
-        debug_assert!(idx < self.count);
+        assert!(idx < self.count);
         let off = self.offsets[idx] as usize;
         let len = self.lens[idx] as usize;
-        debug_assert!(off + len < self.data_len);
+        assert!(off + len < self.data_len);
+        assert!(self.data[off + len] == 0);
         CStr::from_bytes_with_nul(&self.data[off..off + len + 1]).unwrap()
     }
 
     #[inline(always)]
     fn get_rel_name_cstr(&self, idx: usize) -> &CStr {
-        debug_assert!(idx < self.count);
+        assert!(idx < self.count);
         let off = self.offsets[idx] as usize;
         let name_off = self.name_offsets[idx] as usize;
         let len = self.lens[idx] as usize;
-        debug_assert!(name_off >= off && off + len < self.data_len);
+        assert!(name_off >= off && off + len < self.data_len);
+        assert!(self.data[off + len] == 0);
         CStr::from_bytes_with_nul(&self.data[name_off..off + len + 1]).unwrap()
     }
 }
@@ -135,12 +140,14 @@ struct SchedulerState {
 
 struct WorkScheduler {
     enabled_mask: u64,
+    hidden: bool,
     mutex: Mutex<SchedulerState>,
     cond: Condvar,
 }
 
 impl WorkScheduler {
-    fn new(root: &[u8], enabled_mask: u64) -> Self {
+    fn new(root: &[u8], enabled_mask: u64, hidden: bool) -> Self {
+        assert!(!root.is_empty());
         let mut dirs_arena = Vec::with_capacity(65536);
         dirs_arena.extend_from_slice(root);
         let mut dirs_spans = Vec::with_capacity(256);
@@ -148,6 +155,7 @@ impl WorkScheduler {
 
         Self {
             enabled_mask,
+            hidden,
             mutex: Mutex::new(SchedulerState {
                 dirs_arena,
                 dirs_spans,
@@ -172,7 +180,8 @@ impl WorkScheduler {
     }
 
     fn submit_batch_and_swap(&self, full_batch: Box<Batch>) -> Box<Batch> {
-        debug_assert!(full_batch.count > 0);
+        assert!(full_batch.count > 0 && full_batch.count <= BATCH_SIZE);
+        assert!(full_batch.data_len <= BATCH_BUF_SIZE);
         let mut s = self.mutex.lock().unwrap();
         s.ready_batches.push(full_batch);
         self.cond.notify_one();
@@ -193,7 +202,7 @@ impl WorkScheduler {
     ) -> Task {
         let mut s = self.mutex.lock().unwrap();
         if let Some(b) = finished_batch {
-            debug_assert!(s.active_workers >= 1);
+            assert!(s.active_workers >= 1);
             s.free_batches.push(b);
             s.active_workers -= 1;
         }
@@ -206,7 +215,7 @@ impl WorkScheduler {
             if let Some((off, len)) = s.dirs_spans.pop() {
                 let start = off as usize;
                 let end = start + len as usize;
-                debug_assert!(end <= s.dirs_arena.len());
+                assert!(end <= s.dirs_arena.len());
                 dir_buf.clear();
                 dir_buf.extend_from_slice(&s.dirs_arena[start..end]);
                 dir_buf.push(0);
@@ -241,14 +250,14 @@ impl WorkScheduler {
         local_batch: &mut Option<Box<Batch>>,
     ) {
         let mut s = self.mutex.lock().unwrap();
-        debug_assert!(s.active_workers >= 1);
+        assert!(s.active_workers >= 1);
         let subdirs_len = subdirs_spans.len();
         if subdirs_len > 0 {
             let base = s.dirs_arena.len() as u32;
             s.dirs_arena.extend_from_slice(subdirs_arena);
             s.dirs_spans.reserve(subdirs_len);
             for &(off, len) in subdirs_spans {
-                debug_assert!((off + len) as usize <= subdirs_arena.len());
+                assert!((off + len) as usize <= subdirs_arena.len());
                 s.dirs_spans.push((base + off, len));
             }
         }
@@ -277,11 +286,21 @@ impl WorkScheduler {
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 struct WorkerResult {
     lang_stats: LangStats,
     files_found: [i64; LANG_COUNT],
     files_processed: [i64; LANG_COUNT],
+}
+
+impl Default for WorkerResult {
+    fn default() -> Self {
+        Self {
+            lang_stats: LangStats::default(),
+            files_found: [0; LANG_COUNT],
+            files_processed: [0; LANG_COUNT],
+        }
+    }
 }
 
 impl WorkerResult {
@@ -290,11 +309,14 @@ impl WorkerResult {
         for i in 0..LANG_COUNT {
             self.files_found[i] += other.files_found[i];
             self.files_processed[i] += other.files_processed[i];
+            assert!(self.files_processed[i] <= self.files_found[i]);
         }
     }
 
     fn total_files_found(&self) -> i64 {
-        self.files_found.iter().sum()
+        let total: i64 = self.files_found.iter().sum();
+        assert!(total >= 0);
+        total
     }
 }
 
@@ -356,6 +378,7 @@ fn process_single_path<Fd: AsFd>(
 
 fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
     let enabled_mask = sched.enabled_mask;
+    let hidden = sched.hidden;
     let mut res = WorkerResult::default();
     let mut fb = Vec::with_capacity(131072);
     let mut dents_buf: Vec<u8> = Vec::with_capacity(32768);
@@ -414,6 +437,9 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                         let name = name_cstr.to_bytes();
 
                         if name == b"." || name == b".." {
+                            continue;
+                        }
+                        if !hidden && name[0] == b'.' {
                             continue;
                         }
 
@@ -508,6 +534,7 @@ fn format_number(num: i64) -> String {
         out[dest] = bytes[src];
         count += 1;
     }
+    assert_eq!(dest, 0);
     String::from_utf8(out).unwrap()
 }
 
@@ -663,6 +690,432 @@ fn print_detailed_results(
     let _ = write(stdout(), out.as_bytes());
 }
 
+fn write_summary_markdown<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+    _processing_time: f64,
+    _num_workers: usize,
+    _cpu_count: usize,
+) {
+    let _ = writeln!(
+        out,
+        "| Language | Files | Lines | Code | Comments | Blanks | Keywords |"
+    );
+    let _ = writeln!(
+        out,
+        "|:---|---:|---:|---:|---:|---:|---:|"
+    );
+
+    let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
+    let mut total_files = 0i64;
+    let mut total_lines = 0i64;
+    let mut total_code = 0i64;
+    let mut total_comments = 0i64;
+    let mut total_blanks = 0i64;
+    let mut total_keywords = 0i64;
+
+    for lang in ALL_LANGS {
+        let idx = lang as usize;
+        let files = totals.files_processed[idx];
+        if files > 0 {
+            let lines = totals.lang_stats.lines(lang);
+            let code = totals.lang_stats.code_lines(lang);
+            let comments = totals.lang_stats.comment_lines(lang);
+            let blanks = totals.lang_stats.blank_lines(lang);
+            let kws = totals.lang_stats.total_keywords(lang);
+            total_files += files;
+            total_lines += lines;
+            total_code += code;
+            total_comments += comments;
+            total_blanks += blanks;
+            total_keywords += kws;
+            rows.push((lang, files, lines, code, comments, blanks, kws));
+        }
+    }
+
+    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+
+    for (lang, files, lines, code, comments, blanks, kws) in rows {
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} | {} | {} | {} | {} |",
+            lang.name(),
+            files,
+            lines,
+            code,
+            comments,
+            blanks,
+            kws
+        );
+    }
+
+    let _ = writeln!(
+        out,
+        "| Total | {} | {} | {} | {} | {} | {} |",
+        total_files,
+        total_lines,
+        total_code,
+        total_comments,
+        total_blanks,
+        total_keywords
+    );
+}
+
+fn write_detailed_markdown<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+    lang: LangId,
+    _processing_time: f64,
+    _num_workers: usize,
+    _cpu_count: usize,
+) {
+    let idx = lang as usize;
+    let files_processed = totals.files_processed[idx];
+    let lines = totals.lang_stats.lines(lang);
+    let code = totals.lang_stats.code_lines(lang);
+    let comments = totals.lang_stats.comment_lines(lang);
+    let blanks = totals.lang_stats.blank_lines(lang);
+    let total_kw = totals.lang_stats.total_keywords(lang);
+    let kw_names = LangStats::keyword_names(lang);
+    let kw_counts = totals.lang_stats.keyword_counts(lang);
+
+    let _ = writeln!(
+        out,
+        "### {}\n",
+        lang.name()
+    );
+    let _ = writeln!(
+        out,
+        "| Language | Files | Lines | Code | Comments | Blanks | Keywords |"
+    );
+    let _ = writeln!(
+        out,
+        "|:---|---:|---:|---:|---:|---:|---:|"
+    );
+    let _ = writeln!(
+        out,
+        "| {} | {} | {} | {} | {} | {} | {} |\n",
+        lang.name(),
+        files_processed,
+        lines,
+        code,
+        comments,
+        blanks,
+        total_kw
+    );
+
+    let mut stats = Vec::with_capacity(kw_names.len());
+    for (i, &c) in kw_counts.iter().enumerate() {
+        if c > 0 {
+            let pct = if total_kw > 0 {
+                (c as f64 / total_kw as f64) * 100.0
+            } else {
+                0.0
+            };
+            stats.push(KeywordStat {
+                keyword_id: i as u16,
+                count: c,
+                percentage: pct,
+            });
+        }
+    }
+
+    stats.sort_unstable_by(|a, b| match b.count.cmp(&a.count) {
+        Ordering::Equal => kw_names[a.keyword_id as usize].cmp(kw_names[b.keyword_id as usize]),
+        ord => ord,
+    });
+
+    let _ = writeln!(out, "| Rank | Keyword | Count | Percent |");
+    let _ = writeln!(out, "|---:|:---|---:|---:|");
+    for (i, st) in stats.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "| {} | {} | {} | {:.2}% |",
+            i + 1,
+            kw_names[st.keyword_id as usize],
+            st.count,
+            st.percentage
+        );
+    }
+    let _ = writeln!(out, "| Total | | {} | 100.00% |", total_kw);
+}
+
+fn write_summary_csv<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+) {
+    let _ = writeln!(
+        out,
+        "language,files,lines,code,comments,blanks,keywords"
+    );
+
+    let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
+    let mut total_files = 0i64;
+    let mut total_lines = 0i64;
+    let mut total_code = 0i64;
+    let mut total_comments = 0i64;
+    let mut total_blanks = 0i64;
+    let mut total_keywords = 0i64;
+
+    for lang in ALL_LANGS {
+        let idx = lang as usize;
+        let files = totals.files_processed[idx];
+        if files > 0 {
+            let lines = totals.lang_stats.lines(lang);
+            let code = totals.lang_stats.code_lines(lang);
+            let comments = totals.lang_stats.comment_lines(lang);
+            let blanks = totals.lang_stats.blank_lines(lang);
+            let kws = totals.lang_stats.total_keywords(lang);
+            total_files += files;
+            total_lines += lines;
+            total_code += code;
+            total_comments += comments;
+            total_blanks += blanks;
+            total_keywords += kws;
+            rows.push((lang, files, lines, code, comments, blanks, kws));
+        }
+    }
+
+    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+
+    for (lang, files, lines, code, comments, blanks, kws) in rows {
+        let _ = writeln!(
+            out,
+            "{},{},{},{},{},{},{}",
+            lang.name(),
+            files,
+            lines,
+            code,
+            comments,
+            blanks,
+            kws
+        );
+    }
+
+    let _ = writeln!(
+        out,
+        "Total,{},{},{},{},{},{}",
+        total_files,
+        total_lines,
+        total_code,
+        total_comments,
+        total_blanks,
+        total_keywords
+    );
+}
+
+fn write_detailed_csv<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+    lang: LangId,
+) {
+    let idx = lang as usize;
+    let files_processed = totals.files_processed[idx];
+    let lines = totals.lang_stats.lines(lang);
+    let code = totals.lang_stats.code_lines(lang);
+    let comments = totals.lang_stats.comment_lines(lang);
+    let blanks = totals.lang_stats.blank_lines(lang);
+    let total_kw = totals.lang_stats.total_keywords(lang);
+    let kw_names = LangStats::keyword_names(lang);
+    let kw_counts = totals.lang_stats.keyword_counts(lang);
+
+    let _ = writeln!(
+        out,
+        "language,files,lines,code,comments,blanks,keywords"
+    );
+    let _ = writeln!(
+        out,
+        "{},{},{},{},{},{},{}",
+        lang.name(),
+        files_processed,
+        lines,
+        code,
+        comments,
+        blanks,
+        total_kw
+    );
+    let _ = writeln!(out);
+
+    let mut stats = Vec::with_capacity(kw_names.len());
+    for (i, &c) in kw_counts.iter().enumerate() {
+        if c > 0 {
+            let pct = if total_kw > 0 {
+                (c as f64 / total_kw as f64) * 100.0
+            } else {
+                0.0
+            };
+            stats.push(KeywordStat {
+                keyword_id: i as u16,
+                count: c,
+                percentage: pct,
+            });
+        }
+    }
+
+    stats.sort_unstable_by(|a, b| match b.count.cmp(&a.count) {
+        Ordering::Equal => kw_names[a.keyword_id as usize].cmp(kw_names[b.keyword_id as usize]),
+        ord => ord,
+    });
+
+    let _ = writeln!(out, "rank,keyword,count,percent");
+    for (i, st) in stats.iter().enumerate() {
+        let _ = writeln!(
+            out,
+            "{},{},{},{:.2}%",
+            i + 1,
+            kw_names[st.keyword_id as usize],
+            st.count,
+            st.percentage
+        );
+    }
+}
+
+fn write_summary_json<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+    processing_time: f64,
+    num_workers: usize,
+    cpu_count: usize,
+) {
+    let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
+    let mut total_files = 0i64;
+    let mut total_lines = 0i64;
+    let mut total_code = 0i64;
+    let mut total_comments = 0i64;
+    let mut total_blanks = 0i64;
+    let mut total_keywords = 0i64;
+
+    for lang in ALL_LANGS {
+        let idx = lang as usize;
+        let files = totals.files_processed[idx];
+        if files > 0 {
+            let lines = totals.lang_stats.lines(lang);
+            let code = totals.lang_stats.code_lines(lang);
+            let comments = totals.lang_stats.comment_lines(lang);
+            let blanks = totals.lang_stats.blank_lines(lang);
+            let kws = totals.lang_stats.total_keywords(lang);
+            total_files += files;
+            total_lines += lines;
+            total_code += code;
+            total_comments += comments;
+            total_blanks += blanks;
+            total_keywords += kws;
+            rows.push((lang, files, lines, code, comments, blanks, kws));
+        }
+    }
+
+    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"summary\": {{");
+    let _ = writeln!(out, "    \"languages\": [");
+    for (i, (lang, files, lines, code, comments, blanks, kws)) in rows.iter().enumerate() {
+        let comma = if i + 1 < rows.len() { "," } else { "" };
+        let _ = writeln!(out, "      {{");
+        let _ = writeln!(out, "        \"language\": \"{}\",", lang.name());
+        let _ = writeln!(out, "        \"files\": {files},");
+        let _ = writeln!(out, "        \"lines\": {lines},");
+        let _ = writeln!(out, "        \"code\": {code},");
+        let _ = writeln!(out, "        \"comments\": {comments},");
+        let _ = writeln!(out, "        \"blanks\": {blanks},");
+        let _ = writeln!(out, "        \"keywords\": {kws}");
+        let _ = writeln!(out, "      }}{comma}");
+    }
+    let _ = writeln!(out, "    ],");
+    let _ = writeln!(out, "    \"total\": {{");
+    let _ = writeln!(out, "      \"files\": {total_files},");
+    let _ = writeln!(out, "      \"lines\": {total_lines},");
+    let _ = writeln!(out, "      \"code\": {total_code},");
+    let _ = writeln!(out, "      \"comments\": {total_comments},");
+    let _ = writeln!(out, "      \"blanks\": {total_blanks},");
+    let _ = writeln!(out, "      \"keywords\": {total_keywords}");
+    let _ = writeln!(out, "    }}");
+    let _ = writeln!(out, "  }},");
+    let _ = writeln!(out, "  \"meta\": {{");
+    let _ = writeln!(out, "    \"total_files_found\": {},", totals.total_files_found());
+    let _ = writeln!(out, "    \"workers\": {num_workers},");
+    let _ = writeln!(out, "    \"cpu_cores\": {cpu_count},");
+    let _ = writeln!(out, "    \"processing_time_seconds\": {processing_time}");
+    let _ = writeln!(out, "  }}");
+    let _ = writeln!(out, "}}");
+}
+
+fn write_detailed_json<W: std::io::Write>(
+    out: &mut W,
+    totals: &WorkerResult,
+    selected_langs: &[LangId],
+    processing_time: f64,
+    num_workers: usize,
+    cpu_count: usize,
+) {
+    let _ = writeln!(out, "{{");
+    let _ = writeln!(out, "  \"languages\": [");
+    for (l_idx, &lang) in selected_langs.iter().enumerate() {
+        let idx = lang as usize;
+        let files_found = totals.files_found[idx];
+        let files_processed = totals.files_processed[idx];
+        let lines = totals.lang_stats.lines(lang);
+        let code = totals.lang_stats.code_lines(lang);
+        let comments = totals.lang_stats.comment_lines(lang);
+        let blanks = totals.lang_stats.blank_lines(lang);
+        let total_kw = totals.lang_stats.total_keywords(lang);
+        let kw_names = LangStats::keyword_names(lang);
+        let kw_counts = totals.lang_stats.keyword_counts(lang);
+
+        let mut stats = Vec::with_capacity(kw_names.len());
+        for (i, &c) in kw_counts.iter().enumerate() {
+            if c > 0 {
+                let pct = if total_kw > 0 {
+                    (c as f64 / total_kw as f64) * 100.0
+                } else {
+                    0.0
+                };
+                stats.push(KeywordStat {
+                    keyword_id: i as u16,
+                    count: c,
+                    percentage: pct,
+                });
+            }
+        }
+
+        stats.sort_unstable_by(|a, b| match b.count.cmp(&a.count) {
+            Ordering::Equal => kw_names[a.keyword_id as usize].cmp(kw_names[b.keyword_id as usize]),
+            ord => ord,
+        });
+
+        let comma_l = if l_idx + 1 < selected_langs.len() { "," } else { "" };
+        let _ = writeln!(out, "    {{");
+        let _ = writeln!(out, "      \"language\": \"{}\",", lang.name());
+        let _ = writeln!(out, "      \"files_found\": {files_found},");
+        let _ = writeln!(out, "      \"files_processed\": {files_processed},");
+        let _ = writeln!(out, "      \"lines\": {lines},");
+        let _ = writeln!(out, "      \"code\": {code},");
+        let _ = writeln!(out, "      \"comments\": {comments},");
+        let _ = writeln!(out, "      \"blanks\": {blanks},");
+        let _ = writeln!(out, "      \"keywords\": {total_kw},");
+        let _ = writeln!(out, "      \"keyword_frequencies\": [");
+        for (k_idx, st) in stats.iter().enumerate() {
+            let comma_k = if k_idx + 1 < stats.len() { "," } else { "" };
+            let _ = writeln!(out, "        {{");
+            let _ = writeln!(out, "          \"rank\": {},", k_idx + 1);
+            let _ = writeln!(out, "          \"keyword\": \"{}\",", kw_names[st.keyword_id as usize]);
+            let _ = writeln!(out, "          \"count\": {},", st.count);
+            let _ = writeln!(out, "          \"percent\": {:.2}", st.percentage);
+            let _ = writeln!(out, "        }}{comma_k}");
+        }
+        let _ = writeln!(out, "      ]");
+        let _ = writeln!(out, "    }}{comma_l}");
+    }
+    let _ = writeln!(out, "  ],");
+    let _ = writeln!(out, "  \"meta\": {{");
+    let _ = writeln!(out, "    \"total_files_found\": {},", totals.total_files_found());
+    let _ = writeln!(out, "    \"workers\": {num_workers},");
+    let _ = writeln!(out, "    \"cpu_cores\": {cpu_count},");
+    let _ = writeln!(out, "    \"processing_time_seconds\": {processing_time}");
+    let _ = writeln!(out, "  }}");
+    let _ = writeln!(out, "}}");
+}
+
 fn print_summary_results(
     totals: &WorkerResult,
     processing_time: f64,
@@ -798,7 +1251,7 @@ fn print_version() {
     );
 }
 
-fn print_usage(prog: &str) {
+fn render_usage<W: std::io::Write>(writer: &mut W, prog: &str) {
     let color = should_color();
     let (c_bold, c_cyan, c_yellow, c_gray, c_reset) = if color {
         ("\x1b[1m", "\x1b[36m", "\x1b[33m", "\x1b[90m", "\x1b[0m")
@@ -806,7 +1259,8 @@ fn print_usage(prog: &str) {
         ("", "", "", "", "")
     };
 
-    println!(
+    let _ = writeln!(
+        writer,
         "{}{}lfa{} {}v{}{}\nHigh-performance parallel source code keyword analyzer\n",
         c_bold,
         c_cyan,
@@ -815,38 +1269,101 @@ fn print_usage(prog: &str) {
         env!("CARGO_PKG_VERSION"),
         c_reset
     );
-    println!(
+    let _ = writeln!(
+        writer,
         "{c_bold}USAGE:{c_reset}\n    {prog} [OPTIONS] <PATH>\n"
     );
-    println!("{c_bold}ARGUMENTS:{c_reset}");
-    println!(
+    let _ = writeln!(writer, "{c_bold}ARGUMENTS:{c_reset}");
+    let _ = writeln!(
+        writer,
         "    {c_yellow}<PATH>{c_reset}\n            Source file or root directory to recursively analyze\n"
     );
-    println!("{c_bold}OPTIONS:{c_reset}");
-    println!(
+    let _ = writeln!(writer, "{c_bold}OPTIONS:{c_reset}");
+    let _ = writeln!(
+        writer,
         "    {c_cyan}-h{c_reset}, {c_cyan}--help{c_reset}\n            Print help information and supported languages\n"
     );
-    println!(
+    let _ = writeln!(
+        writer,
         "    {c_cyan}-V{c_reset}, {c_cyan}--version{c_reset}\n            Print version information\n"
     );
-    println!("{c_bold}LANGUAGE FILTERS:{c_reset}");
-    println!("    Filter analysis and display breakdown table for specific language(s).\n");
+    let _ = writeln!(
+        writer,
+        "    {c_cyan}-f{c_reset}, {c_cyan}--format <FORMAT>{c_reset}\n            Output format: table, json, csv, markdown (or md)\n            Short flags: {c_cyan}--json{c_reset}, {c_cyan}--csv{c_reset}, {c_cyan}--markdown{c_reset}\n"
+    );
+    let _ = writeln!(
+        writer,
+        "    {c_cyan}--hidden{c_reset}\n            Count hidden files and directories (starting with '.')\n"
+    );
+    let _ = writeln!(writer, "{c_bold}LANGUAGE FILTERS:{c_reset}");
+    let _ = writeln!(
+        writer,
+        "    Filter analysis and display breakdown table for specific language(s).\n"
+    );
+
+    let mut max_width = 0;
+    for lang in ALL_LANGS {
+        let aliases = lang.flag_aliases();
+        let width = aliases.iter().map(|s| s.len()).sum::<usize>() + (aliases.len().saturating_sub(1) * 2);
+        if width > max_width {
+            max_width = width;
+        }
+    }
 
     for lang in ALL_LANGS {
         let aliases = lang.flag_aliases();
         let flags_str = aliases.join(", ");
-        println!(
-            "    {c_cyan}{:<28}{c_reset} Show detailed {} keyword frequencies",
-            flags_str,
-            lang.name()
+        let _ = writeln!(
+            writer,
+            "    {c_cyan}{flags_str:<width$}{c_reset}  Show detailed {} keyword frequencies",
+            lang.name(),
+            width = max_width
         );
     }
 
-    println!("\n{c_bold}EXAMPLES:{c_reset}");
-    println!("    {c_gray}# Scan entire repository for all 24 supported languages{c_reset}");
-    println!("    {prog} .\n");
-    println!("    {c_gray}# Filter for Rust and C++ with frequency breakdown{c_reset}");
-    println!("    {prog} -rust -cpp /path/to/code");
+    let _ = writeln!(writer, "\n{c_bold}EXAMPLES:{c_reset}");
+    let _ = writeln!(
+        writer,
+        "    {c_gray}# Scan entire repository for all {} supported languages{c_reset}",
+        LANG_COUNT
+    );
+    let _ = writeln!(writer, "    {prog} .\n");
+    let _ = writeln!(
+        writer,
+        "    {c_gray}# Filter for Rust and C++ with frequency breakdown{c_reset}"
+    );
+    let _ = writeln!(writer, "    {prog} -rust -cpp /path/to/code");
+}
+
+fn print_usage(prog: &str) {
+    let stdout = std::io::stdout();
+    let mut handle = stdout.lock();
+    render_usage(&mut handle, prog);
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+enum OutputFormat {
+    #[default]
+    Table,
+    Json,
+    Csv,
+    Markdown,
+}
+
+impl OutputFormat {
+    fn from_str_name(s: &str) -> Option<Self> {
+        if s.eq_ignore_ascii_case("table") {
+            Some(OutputFormat::Table)
+        } else if s.eq_ignore_ascii_case("json") {
+            Some(OutputFormat::Json)
+        } else if s.eq_ignore_ascii_case("csv") {
+            Some(OutputFormat::Csv)
+        } else if s.eq_ignore_ascii_case("markdown") || s.eq_ignore_ascii_case("md") {
+            Some(OutputFormat::Markdown)
+        } else {
+            None
+        }
+    }
 }
 
 enum CliResult<'a> {
@@ -854,6 +1371,8 @@ enum CliResult<'a> {
         target: &'a OsStr,
         mask: u64,
         selected_langs: Vec<LangId>,
+        format: OutputFormat,
+        hidden: bool,
     },
     Help,
     Version,
@@ -868,8 +1387,12 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     let mut target_os: Option<&'a OsStr> = None;
     let mut flag_mask = 0u64;
     let mut selected_langs: Vec<LangId> = Vec::new();
+    let mut format = OutputFormat::Table;
+    let mut hidden = false;
 
-    for arg in &args[1..] {
+    let mut idx = 1;
+    while idx < args.len() {
+        let arg = &args[idx];
         let bytes = arg.as_bytes();
         if bytes == b"-h" || bytes == b"--help" {
             return CliResult::Help;
@@ -878,7 +1401,31 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
             return CliResult::Version;
         }
 
-        if bytes.starts_with(b"-") && bytes.len() > 1 {
+        if bytes == b"-f" || bytes == b"--format" {
+            idx += 1;
+            if idx >= args.len() {
+                return CliResult::Err(format!("Missing argument for '{}'", arg.to_string_lossy()));
+            }
+            let val = args[idx].to_string_lossy();
+            match OutputFormat::from_str_name(&val) {
+                Some(fmt) => format = fmt,
+                None => return CliResult::Err(format!("Unknown output format '{val}'")),
+            }
+        } else if bytes.starts_with(b"--format=") {
+            let val = String::from_utf8_lossy(&bytes[b"--format=".len()..]);
+            match OutputFormat::from_str_name(&val) {
+                Some(fmt) => format = fmt,
+                None => return CliResult::Err(format!("Unknown output format '{val}'")),
+            }
+        } else if bytes == b"--json" {
+            format = OutputFormat::Json;
+        } else if bytes == b"--csv" {
+            format = OutputFormat::Csv;
+        } else if bytes == b"--markdown" || bytes == b"--md" {
+            format = OutputFormat::Markdown;
+        } else if bytes == b"--hidden" {
+            hidden = true;
+        } else if bytes.starts_with(b"-") && bytes.len() > 1 {
             if let Some(lang) = LangId::from_flag(bytes) {
                 flag_mask |= lang.mask();
                 if !selected_langs.contains(&lang) {
@@ -892,6 +1439,8 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
         } else {
             return CliResult::Err(format!("Unexpected argument '{}'", arg.to_string_lossy()));
         }
+
+        idx += 1;
     }
 
     let Some(target) = target_os else {
@@ -908,6 +1457,8 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
         target,
         mask: enabled_mask,
         selected_langs,
+        format,
+        hidden,
     }
 }
 
@@ -924,7 +1475,7 @@ fn print_error_and_exit(prog: &str, msg: &str) -> ! {
     process::exit(2);
 }
 
-fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>) {
+fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>, OutputFormat, bool) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())
@@ -935,7 +1486,9 @@ fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>) {
             target,
             mask,
             selected_langs,
-        } => (target, mask, selected_langs),
+            format,
+            hidden,
+        } => (target, mask, selected_langs, format, hidden),
         CliResult::Help => {
             print_usage(&prog);
             process::exit(0);
@@ -953,7 +1506,7 @@ fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>) {
 fn main() {
     let start = Instant::now();
     let args: Vec<_> = env::args_os().collect();
-    let (target_os, enabled_mask, selected_langs) = parse_cli_args(&args);
+    let (target_os, enabled_mask, selected_langs, output_format, hidden) = parse_cli_args(&args);
     let target_bytes = target_os.as_bytes();
 
     let Ok(stx) = statx(CWD, target_bytes, AtFlags::empty(), StatxFlags::TYPE) else {
@@ -977,7 +1530,7 @@ fn main() {
     let mut num_workers = cpu_count;
 
     if ft == FileType::Directory {
-        let sched = WorkScheduler::new(target_bytes, enabled_mask);
+        let sched = WorkScheduler::new(target_bytes, enabled_mask, hidden);
         let extra_threads = cpu_count.saturating_sub(1);
 
         thread::scope(|s| {
@@ -1030,14 +1583,55 @@ fn main() {
     }
 
     let processing_time = start.elapsed().as_secs_f64();
-    if selected_langs.is_empty() {
-        print_summary_results(&totals, processing_time, num_workers, cpu_count);
-    } else {
-        for (i, &lang) in selected_langs.iter().enumerate() {
-            if i > 0 {
-                println!();
+    match output_format {
+        OutputFormat::Table => {
+            if selected_langs.is_empty() {
+                print_summary_results(&totals, processing_time, num_workers, cpu_count);
+            } else {
+                for (i, &lang) in selected_langs.iter().enumerate() {
+                    if i > 0 {
+                        println!();
+                    }
+                    print_detailed_results(&totals, lang, processing_time, num_workers, cpu_count);
+                }
             }
-            print_detailed_results(&totals, lang, processing_time, num_workers, cpu_count);
+        }
+        OutputFormat::Markdown => {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            if selected_langs.is_empty() {
+                write_summary_markdown(&mut handle, &totals, processing_time, num_workers, cpu_count);
+            } else {
+                for (i, &lang) in selected_langs.iter().enumerate() {
+                    if i > 0 {
+                        let _ = writeln!(handle);
+                    }
+                    write_detailed_markdown(&mut handle, &totals, lang, processing_time, num_workers, cpu_count);
+                }
+            }
+        }
+        OutputFormat::Csv => {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            if selected_langs.is_empty() {
+                write_summary_csv(&mut handle, &totals);
+            } else {
+                for (i, &lang) in selected_langs.iter().enumerate() {
+                    if i > 0 {
+                        let _ = writeln!(handle);
+                    }
+                    write_detailed_csv(&mut handle, &totals, lang);
+                }
+            }
+        }
+        OutputFormat::Json => {
+            let stdout = std::io::stdout();
+            let mut handle = stdout.lock();
+            if selected_langs.is_empty() {
+                write_summary_json(&mut handle, &totals, processing_time, num_workers, cpu_count);
+            } else {
+                write_detailed_json(&mut handle, &totals, &selected_langs, processing_time, num_workers, cpu_count);
+            }
         }
     }
 }
@@ -1100,7 +1694,7 @@ mod tests {
         )
         .unwrap();
 
-        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK);
+        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, true);
         let mut totals = WorkerResult::default();
 
         thread::scope(|s| {
@@ -1164,12 +1758,12 @@ mod tests {
             1
         );
 
-        let c_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::C.mask());
+        let c_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::C.mask(), true);
         let c_only_res = unified_worker_proc(&c_only_sched);
         assert_eq!(c_only_res.files_found[c_idx], 3);
         assert_eq!(c_only_res.files_found[cpp_idx], 0);
 
-        let cpp_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::Cpp.mask());
+        let cpp_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::Cpp.mask(), true);
         let cpp_only_res = unified_worker_proc(&cpp_only_sched);
         assert_eq!(cpp_only_res.files_found[c_idx], 0);
         assert_eq!(cpp_only_res.files_found[cpp_idx], 2);
@@ -1233,7 +1827,7 @@ mod tests {
         let broken_link = format!("{}broken.c", tmp_dir);
         symlinkat(&b"nonexistent_target.c"[..], CWD, broken_link.as_bytes()).unwrap();
 
-        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK);
+        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, true);
         let mut totals = WorkerResult::default();
 
         thread::scope(|s| {
@@ -1255,7 +1849,7 @@ mod tests {
         assert_eq!(totals.lang_stats.c.lines_processed, (file_count * 2) as i64);
         assert_eq!(totals.lang_stats.c.total_keywords, (file_count * 2) as i64);
 
-        let disabled_sched = WorkScheduler::new(tmp_dir.as_bytes(), 0);
+        let disabled_sched = WorkScheduler::new(tmp_dir.as_bytes(), 0, true);
         let disabled_res = unified_worker_proc(&disabled_sched);
         assert_eq!(disabled_res.total_files_found(), 0);
 
@@ -1265,40 +1859,60 @@ mod tests {
     #[test]
     fn test_cli_flag_parsing() {
         let args = vec![OsString::from("lfa"), OsString::from("/tmp")];
-        let (target, mask, detailed) = parse_cli_args(&args);
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
         assert_eq!(detailed, Vec::<LangId>::new());
+        assert_eq!(format, OutputFormat::Table);
+        assert!(!hidden);
+
+        let args_hidden = vec![
+            OsString::from("lfa"),
+            OsString::from("--hidden"),
+            OsString::from("/tmp"),
+        ];
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_hidden);
+        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(mask, LANG_ALL_MASK);
+        assert_eq!(detailed, Vec::<LangId>::new());
+        assert_eq!(format, OutputFormat::Table);
+        assert!(hidden);
 
         let args_c = vec![
             OsString::from("lfa"),
             OsString::from("/tmp"),
             OsString::from("-c"),
         ];
-        let (target, mask, detailed) = parse_cli_args(&args_c);
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask());
         assert_eq!(detailed, vec![LangId::C]);
+        assert_eq!(format, OutputFormat::Table);
+        assert!(!hidden);
 
         let args_c_first = vec![
             OsString::from("lfa"),
             OsString::from("-c"),
             OsString::from("/tmp"),
         ];
-        let (target, mask, detailed) = parse_cli_args(&args_c_first);
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c_first);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask());
         assert_eq!(detailed, vec![LangId::C]);
+        assert_eq!(format, OutputFormat::Table);
+        assert!(!hidden);
 
         let args_cpp = vec![
             OsString::from("lfa"),
             OsString::from("-cpp"),
             OsString::from("/tmp"),
         ];
-        let (target, mask, detailed) = parse_cli_args(&args_cpp);
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_cpp);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::Cpp.mask());
         assert_eq!(detailed, vec![LangId::Cpp]);
+        assert_eq!(format, OutputFormat::Table);
+        assert!(!hidden);
 
         for flag in ["-rs", "--rs", "-rust", "--rust"] {
             let args_rs = vec![
@@ -1306,10 +1920,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_rs);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_rs);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Rust.mask());
             assert_eq!(detailed, vec![LangId::Rust]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-py", "--py", "-python", "--python"] {
@@ -1318,10 +1934,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_py);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_py);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Python.mask());
             assert_eq!(detailed, vec![LangId::Python]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-pl", "--pl", "-perl", "--perl"] {
@@ -1330,10 +1948,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_pl);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_pl);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Perl.mask());
             assert_eq!(detailed, vec![LangId::Perl]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-go", "--go", "-golang", "--golang"] {
@@ -1342,10 +1962,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_go);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_go);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Go.mask());
             assert_eq!(detailed, vec![LangId::Go]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-zig", "--zig"] {
@@ -1354,10 +1976,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_zig);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_zig);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Zig.mask());
             assert_eq!(detailed, vec![LangId::Zig]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-odin", "--odin"] {
@@ -1366,10 +1990,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_odin);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_odin);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Odin.mask());
             assert_eq!(detailed, vec![LangId::Odin]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-js", "--js", "-javascript", "--javascript"] {
@@ -1378,10 +2004,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_js);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_js);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::JavaScript.mask());
             assert_eq!(detailed, vec![LangId::JavaScript]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-ts", "--ts", "-typescript", "--typescript"] {
@@ -1390,10 +2018,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_ts);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_ts);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::TypeScript.mask());
             assert_eq!(detailed, vec![LangId::TypeScript]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         for flag in ["-lua", "--lua", "-LUA", "--LUA"] {
@@ -1402,10 +2032,12 @@ mod tests {
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed) = parse_cli_args(&args_lua);
+            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_lua);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Lua.mask());
             assert_eq!(detailed, vec![LangId::Lua]);
+            assert_eq!(format, OutputFormat::Table);
+            assert!(!hidden);
         }
 
         let args_multi = vec![
@@ -1416,13 +2048,15 @@ mod tests {
             OsString::from("-zig"),
             OsString::from("-odin"),
         ];
-        let (target, mask, detailed) = parse_cli_args(&args_multi);
+        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_multi);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(
             mask,
             LangId::Zig.mask() | LangId::C.mask() | LangId::Odin.mask()
         );
         assert_eq!(detailed, vec![LangId::Zig, LangId::C, LangId::Odin]);
+        assert_eq!(format, OutputFormat::Table);
+        assert!(!hidden);
 
         for lang in ALL_LANGS {
             let flag = format!("-{}", lang.name().to_lowercase());
@@ -1433,7 +2067,7 @@ mod tests {
             ];
             let res = try_parse_cli_args(&args_lang);
             match res {
-                CliResult::Run { target, mask, selected_langs } => {
+                CliResult::Run { target, mask, selected_langs, .. } => {
                     assert_eq!(target.as_bytes(), b"/tmp");
                     assert_eq!(mask, lang.mask());
                     assert_eq!(selected_langs, vec![lang]);
@@ -1459,6 +2093,31 @@ mod tests {
             CliResult::Version
         ));
 
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("-f"), OsString::from("json"), OsString::from("/tmp")]) {
+            CliResult::Run { format, .. } => assert_eq!(format, OutputFormat::Json),
+            _ => panic!("Expected CliResult::Run with json format"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--format=csv"), OsString::from("/tmp")]) {
+            CliResult::Run { format, .. } => assert_eq!(format, OutputFormat::Csv),
+            _ => panic!("Expected CliResult::Run with csv format"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--markdown"), OsString::from("/tmp")]) {
+            CliResult::Run { format, .. } => assert_eq!(format, OutputFormat::Markdown),
+            _ => panic!("Expected CliResult::Run with markdown format"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--json"), OsString::from("/tmp")]) {
+            CliResult::Run { format, .. } => assert_eq!(format, OutputFormat::Json),
+            _ => panic!("Expected CliResult::Run with json format"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("-f")]) {
+            CliResult::Err(e) => assert!(e.contains("Missing argument for '-f'")),
+            _ => panic!("Expected CliResult::Err"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--format"), OsString::from("yaml"), OsString::from("/tmp")]) {
+            CliResult::Err(e) => assert!(e.contains("Unknown output format 'yaml'")),
+            _ => panic!("Expected CliResult::Err"),
+        }
+
         match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--unknown-flag"), OsString::from("/tmp")]) {
             CliResult::Err(e) => {
                 assert!(e.contains("Unknown flag"));
@@ -1481,6 +2140,67 @@ mod tests {
             }
             _ => panic!("Expected CliResult::Err"),
         }
+
+        let mut help_buf = Vec::new();
+        render_usage(&mut help_buf, "lfa");
+        let help_output = String::from_utf8(help_buf).expect("valid utf8 help");
+        assert!(help_output.contains("High-performance parallel source code keyword analyzer"));
+        assert!(help_output.contains(&format!("all {} supported languages", LANG_COUNT)));
+        assert!(help_output.contains("--format <FORMAT>"));
+        assert!(help_output.contains("--json"));
+        let desc_positions: Vec<usize> = help_output
+            .lines()
+            .filter_map(|line| line.find("Show detailed "))
+            .collect();
+        assert_eq!(desc_positions.len(), LANG_COUNT);
+        let first_pos = desc_positions[0];
+        for pos in desc_positions {
+            assert_eq!(pos, first_pos);
+        }
+
+        let mut dummy_totals = WorkerResult::default();
+        dummy_totals.files_processed[LangId::Rust as usize] = 2;
+        dummy_totals.lang_stats.rust.lines_processed = 100;
+        dummy_totals.lang_stats.rust.code_lines = 80;
+        dummy_totals.lang_stats.rust.comment_lines = 10;
+        dummy_totals.lang_stats.rust.blank_lines = 10;
+        dummy_totals.lang_stats.rust.total_keywords = 1;
+        dummy_totals.lang_stats.rust.keyword_counts[0] = 1;
+
+        let mut csv_buf = Vec::new();
+        write_summary_csv(&mut csv_buf, &dummy_totals);
+        let csv_str = String::from_utf8(csv_buf).unwrap();
+        assert!(csv_str.contains("Rust,2,100,80,10,10,1"));
+        assert!(csv_str.contains("Total,2,100,80,10,10,1"));
+
+        let mut json_buf = Vec::new();
+        write_summary_json(&mut json_buf, &dummy_totals, 0.05, 4, 4);
+        let json_str = String::from_utf8(json_buf).unwrap();
+        assert!(json_str.contains("\"language\": \"Rust\""));
+        assert!(json_str.contains("\"lines\": 100"));
+        assert!(json_str.contains("\"code\": 80"));
+
+        let mut md_buf = Vec::new();
+        write_summary_markdown(&mut md_buf, &dummy_totals, 0.05, 4, 4);
+        let md_str = String::from_utf8(md_buf).unwrap();
+        assert!(md_str.contains("| Rust | 2 | 100 | 80 | 10 | 10 | 1 |"));
+
+        let mut det_json_buf = Vec::new();
+        write_detailed_json(&mut det_json_buf, &dummy_totals, &[LangId::Rust], 0.05, 4, 4);
+        let det_json_str = String::from_utf8(det_json_buf).unwrap();
+        assert!(det_json_str.contains("\"keyword_frequencies\": ["));
+        assert!(det_json_str.contains("\"rank\": 1"));
+
+        let mut det_csv_buf = Vec::new();
+        write_detailed_csv(&mut det_csv_buf, &dummy_totals, LangId::Rust);
+        let det_csv_str = String::from_utf8(det_csv_buf).unwrap();
+        assert!(det_csv_str.contains("rank,keyword,count,percent"));
+
+        let mut det_md_buf = Vec::new();
+        write_detailed_markdown(&mut det_md_buf, &dummy_totals, LangId::Rust, 0.05, 4, 4);
+        let det_md_str = String::from_utf8(det_md_buf).unwrap();
+        assert!(det_md_str.contains("### Rust"));
+        assert!(det_md_str.contains("| Rank | Keyword | Count | Percent |"));
     }
 
     #[test]
@@ -1492,5 +2212,83 @@ mod tests {
         assert_eq!(format_number(1234567), "1,234,567");
         assert_eq!(format_number(10000000000), "10,000,000,000");
         assert!(get_cpu_count() >= 1);
+    }
+
+    #[test]
+    fn test_pipeline_single_file_and_directory_consistency() {
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tmp_dir = format!("/tmp/lfa_pipe_test_{unique_id}");
+        fs::create_dir_all(&tmp_dir).unwrap();
+
+        let rust_code = b"fn main() {\n    let mut x = 1;\n    // comment line\n    x += 1;\n}\n";
+        let c_code = b"int main() {\n    int a = 0;\n    /* comment */\n    return a;\n}\n";
+
+        let rust_file = format!("{tmp_dir}/main.rs");
+        let c_file = format!("{tmp_dir}/main.c");
+        fs::write(&rust_file, rust_code).unwrap();
+        fs::write(&c_file, c_code).unwrap();
+
+        let mut stats_dir_all = WorkerResult::default();
+        let sched_all = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, true);
+        let res_dir_all = unified_worker_proc(&sched_all);
+        stats_dir_all.add(&res_dir_all);
+
+        assert_eq!(stats_dir_all.files_processed[LangId::Rust as usize], 1);
+        assert_eq!(stats_dir_all.files_processed[LangId::C as usize], 1);
+        assert_eq!(stats_dir_all.lang_stats.lines(LangId::Rust), 5);
+        assert_eq!(stats_dir_all.lang_stats.lines(LangId::C), 5);
+
+        let mut stats_dir_rust = WorkerResult::default();
+        let sched_rust = WorkScheduler::new(tmp_dir.as_bytes(), LangId::Rust.mask(), true);
+        let res_dir_rust = unified_worker_proc(&sched_rust);
+        stats_dir_rust.add(&res_dir_rust);
+
+        assert_eq!(stats_dir_rust.files_processed[LangId::Rust as usize], 1);
+        assert_eq!(stats_dir_rust.files_processed[LangId::C as usize], 0);
+
+        let mut single_stats = LangStats::default();
+        parse_into(LangId::Rust, rust_code, &mut single_stats);
+        assert_eq!(stats_dir_all.lang_stats.lines(LangId::Rust), single_stats.lines(LangId::Rust));
+        assert_eq!(stats_dir_all.lang_stats.code_lines(LangId::Rust), single_stats.code_lines(LangId::Rust));
+        assert_eq!(stats_dir_all.lang_stats.comment_lines(LangId::Rust), single_stats.comment_lines(LangId::Rust));
+        assert_eq!(stats_dir_all.lang_stats.blank_lines(LangId::Rust), single_stats.blank_lines(LangId::Rust));
+        assert_eq!(stats_dir_all.lang_stats.total_keywords(LangId::Rust), single_stats.total_keywords(LangId::Rust));
+
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_hidden_files_and_directories_filter() {
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tmp_dir = format!("/tmp/lfa_hidden_test_{unique_id}");
+        let hidden_dir = format!("{tmp_dir}/.hidden_dir");
+        fs::create_dir_all(&hidden_dir).unwrap();
+
+        let visible_file = format!("{tmp_dir}/visible.c");
+        let hidden_file = format!("{tmp_dir}/.hidden.c");
+        let in_hidden_dir_file = format!("{hidden_dir}/inside.c");
+
+        let c_code = b"int main() { return 0; }\n";
+        fs::write(&visible_file, c_code).unwrap();
+        fs::write(&hidden_file, c_code).unwrap();
+        fs::write(&in_hidden_dir_file, c_code).unwrap();
+
+        let sched_default = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, false);
+        let res_default = unified_worker_proc(&sched_default);
+        assert_eq!(res_default.files_processed[LangId::C as usize], 1);
+        assert_eq!(res_default.lang_stats.lines(LangId::C), 1);
+
+        let sched_hidden = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, true);
+        let res_hidden = unified_worker_proc(&sched_hidden);
+        assert_eq!(res_hidden.files_processed[LangId::C as usize], 3);
+        assert_eq!(res_hidden.lang_stats.lines(LangId::C), 3);
+
+        let _ = fs::remove_dir_all(&tmp_dir);
     }
 }

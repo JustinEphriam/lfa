@@ -1,22 +1,36 @@
+pub mod ada;
+pub mod assembly;
 pub mod bash;
 pub mod c;
+pub mod clojure;
+pub mod cmake;
 pub mod cpp;
 pub mod csharp;
+pub mod cuda;
 pub mod d;
 pub mod dart;
+pub mod dockerfile;
 pub mod elixir;
 pub mod erlang;
 pub mod fortran;
+pub mod fsharp;
 pub mod gleam;
+pub mod glsl;
 pub mod go;
+pub mod groovy;
 pub mod haskell;
+pub mod hlsl;
 pub mod java;
 pub mod javascript;
+pub mod json;
 pub mod julia;
 pub mod kotlin;
 pub mod lua;
+pub mod makefile;
 pub mod matlab;
+pub mod mojo;
 pub mod nim;
+pub mod objc;
 pub mod ocaml;
 pub mod odin;
 pub mod perl;
@@ -26,9 +40,16 @@ pub mod r;
 pub mod ruby;
 pub mod rust;
 pub mod scala;
+pub mod scheme;
+pub mod solidity;
 pub mod sql;
 pub mod swift;
+pub mod tcl;
+pub mod toml;
 pub mod typescript;
+pub mod verilog;
+pub mod wgsl;
+pub mod yaml;
 pub mod zig;
 
 #[repr(u8)]
@@ -66,9 +87,30 @@ pub enum LangId {
     Julia = 29,
     R = 30,
     Matlab = 31,
+    Solidity = 32,
+    FSharp = 33,
+    Mojo = 34,
+    Verilog = 35,
+    Cuda = 36,
+    Wgsl = 37,
+    Ada = 38,
+    Groovy = 39,
+    Clojure = 40,
+    Assembly = 41,
+    Tcl = 42,
+    Scheme = 43,
+    Json = 44,
+    Toml = 45,
+    Yaml = 46,
+    Dockerfile = 47,
+    Makefile = 48,
+    CMake = 49,
+    Glsl = 50,
+    Hlsl = 51,
+    ObjectiveC = 52,
 }
 
-pub const LANG_COUNT: usize = 32;
+pub const LANG_COUNT: usize = 53;
 pub const LANG_C_MASK: u64 = 1 << (LangId::C as u64);
 pub const LANG_CPP_MASK: u64 = 1 << (LangId::Cpp as u64);
 pub const LANG_RUST_MASK: u64 = 1 << (LangId::Rust as u64);
@@ -101,6 +143,27 @@ pub const LANG_ERLANG_MASK: u64 = 1 << (LangId::Erlang as u64);
 pub const LANG_JULIA_MASK: u64 = 1 << (LangId::Julia as u64);
 pub const LANG_R_MASK: u64 = 1 << (LangId::R as u64);
 pub const LANG_MATLAB_MASK: u64 = 1 << (LangId::Matlab as u64);
+pub const LANG_SOLIDITY_MASK: u64 = 1 << (LangId::Solidity as u64);
+pub const LANG_FSHARP_MASK: u64 = 1 << (LangId::FSharp as u64);
+pub const LANG_MOJO_MASK: u64 = 1 << (LangId::Mojo as u64);
+pub const LANG_VERILOG_MASK: u64 = 1 << (LangId::Verilog as u64);
+pub const LANG_CUDA_MASK: u64 = 1 << (LangId::Cuda as u64);
+pub const LANG_WGSL_MASK: u64 = 1 << (LangId::Wgsl as u64);
+pub const LANG_ADA_MASK: u64 = 1 << (LangId::Ada as u64);
+pub const LANG_GROOVY_MASK: u64 = 1 << (LangId::Groovy as u64);
+pub const LANG_CLOJURE_MASK: u64 = 1 << (LangId::Clojure as u64);
+pub const LANG_ASSEMBLY_MASK: u64 = 1 << (LangId::Assembly as u64);
+pub const LANG_TCL_MASK: u64 = 1 << (LangId::Tcl as u64);
+pub const LANG_SCHEME_MASK: u64 = 1 << (LangId::Scheme as u64);
+pub const LANG_JSON_MASK: u64 = 1 << (LangId::Json as u64);
+pub const LANG_TOML_MASK: u64 = 1 << (LangId::Toml as u64);
+pub const LANG_YAML_MASK: u64 = 1 << (LangId::Yaml as u64);
+pub const LANG_DOCKERFILE_MASK: u64 = 1 << (LangId::Dockerfile as u64);
+pub const LANG_MAKEFILE_MASK: u64 = 1 << (LangId::Makefile as u64);
+pub const LANG_CMAKE_MASK: u64 = 1 << (LangId::CMake as u64);
+pub const LANG_GLSL_MASK: u64 = 1 << (LangId::Glsl as u64);
+pub const LANG_HLSL_MASK: u64 = 1 << (LangId::Hlsl as u64);
+pub const LANG_OBJECTIVEC_MASK: u64 = 1 << (LangId::ObjectiveC as u64);
 pub const LANG_ALL_MASK: u64 = if LANG_COUNT == 64 {
     !0u64
 } else {
@@ -140,10 +203,38 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Julia,
     LangId::R,
     LangId::Matlab,
+    LangId::Solidity,
+    LangId::FSharp,
+    LangId::Mojo,
+    LangId::Verilog,
+    LangId::Cuda,
+    LangId::Wgsl,
+    LangId::Ada,
+    LangId::Groovy,
+    LangId::Clojure,
+    LangId::Assembly,
+    LangId::Tcl,
+    LangId::Scheme,
+    LangId::Json,
+    LangId::Toml,
+    LangId::Yaml,
+    LangId::Dockerfile,
+    LangId::Makefile,
+    LangId::CMake,
+    LangId::Glsl,
+    LangId::Hlsl,
+    LangId::ObjectiveC,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 64);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
+const _: () = {
+    let mut i = 0;
+    while i < LANG_COUNT {
+        assert!(ALL_LANGS[i] as usize == i);
+        i += 1;
+    }
+};
 
 impl LangId {
     #[inline(always)]
@@ -181,6 +272,27 @@ impl LangId {
             Self::Julia => "Julia",
             Self::R => "R",
             Self::Matlab => "MATLAB",
+            Self::Solidity => "Solidity",
+            Self::FSharp => "F#",
+            Self::Mojo => "Mojo",
+            Self::Verilog => "Verilog",
+            Self::Cuda => "CUDA",
+            Self::Wgsl => "WGSL",
+            Self::Ada => "Ada",
+            Self::Groovy => "Groovy",
+            Self::Clojure => "Clojure",
+            Self::Assembly => "Assembly",
+            Self::Tcl => "Tcl",
+            Self::Scheme => "Scheme",
+            Self::Json => "JSON",
+            Self::Toml => "TOML",
+            Self::Yaml => "YAML",
+            Self::Dockerfile => "Dockerfile",
+            Self::Makefile => "Makefile",
+            Self::CMake => "CMake",
+            Self::Glsl => "GLSL",
+            Self::Hlsl => "HLSL",
+            Self::ObjectiveC => "Objective-C",
         }
     }
 
@@ -224,6 +336,27 @@ impl LangId {
             Self::Julia => &["-jl", "--jl", "-julia", "--julia"],
             Self::R => &["-r", "--r"],
             Self::Matlab => &["-m", "--m", "-matlab", "--matlab", "-octave", "--octave"],
+            Self::Solidity => &["-sol", "--sol", "-solidity", "--solidity"],
+            Self::FSharp => &["-fs", "--fs", "-fsharp", "--fsharp", "-f#", "--f#"],
+            Self::Mojo => &["-mojo", "--mojo"],
+            Self::Verilog => &["-v", "--v", "-verilog", "--verilog", "-sv", "--sv"],
+            Self::Cuda => &["-cu", "--cu", "-cuda", "--cuda"],
+            Self::Wgsl => &["-wgsl", "--wgsl"],
+            Self::Ada => &["-ada", "--ada"],
+            Self::Groovy => &["-groovy", "--groovy", "-gvy", "--gvy"],
+            Self::Clojure => &["-clj", "--clj", "-clojure", "--clojure"],
+            Self::Assembly => &["-asm", "--asm", "-s", "--s", "-assembly", "--assembly"],
+            Self::Tcl => &["-tcl", "--tcl"],
+            Self::Scheme => &["-scm", "--scm", "-scheme", "--scheme", "-rkt", "--rkt"],
+            Self::Json => &["-json", "--json-lang"],
+            Self::Toml => &["-toml", "--toml"],
+            Self::Yaml => &["-yaml", "--yaml", "-yml", "--yml"],
+            Self::Dockerfile => &["-docker", "--docker", "-dockerfile", "--dockerfile"],
+            Self::Makefile => &["-make", "--make", "-makefile", "--makefile"],
+            Self::CMake => &["-cmake", "--cmake"],
+            Self::Glsl => &["-glsl", "--glsl"],
+            Self::Hlsl => &["-hlsl", "--hlsl"],
+            Self::ObjectiveC => &["-objc", "--objc", "-m", "--m"],
         }
     }
 
@@ -286,6 +419,69 @@ impl LangId {
             b"-m" | b"--m" | b"-M" | b"--M" | b"-matlab" | b"--matlab" | b"-MATLAB"
             | b"--MATLAB" | b"-octave" | b"--octave" | b"-OCTAVE" | b"--OCTAVE" => {
                 Some(Self::Matlab)
+            }
+            b"-sol" | b"--sol" | b"-SOL" | b"--SOL" | b"-solidity" | b"--solidity" | b"-SOLIDITY" | b"--SOLIDITY" => {
+                Some(Self::Solidity)
+            }
+            b"-fs" | b"--fs" | b"-FS" | b"--FS" | b"-fsharp" | b"--fsharp" | b"-FSHARP" | b"--FSHARP" | b"-f#" | b"--f#" | b"-F#" | b"--F#" => {
+                Some(Self::FSharp)
+            }
+            b"-mojo" | b"--mojo" | b"-MOJO" | b"--MOJO" => {
+                Some(Self::Mojo)
+            }
+            b"-v" | b"--v" | b"-V_LOG" | b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
+                Some(Self::Verilog)
+            }
+            b"-cu" | b"--cu" | b"-CU" | b"--CU" | b"-cuda" | b"--cuda" | b"-CUDA" | b"--CUDA" => {
+                Some(Self::Cuda)
+            }
+            b"-wgsl" | b"--wgsl" | b"-WGSL" | b"--WGSL" => {
+                Some(Self::Wgsl)
+            }
+            b"-ada" | b"--ada" | b"-ADA" | b"--ADA" => {
+                Some(Self::Ada)
+            }
+            b"-groovy" | b"--groovy" | b"-GROOVY" | b"--GROOVY" | b"-gvy" | b"--gvy" | b"-GVY" | b"--GVY" => {
+                Some(Self::Groovy)
+            }
+            b"-clj" | b"--clj" | b"-CLJ" | b"--CLJ" | b"-clojure" | b"--clojure" | b"-CLOJURE" | b"--CLOJURE" => {
+                Some(Self::Clojure)
+            }
+            b"-asm" | b"--asm" | b"-ASM" | b"--ASM" | b"-s" | b"--s" | b"-assembly" | b"--assembly" => {
+                Some(Self::Assembly)
+            }
+            b"-tcl" | b"--tcl" | b"-TCL" | b"--TCL" => {
+                Some(Self::Tcl)
+            }
+            b"-scm" | b"--scm" | b"-SCM" | b"--SCM" | b"-scheme" | b"--scheme" | b"-rkt" | b"--rkt" => {
+                Some(Self::Scheme)
+            }
+            b"-json" | b"--json-lang" => {
+                Some(Self::Json)
+            }
+            b"-toml" | b"--toml" | b"-TOML" | b"--TOML" => {
+                Some(Self::Toml)
+            }
+            b"-yaml" | b"--yaml" | b"-YAML" | b"--YAML" | b"-yml" | b"--yml" | b"-YML" | b"--YML" => {
+                Some(Self::Yaml)
+            }
+            b"-docker" | b"--docker" | b"-DOCKER" | b"--DOCKER" | b"-dockerfile" | b"--dockerfile" | b"-DOCKERFILE" | b"--DOCKERFILE" => {
+                Some(Self::Dockerfile)
+            }
+            b"-make" | b"--make" | b"-MAKE" | b"--MAKE" | b"-makefile" | b"--makefile" | b"-MAKEFILE" | b"--MAKEFILE" => {
+                Some(Self::Makefile)
+            }
+            b"-cmake" | b"--cmake" | b"-CMAKE" | b"--CMAKE" => {
+                Some(Self::CMake)
+            }
+            b"-glsl" | b"--glsl" | b"-GLSL" | b"--GLSL" => {
+                Some(Self::Glsl)
+            }
+            b"-hlsl" | b"--hlsl" | b"-HLSL" | b"--HLSL" => {
+                Some(Self::Hlsl)
+            }
+            b"-objc" | b"--objc" | b"-OBJC" | b"--OBJC" | b"-objective-c" | b"--objective-c" | b"-OBJECTIVE-C" | b"--OBJECTIVE-C" => {
+                Some(Self::ObjectiveC)
             }
             _ => None,
         }
@@ -363,6 +559,27 @@ pub struct LangStats {
     pub julia: ParseResult<{ julia::KEYWORD_COUNT }>,
     pub r: ParseResult<{ r::KEYWORD_COUNT }>,
     pub matlab: ParseResult<{ matlab::KEYWORD_COUNT }>,
+    pub solidity: ParseResult<{ solidity::KEYWORD_COUNT }>,
+    pub fsharp: ParseResult<{ fsharp::KEYWORD_COUNT }>,
+    pub mojo: ParseResult<{ mojo::KEYWORD_COUNT }>,
+    pub verilog: ParseResult<{ verilog::KEYWORD_COUNT }>,
+    pub cuda: ParseResult<{ cuda::KEYWORD_COUNT }>,
+    pub wgsl: ParseResult<{ wgsl::KEYWORD_COUNT }>,
+    pub ada: ParseResult<{ ada::KEYWORD_COUNT }>,
+    pub groovy: ParseResult<{ groovy::KEYWORD_COUNT }>,
+    pub clojure: ParseResult<{ clojure::KEYWORD_COUNT }>,
+    pub assembly: ParseResult<{ assembly::KEYWORD_COUNT }>,
+    pub tcl: ParseResult<{ tcl::KEYWORD_COUNT }>,
+    pub scheme: ParseResult<{ scheme::KEYWORD_COUNT }>,
+    pub json: ParseResult<{ json::KEYWORD_COUNT }>,
+    pub toml: ParseResult<{ toml::KEYWORD_COUNT }>,
+    pub yaml: ParseResult<{ yaml::KEYWORD_COUNT }>,
+    pub dockerfile: ParseResult<{ dockerfile::KEYWORD_COUNT }>,
+    pub makefile: ParseResult<{ makefile::KEYWORD_COUNT }>,
+    pub cmake: ParseResult<{ cmake::KEYWORD_COUNT }>,
+    pub glsl: ParseResult<{ glsl::KEYWORD_COUNT }>,
+    pub hlsl: ParseResult<{ hlsl::KEYWORD_COUNT }>,
+    pub objc: ParseResult<{ objc::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -400,6 +617,27 @@ impl LangStats {
         self.julia.add(&other.julia);
         self.r.add(&other.r);
         self.matlab.add(&other.matlab);
+        self.solidity.add(&other.solidity);
+        self.fsharp.add(&other.fsharp);
+        self.mojo.add(&other.mojo);
+        self.verilog.add(&other.verilog);
+        self.cuda.add(&other.cuda);
+        self.wgsl.add(&other.wgsl);
+        self.ada.add(&other.ada);
+        self.groovy.add(&other.groovy);
+        self.clojure.add(&other.clojure);
+        self.assembly.add(&other.assembly);
+        self.tcl.add(&other.tcl);
+        self.scheme.add(&other.scheme);
+        self.json.add(&other.json);
+        self.toml.add(&other.toml);
+        self.yaml.add(&other.yaml);
+        self.dockerfile.add(&other.dockerfile);
+        self.makefile.add(&other.makefile);
+        self.cmake.add(&other.cmake);
+        self.glsl.add(&other.glsl);
+        self.hlsl.add(&other.hlsl);
+        self.objc.add(&other.objc);
     }
 
     #[inline(always)]
@@ -437,6 +675,27 @@ impl LangStats {
             LangId::Julia => self.julia.lines_processed,
             LangId::R => self.r.lines_processed,
             LangId::Matlab => self.matlab.lines_processed,
+            LangId::Solidity => self.solidity.lines_processed,
+            LangId::FSharp => self.fsharp.lines_processed,
+            LangId::Mojo => self.mojo.lines_processed,
+            LangId::Verilog => self.verilog.lines_processed,
+            LangId::Cuda => self.cuda.lines_processed,
+            LangId::Wgsl => self.wgsl.lines_processed,
+            LangId::Ada => self.ada.lines_processed,
+            LangId::Groovy => self.groovy.lines_processed,
+            LangId::Clojure => self.clojure.lines_processed,
+            LangId::Assembly => self.assembly.lines_processed,
+            LangId::Tcl => self.tcl.lines_processed,
+            LangId::Scheme => self.scheme.lines_processed,
+            LangId::Json => self.json.lines_processed,
+            LangId::Toml => self.toml.lines_processed,
+            LangId::Yaml => self.yaml.lines_processed,
+            LangId::Dockerfile => self.dockerfile.lines_processed,
+            LangId::Makefile => self.makefile.lines_processed,
+            LangId::CMake => self.cmake.lines_processed,
+            LangId::Glsl => self.glsl.lines_processed,
+            LangId::Hlsl => self.hlsl.lines_processed,
+            LangId::ObjectiveC => self.objc.lines_processed,
         }
     }
 
@@ -475,6 +734,27 @@ impl LangStats {
             LangId::Julia => self.julia.code_lines,
             LangId::R => self.r.code_lines,
             LangId::Matlab => self.matlab.code_lines,
+            LangId::Solidity => self.solidity.code_lines,
+            LangId::FSharp => self.fsharp.code_lines,
+            LangId::Mojo => self.mojo.code_lines,
+            LangId::Verilog => self.verilog.code_lines,
+            LangId::Cuda => self.cuda.code_lines,
+            LangId::Wgsl => self.wgsl.code_lines,
+            LangId::Ada => self.ada.code_lines,
+            LangId::Groovy => self.groovy.code_lines,
+            LangId::Clojure => self.clojure.code_lines,
+            LangId::Assembly => self.assembly.code_lines,
+            LangId::Tcl => self.tcl.code_lines,
+            LangId::Scheme => self.scheme.code_lines,
+            LangId::Json => self.json.code_lines,
+            LangId::Toml => self.toml.code_lines,
+            LangId::Yaml => self.yaml.code_lines,
+            LangId::Dockerfile => self.dockerfile.code_lines,
+            LangId::Makefile => self.makefile.code_lines,
+            LangId::CMake => self.cmake.code_lines,
+            LangId::Glsl => self.glsl.code_lines,
+            LangId::Hlsl => self.hlsl.code_lines,
+            LangId::ObjectiveC => self.objc.code_lines,
         }
     }
 
@@ -513,6 +793,27 @@ impl LangStats {
             LangId::Julia => self.julia.comment_lines,
             LangId::R => self.r.comment_lines,
             LangId::Matlab => self.matlab.comment_lines,
+            LangId::Solidity => self.solidity.comment_lines,
+            LangId::FSharp => self.fsharp.comment_lines,
+            LangId::Mojo => self.mojo.comment_lines,
+            LangId::Verilog => self.verilog.comment_lines,
+            LangId::Cuda => self.cuda.comment_lines,
+            LangId::Wgsl => self.wgsl.comment_lines,
+            LangId::Ada => self.ada.comment_lines,
+            LangId::Groovy => self.groovy.comment_lines,
+            LangId::Clojure => self.clojure.comment_lines,
+            LangId::Assembly => self.assembly.comment_lines,
+            LangId::Tcl => self.tcl.comment_lines,
+            LangId::Scheme => self.scheme.comment_lines,
+            LangId::Json => self.json.comment_lines,
+            LangId::Toml => self.toml.comment_lines,
+            LangId::Yaml => self.yaml.comment_lines,
+            LangId::Dockerfile => self.dockerfile.comment_lines,
+            LangId::Makefile => self.makefile.comment_lines,
+            LangId::CMake => self.cmake.comment_lines,
+            LangId::Glsl => self.glsl.comment_lines,
+            LangId::Hlsl => self.hlsl.comment_lines,
+            LangId::ObjectiveC => self.objc.comment_lines,
         }
     }
 
@@ -551,6 +852,27 @@ impl LangStats {
             LangId::Julia => self.julia.blank_lines,
             LangId::R => self.r.blank_lines,
             LangId::Matlab => self.matlab.blank_lines,
+            LangId::Solidity => self.solidity.blank_lines,
+            LangId::FSharp => self.fsharp.blank_lines,
+            LangId::Mojo => self.mojo.blank_lines,
+            LangId::Verilog => self.verilog.blank_lines,
+            LangId::Cuda => self.cuda.blank_lines,
+            LangId::Wgsl => self.wgsl.blank_lines,
+            LangId::Ada => self.ada.blank_lines,
+            LangId::Groovy => self.groovy.blank_lines,
+            LangId::Clojure => self.clojure.blank_lines,
+            LangId::Assembly => self.assembly.blank_lines,
+            LangId::Tcl => self.tcl.blank_lines,
+            LangId::Scheme => self.scheme.blank_lines,
+            LangId::Json => self.json.blank_lines,
+            LangId::Toml => self.toml.blank_lines,
+            LangId::Yaml => self.yaml.blank_lines,
+            LangId::Dockerfile => self.dockerfile.blank_lines,
+            LangId::Makefile => self.makefile.blank_lines,
+            LangId::CMake => self.cmake.blank_lines,
+            LangId::Glsl => self.glsl.blank_lines,
+            LangId::Hlsl => self.hlsl.blank_lines,
+            LangId::ObjectiveC => self.objc.blank_lines,
         }
     }
 
@@ -589,6 +911,27 @@ impl LangStats {
             LangId::Julia => self.julia.total_keywords,
             LangId::R => self.r.total_keywords,
             LangId::Matlab => self.matlab.total_keywords,
+            LangId::Solidity => self.solidity.total_keywords,
+            LangId::FSharp => self.fsharp.total_keywords,
+            LangId::Mojo => self.mojo.total_keywords,
+            LangId::Verilog => self.verilog.total_keywords,
+            LangId::Cuda => self.cuda.total_keywords,
+            LangId::Wgsl => self.wgsl.total_keywords,
+            LangId::Ada => self.ada.total_keywords,
+            LangId::Groovy => self.groovy.total_keywords,
+            LangId::Clojure => self.clojure.total_keywords,
+            LangId::Assembly => self.assembly.total_keywords,
+            LangId::Tcl => self.tcl.total_keywords,
+            LangId::Scheme => self.scheme.total_keywords,
+            LangId::Json => self.json.total_keywords,
+            LangId::Toml => self.toml.total_keywords,
+            LangId::Yaml => self.yaml.total_keywords,
+            LangId::Dockerfile => self.dockerfile.total_keywords,
+            LangId::Makefile => self.makefile.total_keywords,
+            LangId::CMake => self.cmake.total_keywords,
+            LangId::Glsl => self.glsl.total_keywords,
+            LangId::Hlsl => self.hlsl.total_keywords,
+            LangId::ObjectiveC => self.objc.total_keywords,
         }
     }
 
@@ -627,6 +970,27 @@ impl LangStats {
             LangId::Julia => &julia::KEYWORD_NAMES,
             LangId::R => &r::KEYWORD_NAMES,
             LangId::Matlab => &matlab::KEYWORD_NAMES,
+            LangId::Solidity => &solidity::KEYWORD_NAMES,
+            LangId::FSharp => &fsharp::KEYWORD_NAMES,
+            LangId::Mojo => &mojo::KEYWORD_NAMES,
+            LangId::Verilog => &verilog::KEYWORD_NAMES,
+            LangId::Cuda => &cuda::KEYWORD_NAMES,
+            LangId::Wgsl => &wgsl::KEYWORD_NAMES,
+            LangId::Ada => &ada::KEYWORD_NAMES,
+            LangId::Groovy => &groovy::KEYWORD_NAMES,
+            LangId::Clojure => &clojure::KEYWORD_NAMES,
+            LangId::Assembly => &assembly::KEYWORD_NAMES,
+            LangId::Tcl => &tcl::KEYWORD_NAMES,
+            LangId::Scheme => &scheme::KEYWORD_NAMES,
+            LangId::Json => &json::KEYWORD_NAMES,
+            LangId::Toml => &toml::KEYWORD_NAMES,
+            LangId::Yaml => &yaml::KEYWORD_NAMES,
+            LangId::Dockerfile => &dockerfile::KEYWORD_NAMES,
+            LangId::Makefile => &makefile::KEYWORD_NAMES,
+            LangId::CMake => &cmake::KEYWORD_NAMES,
+            LangId::Glsl => &glsl::KEYWORD_NAMES,
+            LangId::Hlsl => &hlsl::KEYWORD_NAMES,
+            LangId::ObjectiveC => &objc::KEYWORD_NAMES,
         }
     }
 
@@ -665,6 +1029,27 @@ impl LangStats {
             LangId::Julia => &self.julia.keyword_counts,
             LangId::R => &self.r.keyword_counts,
             LangId::Matlab => &self.matlab.keyword_counts,
+            LangId::Solidity => &self.solidity.keyword_counts,
+            LangId::FSharp => &self.fsharp.keyword_counts,
+            LangId::Mojo => &self.mojo.keyword_counts,
+            LangId::Verilog => &self.verilog.keyword_counts,
+            LangId::Cuda => &self.cuda.keyword_counts,
+            LangId::Wgsl => &self.wgsl.keyword_counts,
+            LangId::Ada => &self.ada.keyword_counts,
+            LangId::Groovy => &self.groovy.keyword_counts,
+            LangId::Clojure => &self.clojure.keyword_counts,
+            LangId::Assembly => &self.assembly.keyword_counts,
+            LangId::Tcl => &self.tcl.keyword_counts,
+            LangId::Scheme => &self.scheme.keyword_counts,
+            LangId::Json => &self.json.keyword_counts,
+            LangId::Toml => &self.toml.keyword_counts,
+            LangId::Yaml => &self.yaml.keyword_counts,
+            LangId::Dockerfile => &self.dockerfile.keyword_counts,
+            LangId::Makefile => &self.makefile.keyword_counts,
+            LangId::CMake => &self.cmake.keyword_counts,
+            LangId::Glsl => &self.glsl.keyword_counts,
+            LangId::Hlsl => &self.hlsl.keyword_counts,
+            LangId::ObjectiveC => &self.objc.keyword_counts,
         }
     }
 
@@ -703,6 +1088,27 @@ impl LangStats {
             LangId::Julia => &julia::KEYWORD_LENS,
             LangId::R => &r::KEYWORD_LENS,
             LangId::Matlab => &matlab::KEYWORD_LENS,
+            LangId::Solidity => &solidity::KEYWORD_LENS,
+            LangId::FSharp => &fsharp::KEYWORD_LENS,
+            LangId::Mojo => &mojo::KEYWORD_LENS,
+            LangId::Verilog => &verilog::KEYWORD_LENS,
+            LangId::Cuda => &cuda::KEYWORD_LENS,
+            LangId::Wgsl => &wgsl::KEYWORD_LENS,
+            LangId::Ada => &ada::KEYWORD_LENS,
+            LangId::Groovy => &groovy::KEYWORD_LENS,
+            LangId::Clojure => &clojure::KEYWORD_LENS,
+            LangId::Assembly => &assembly::KEYWORD_LENS,
+            LangId::Tcl => &tcl::KEYWORD_LENS,
+            LangId::Scheme => &scheme::KEYWORD_LENS,
+            LangId::Json => &json::KEYWORD_LENS,
+            LangId::Toml => &toml::KEYWORD_LENS,
+            LangId::Yaml => &yaml::KEYWORD_LENS,
+            LangId::Dockerfile => &dockerfile::KEYWORD_LENS,
+            LangId::Makefile => &makefile::KEYWORD_LENS,
+            LangId::CMake => &cmake::KEYWORD_LENS,
+            LangId::Glsl => &glsl::KEYWORD_LENS,
+            LangId::Hlsl => &hlsl::KEYWORD_LENS,
+            LangId::ObjectiveC => &objc::KEYWORD_LENS,
         }
     }
 
@@ -741,6 +1147,27 @@ impl LangStats {
             LangId::Julia => (julia::KW_MIN_LEN, julia::KW_MAX_LEN),
             LangId::R => (r::KW_MIN_LEN, r::KW_MAX_LEN),
             LangId::Matlab => (matlab::KW_MIN_LEN, matlab::KW_MAX_LEN),
+            LangId::Solidity => (solidity::KW_MIN_LEN, solidity::KW_MAX_LEN),
+            LangId::FSharp => (fsharp::KW_MIN_LEN, fsharp::KW_MAX_LEN),
+            LangId::Mojo => (mojo::KW_MIN_LEN, mojo::KW_MAX_LEN),
+            LangId::Verilog => (verilog::KW_MIN_LEN, verilog::KW_MAX_LEN),
+            LangId::Cuda => (cuda::KW_MIN_LEN, cuda::KW_MAX_LEN),
+            LangId::Wgsl => (wgsl::KW_MIN_LEN, wgsl::KW_MAX_LEN),
+            LangId::Ada => (ada::KW_MIN_LEN, ada::KW_MAX_LEN),
+            LangId::Groovy => (groovy::KW_MIN_LEN, groovy::KW_MAX_LEN),
+            LangId::Clojure => (clojure::KW_MIN_LEN, clojure::KW_MAX_LEN),
+            LangId::Assembly => (assembly::KW_MIN_LEN, assembly::KW_MAX_LEN),
+            LangId::Tcl => (tcl::KW_MIN_LEN, tcl::KW_MAX_LEN),
+            LangId::Scheme => (scheme::KW_MIN_LEN, scheme::KW_MAX_LEN),
+            LangId::Json => (json::KW_MIN_LEN, json::KW_MAX_LEN),
+            LangId::Toml => (toml::KW_MIN_LEN, toml::KW_MAX_LEN),
+            LangId::Yaml => (yaml::KW_MIN_LEN, yaml::KW_MAX_LEN),
+            LangId::Dockerfile => (dockerfile::KW_MIN_LEN, dockerfile::KW_MAX_LEN),
+            LangId::Makefile => (makefile::KW_MIN_LEN, makefile::KW_MAX_LEN),
+            LangId::CMake => (cmake::KW_MIN_LEN, cmake::KW_MAX_LEN),
+            LangId::Glsl => (glsl::KW_MIN_LEN, glsl::KW_MAX_LEN),
+            LangId::Hlsl => (hlsl::KW_MIN_LEN, hlsl::KW_MAX_LEN),
+            LangId::ObjectiveC => (objc::KW_MIN_LEN, objc::KW_MAX_LEN),
         }
     }
 
@@ -779,6 +1206,27 @@ impl LangStats {
             LangId::Julia => (&julia::TOKEN_KIND, &julia::TOKEN_LUT_LO),
             LangId::R => (&r::TOKEN_KIND, &r::TOKEN_LUT_LO),
             LangId::Matlab => (&matlab::TOKEN_KIND, &matlab::TOKEN_LUT_LO),
+            LangId::Solidity => (&solidity::TOKEN_KIND, &solidity::TOKEN_LUT_LO),
+            LangId::FSharp => (&fsharp::TOKEN_KIND, &fsharp::TOKEN_LUT_LO),
+            LangId::Mojo => (&mojo::TOKEN_KIND, &mojo::TOKEN_LUT_LO),
+            LangId::Verilog => (&verilog::TOKEN_KIND, &verilog::TOKEN_LUT_LO),
+            LangId::Cuda => (&cuda::TOKEN_KIND, &cuda::TOKEN_LUT_LO),
+            LangId::Wgsl => (&wgsl::TOKEN_KIND, &wgsl::TOKEN_LUT_LO),
+            LangId::Ada => (&ada::TOKEN_KIND, &ada::TOKEN_LUT_LO),
+            LangId::Groovy => (&groovy::TOKEN_KIND, &groovy::TOKEN_LUT_LO),
+            LangId::Clojure => (&clojure::TOKEN_KIND, &clojure::TOKEN_LUT_LO),
+            LangId::Assembly => (&assembly::TOKEN_KIND, &assembly::TOKEN_LUT_LO),
+            LangId::Tcl => (&tcl::TOKEN_KIND, &tcl::TOKEN_LUT_LO),
+            LangId::Scheme => (&scheme::TOKEN_KIND, &scheme::TOKEN_LUT_LO),
+            LangId::Json => (&json::TOKEN_KIND, &json::TOKEN_LUT_LO),
+            LangId::Toml => (&toml::TOKEN_KIND, &toml::TOKEN_LUT_LO),
+            LangId::Yaml => (&yaml::TOKEN_KIND, &yaml::TOKEN_LUT_LO),
+            LangId::Dockerfile => (&dockerfile::TOKEN_KIND, &dockerfile::TOKEN_LUT_LO),
+            LangId::Makefile => (&makefile::TOKEN_KIND, &makefile::TOKEN_LUT_LO),
+            LangId::CMake => (&cmake::TOKEN_KIND, &cmake::TOKEN_LUT_LO),
+            LangId::Glsl => (&glsl::TOKEN_KIND, &glsl::TOKEN_LUT_LO),
+            LangId::Hlsl => (&hlsl::TOKEN_KIND, &hlsl::TOKEN_LUT_LO),
+            LangId::ObjectiveC => (&objc::TOKEN_KIND, &objc::TOKEN_LUT_LO),
         }
     }
 }
@@ -790,6 +1238,15 @@ fn has_stem(name: &[u8], dot_idx: usize) -> bool {
 
 #[inline(always)]
 pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
+    if (enabled_mask & LANG_MAKEFILE_MASK) != 0 && (name == b"Makefile" || name == b"makefile" || name == b"GNUmakefile") {
+        return Some(LangId::Makefile);
+    }
+    if (enabled_mask & LANG_DOCKERFILE_MASK) != 0 && (name == b"Dockerfile" || name == b"dockerfile" || name.starts_with(b"Dockerfile.") || name.starts_with(b"dockerfile.")) {
+        return Some(LangId::Dockerfile);
+    }
+    if (enabled_mask & LANG_CMAKE_MASK) != 0 && (name == b"CMakeLists.txt" || name == b"cmakelists.txt") {
+        return Some(LangId::CMake);
+    }
     let len = name.len();
     if len < 3 {
         return None;
@@ -812,7 +1269,16 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             }
             b't' if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
             b'r' if (enabled_mask & LANG_R_MASK) != 0 => return Some(LangId::R),
-            b'm' if (enabled_mask & LANG_MATLAB_MASK) != 0 => return Some(LangId::Matlab),
+            b'm' => {
+                if (enabled_mask & LANG_MATLAB_MASK) != 0 {
+                    return Some(LangId::Matlab);
+                }
+                if (enabled_mask & LANG_OBJECTIVEC_MASK) != 0 {
+                    return Some(LangId::ObjectiveC);
+                }
+            }
+            b'v' if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b's' if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
             _ => {}
         }
         return None;
@@ -844,6 +1310,12 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             b"di" if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
             b"ex" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
             b"jl" if (enabled_mask & LANG_JULIA_MASK) != 0 => return Some(LangId::Julia),
+            b"fs" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
+            b"sv" | b"vh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b"cu" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
+            b"ss" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
+            b"mk" if (enabled_mask & LANG_MAKEFILE_MASK) != 0 => return Some(LangId::Makefile),
+            b"mm" if (enabled_mask & LANG_OBJECTIVEC_MASK) != 0 => return Some(LangId::ObjectiveC),
             _ => {}
         }
         return None;
@@ -889,6 +1361,17 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             b"erl" | b"hrl" if (enabled_mask & LANG_ERLANG_MASK) != 0 => {
                 return Some(LangId::Erlang);
             }
+            b"sol" if (enabled_mask & LANG_SOLIDITY_MASK) != 0 => return Some(LangId::Solidity),
+            b"fsi" | b"fsx" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
+            b"svh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b"cuh" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
+            b"adb" | b"ads" if (enabled_mask & LANG_ADA_MASK) != 0 => return Some(LangId::Ada),
+            b"gvy" if (enabled_mask & LANG_GROOVY_MASK) != 0 => return Some(LangId::Groovy),
+            b"clj" | b"edn" if (enabled_mask & LANG_CLOJURE_MASK) != 0 => return Some(LangId::Clojure),
+            b"asm" if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
+            b"tcl" if (enabled_mask & LANG_TCL_MASK) != 0 => return Some(LangId::Tcl),
+            b"scm" | b"rkt" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
+            b"yml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
             _ => {}
         }
         return None;
@@ -910,6 +1393,14 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             b"bash" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
             b"dart" if (enabled_mask & LANG_DART_MASK) != 0 => return Some(LangId::Dart),
             b"nims" if (enabled_mask & LANG_NIM_MASK) != 0 => return Some(LangId::Nim),
+            b"mojo" if (enabled_mask & LANG_MOJO_MASK) != 0 => return Some(LangId::Mojo),
+            b"wgsl" if (enabled_mask & LANG_WGSL_MASK) != 0 => return Some(LangId::Wgsl),
+            b"cljs" | b"cljc" if (enabled_mask & LANG_CLOJURE_MASK) != 0 => return Some(LangId::Clojure),
+            b"json" if (enabled_mask & LANG_JSON_MASK) != 0 => return Some(LangId::Json),
+            b"toml" if (enabled_mask & LANG_TOML_MASK) != 0 => return Some(LangId::Toml),
+            b"yaml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
+            b"glsl" | b"vert" | b"frag" | b"geom" | b"comp" if (enabled_mask & LANG_GLSL_MASK) != 0 => return Some(LangId::Glsl),
+            b"hlsl" if (enabled_mask & LANG_HLSL_MASK) != 0 => return Some(LangId::Hlsl),
             _ => {}
         }
         return None;
@@ -952,6 +1443,24 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
         ];
         if &ext == b"nimble" && (enabled_mask & LANG_NIM_MASK) != 0 {
             return Some(LangId::Nim);
+        }
+        if &ext == b"groovy" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
+            return Some(LangId::Groovy);
+        }
+        if &ext == b"gradle" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
+            return Some(LangId::Groovy);
+        }
+    }
+    if len >= 7 && name[len - 6] == b'.' {
+        let ext = [
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"cmake" && (enabled_mask & LANG_CMAKE_MASK) != 0 {
+            return Some(LangId::CMake);
         }
     }
     None
@@ -1519,6 +2028,7 @@ pub fn kw_match_2_to_16(cand: &[u8], kw: &[u8]) -> bool {
 
 #[inline(always)]
 pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
+    assert!(start_i <= content.len());
     let content_len = content.len();
     let Some(first_close) = find_star_slash(&content[start_i..]) else {
         return content_len;
@@ -1538,7 +2048,9 @@ pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
         k += pos + 1;
     }
     if !has_nested {
-        return first_end + 2;
+        let res = first_end + 2;
+        assert!(res <= content_len);
+        return res;
     }
 
     let mut depth = 1usize;
@@ -1552,6 +2064,7 @@ pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
             depth -= 1;
             i += 2;
             if depth == 0 {
+                assert!(i <= content_len);
                 return i;
             }
         } else {
@@ -1635,7 +2148,7 @@ pub fn skip_nested_hash_equal_comment(content: &[u8], start_i: usize) -> usize {
 
 #[inline(always)]
 pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
-    debug_assert!(start_i <= content.len());
+    assert!(start_i <= content.len());
     let content_len = content.len();
     let mut i = start_i;
     while i + 2 < content_len {
@@ -1651,7 +2164,9 @@ pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
                 j -= 1;
             }
             if (escapes & 1) == 0 {
-                return q_idx + 3;
+                let res = q_idx + 3;
+                assert!(res <= content_len);
+                return res;
             }
         }
         i = q_idx + 1;
@@ -1694,6 +2209,27 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Julia => julia::parse_into(content, &mut stats.julia),
         LangId::R => r::parse_into(content, &mut stats.r),
         LangId::Matlab => matlab::parse_into(content, &mut stats.matlab),
+        LangId::Solidity => solidity::parse_into(content, &mut stats.solidity),
+        LangId::FSharp => fsharp::parse_into(content, &mut stats.fsharp),
+        LangId::Mojo => mojo::parse_into(content, &mut stats.mojo),
+        LangId::Verilog => verilog::parse_into(content, &mut stats.verilog),
+        LangId::Cuda => cuda::parse_into(content, &mut stats.cuda),
+        LangId::Wgsl => wgsl::parse_into(content, &mut stats.wgsl),
+        LangId::Ada => ada::parse_into(content, &mut stats.ada),
+        LangId::Groovy => groovy::parse_into(content, &mut stats.groovy),
+        LangId::Clojure => clojure::parse_into(content, &mut stats.clojure),
+        LangId::Assembly => assembly::parse_into(content, &mut stats.assembly),
+        LangId::Tcl => tcl::parse_into(content, &mut stats.tcl),
+        LangId::Scheme => scheme::parse_into(content, &mut stats.scheme),
+        LangId::Json => json::parse_into(content, &mut stats.json),
+        LangId::Toml => toml::parse_into(content, &mut stats.toml),
+        LangId::Yaml => yaml::parse_into(content, &mut stats.yaml),
+        LangId::Dockerfile => dockerfile::parse_into(content, &mut stats.dockerfile),
+        LangId::Makefile => makefile::parse_into(content, &mut stats.makefile),
+        LangId::CMake => cmake::parse_into(content, &mut stats.cmake),
+        LangId::Glsl => glsl::parse_into(content, &mut stats.glsl),
+        LangId::Hlsl => hlsl::parse_into(content, &mut stats.hlsl),
+        LangId::ObjectiveC => objc::parse_into(content, &mut stats.objc),
     }
 }
 
@@ -1823,8 +2359,8 @@ pub fn skip_line_comment(content: &[u8], start_i: usize) -> usize {
 
 #[inline(always)]
 pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
-    debug_assert!(start_i <= content.len());
-    debug_assert!(quote == b'"' || quote == b'\'' || quote == b'`');
+    assert!(start_i <= content.len());
+    assert!(quote == b'"' || quote == b'\'' || quote == b'`');
     let content_len = content.len();
     let mut i = start_i;
     while i < content_len {
@@ -1839,7 +2375,9 @@ pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
             j -= 1;
         }
         if (escapes & 1) == 0 {
-            return i + 1;
+            let res = i + 1;
+            assert!(res <= content_len);
+            return res;
         }
         i += 1;
     }
@@ -1865,34 +2403,87 @@ mod tests {
     fn test_final_line_without_newline_all_languages() {
         for lang in ALL_LANGS {
             let cmt: &str = match lang {
-                LangId::Python | LangId::Perl | LangId::Ruby | LangId::Bash | LangId::Nim | LangId::Elixir | LangId::Julia | LangId::R => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell => "--",
+                LangId::Python
+                | LangId::Perl
+                | LangId::Ruby
+                | LangId::Bash
+                | LangId::Nim
+                | LangId::Elixir
+                | LangId::Julia
+                | LangId::R
+                | LangId::Mojo
+                | LangId::Tcl
+                | LangId::Toml
+                | LangId::Yaml
+                | LangId::Dockerfile
+                | LangId::Makefile
+                | LangId::CMake => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
                 LangId::Erlang | LangId::Matlab => "%",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly => ";",
+                LangId::Json => "//",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
                 "a\nb".to_string(),
-                format!("a\n{cmt} c"),
-                format!("a\nb {cmt} c"),
                 "a\n\nb".to_string(),
                 "\"x\ny\"".to_string(),
                 "a\n   ".to_string(),
                 "a".to_string(),
-                format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang | LangId::Julia | LangId::R | LangId::Matlab) {
+            if lang != LangId::Json {
+                samples.push(format!("a\n{cmt} c"));
+                samples.push(format!("a\nb {cmt} c"));
+                samples.push(format!("{cmt} c"));
+            }
+            if !matches!(
+                lang,
+                LangId::Python
+                    | LangId::Perl
+                    | LangId::Zig
+                    | LangId::Lua
+                    | LangId::Ruby
+                    | LangId::Bash
+                    | LangId::Haskell
+                    | LangId::OCaml
+                    | LangId::Gleam
+                    | LangId::Nim
+                    | LangId::Fortran
+                    | LangId::Elixir
+                    | LangId::Erlang
+                    | LangId::Julia
+                    | LangId::R
+                    | LangId::Matlab
+                    | LangId::Mojo
+                    | LangId::FSharp
+                    | LangId::Ada
+                    | LangId::Clojure
+                    | LangId::Tcl
+                    | LangId::Scheme
+                    | LangId::Json
+                    | LangId::Toml
+                    | LangId::Yaml
+                    | LangId::Dockerfile
+                    | LangId::Makefile
+                    | LangId::CMake
+            ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
+            }
+            if lang == LangId::Scheme {
+                samples.push("a\n#| x\ny |#".to_string());
+                samples.push("a #| x\ny".to_string());
+                samples.push("a\n#| x |# b".to_string());
             }
             if lang == LangId::Haskell {
                 samples.push("a\n{- x\ny -}".to_string());
                 samples.push("a {- x\ny".to_string());
                 samples.push("a\n{- x -} b".to_string());
             }
-            if lang == LangId::OCaml {
+            if lang == LangId::OCaml || lang == LangId::FSharp {
                 samples.push("a\n(* x\ny *)".to_string());
                 samples.push("a (* x\ny".to_string());
                 samples.push("a\n(* x *) b".to_string());
@@ -1919,12 +2510,14 @@ mod tests {
                 );
             }
             assert_eq!(line_metrics(lang, b"a\nb"), [2, 2, 0, 0], "{}", lang.name());
-            assert_eq!(
-                line_metrics(lang, format!("a\n{cmt} c").as_bytes()),
-                [2, 1, 1, 0],
-                "{}",
-                lang.name()
-            );
+            if lang != LangId::Json {
+                assert_eq!(
+                    line_metrics(lang, format!("a\n{cmt} c").as_bytes()),
+                    [2, 1, 1, 0],
+                    "{}",
+                    lang.name()
+                );
+            }
         }
     }
 
@@ -2135,6 +2728,198 @@ mod tests {
             detect_language(b"foo.gleam", LANG_ALL_MASK),
             Some(LangId::Gleam)
         );
+        assert_eq!(
+            detect_language(b"foo.sol", LANG_ALL_MASK),
+            Some(LangId::Solidity)
+        );
+        assert_eq!(
+            detect_language(b"foo.fs", LANG_ALL_MASK),
+            Some(LangId::FSharp)
+        );
+        assert_eq!(
+            detect_language(b"foo.fsi", LANG_ALL_MASK),
+            Some(LangId::FSharp)
+        );
+        assert_eq!(
+            detect_language(b"foo.fsx", LANG_ALL_MASK),
+            Some(LangId::FSharp)
+        );
+        assert_eq!(
+            detect_language(b"foo.mojo", LANG_ALL_MASK),
+            Some(LangId::Mojo)
+        );
+        assert_eq!(
+            detect_language(b"foo.v", LANG_ALL_MASK),
+            Some(LangId::Verilog)
+        );
+        assert_eq!(
+            detect_language(b"foo.sv", LANG_ALL_MASK),
+            Some(LangId::Verilog)
+        );
+        assert_eq!(
+            detect_language(b"foo.vh", LANG_ALL_MASK),
+            Some(LangId::Verilog)
+        );
+        assert_eq!(
+            detect_language(b"foo.svh", LANG_ALL_MASK),
+            Some(LangId::Verilog)
+        );
+        assert_eq!(
+            detect_language(b"foo.cu", LANG_ALL_MASK),
+            Some(LangId::Cuda)
+        );
+        assert_eq!(
+            detect_language(b"foo.cuh", LANG_ALL_MASK),
+            Some(LangId::Cuda)
+        );
+        assert_eq!(
+            detect_language(b"foo.wgsl", LANG_ALL_MASK),
+            Some(LangId::Wgsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.adb", LANG_ALL_MASK),
+            Some(LangId::Ada)
+        );
+        assert_eq!(
+            detect_language(b"foo.ads", LANG_ALL_MASK),
+            Some(LangId::Ada)
+        );
+        assert_eq!(
+            detect_language(b"foo.groovy", LANG_ALL_MASK),
+            Some(LangId::Groovy)
+        );
+        assert_eq!(
+            detect_language(b"foo.gvy", LANG_ALL_MASK),
+            Some(LangId::Groovy)
+        );
+        assert_eq!(
+            detect_language(b"foo.gradle", LANG_ALL_MASK),
+            Some(LangId::Groovy)
+        );
+        assert_eq!(
+            detect_language(b"foo.clj", LANG_ALL_MASK),
+            Some(LangId::Clojure)
+        );
+        assert_eq!(
+            detect_language(b"foo.cljs", LANG_ALL_MASK),
+            Some(LangId::Clojure)
+        );
+        assert_eq!(
+            detect_language(b"foo.cljc", LANG_ALL_MASK),
+            Some(LangId::Clojure)
+        );
+        assert_eq!(
+            detect_language(b"foo.edn", LANG_ALL_MASK),
+            Some(LangId::Clojure)
+        );
+        assert_eq!(
+            detect_language(b"foo.s", LANG_ALL_MASK),
+            Some(LangId::Assembly)
+        );
+        assert_eq!(
+            detect_language(b"foo.S", LANG_ALL_MASK),
+            Some(LangId::Assembly)
+        );
+        assert_eq!(
+            detect_language(b"foo.asm", LANG_ALL_MASK),
+            Some(LangId::Assembly)
+        );
+        assert_eq!(
+            detect_language(b"foo.tcl", LANG_ALL_MASK),
+            Some(LangId::Tcl)
+        );
+        assert_eq!(
+            detect_language(b"foo.scm", LANG_ALL_MASK),
+            Some(LangId::Scheme)
+        );
+        assert_eq!(
+            detect_language(b"foo.ss", LANG_ALL_MASK),
+            Some(LangId::Scheme)
+        );
+        assert_eq!(
+            detect_language(b"foo.rkt", LANG_ALL_MASK),
+            Some(LangId::Scheme)
+        );
+        assert_eq!(
+            detect_language(b"foo.json", LANG_ALL_MASK),
+            Some(LangId::Json)
+        );
+        assert_eq!(
+            detect_language(b"foo.toml", LANG_ALL_MASK),
+            Some(LangId::Toml)
+        );
+        assert_eq!(
+            detect_language(b"foo.yaml", LANG_ALL_MASK),
+            Some(LangId::Yaml)
+        );
+        assert_eq!(
+            detect_language(b"foo.yml", LANG_ALL_MASK),
+            Some(LangId::Yaml)
+        );
+        assert_eq!(
+            detect_language(b"Dockerfile", LANG_ALL_MASK),
+            Some(LangId::Dockerfile)
+        );
+        assert_eq!(
+            detect_language(b"Dockerfile.build", LANG_ALL_MASK),
+            Some(LangId::Dockerfile)
+        );
+        assert_eq!(
+            detect_language(b"Makefile", LANG_ALL_MASK),
+            Some(LangId::Makefile)
+        );
+        assert_eq!(
+            detect_language(b"makefile", LANG_ALL_MASK),
+            Some(LangId::Makefile)
+        );
+        assert_eq!(
+            detect_language(b"foo.mk", LANG_ALL_MASK),
+            Some(LangId::Makefile)
+        );
+        assert_eq!(
+            detect_language(b"CMakeLists.txt", LANG_ALL_MASK),
+            Some(LangId::CMake)
+        );
+        assert_eq!(
+            detect_language(b"foo.cmake", LANG_ALL_MASK),
+            Some(LangId::CMake)
+        );
+        assert_eq!(
+            detect_language(b"foo.glsl", LANG_ALL_MASK),
+            Some(LangId::Glsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.vert", LANG_ALL_MASK),
+            Some(LangId::Glsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.frag", LANG_ALL_MASK),
+            Some(LangId::Glsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.geom", LANG_ALL_MASK),
+            Some(LangId::Glsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.comp", LANG_ALL_MASK),
+            Some(LangId::Glsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.hlsl", LANG_ALL_MASK),
+            Some(LangId::Hlsl)
+        );
+        assert_eq!(
+            detect_language(b"foo.m", LANG_OBJECTIVEC_MASK),
+            Some(LangId::ObjectiveC)
+        );
+        assert_eq!(
+            detect_language(b"foo.m", LANG_MATLAB_MASK),
+            Some(LangId::Matlab)
+        );
+        assert_eq!(
+            detect_language(b"foo.mm", LANG_ALL_MASK),
+            Some(LangId::ObjectiveC)
+        );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
         assert_eq!(detect_language(b"foo.h", LANG_C_MASK), Some(LangId::C));
@@ -2266,6 +3051,148 @@ mod tests {
                 let mut stats2 = LangStats::default();
                 parse_into(lang, &prefixed, &mut stats2);
                 assert_eq!(stats2.total_keywords(lang), 0, "lang {:?} kw {}", lang, kw);
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_languages_truncation_no_panic_and_empty_inputs() {
+        for lang in ALL_LANGS {
+            let mut empty_stats = LangStats::default();
+            parse_into(lang, b"", &mut empty_stats);
+            assert_eq!(empty_stats.lines(lang), 0);
+            assert_eq!(empty_stats.code_lines(lang), 0);
+            assert_eq!(empty_stats.comment_lines(lang), 0);
+            assert_eq!(empty_stats.blank_lines(lang), 0);
+            assert_eq!(empty_stats.total_keywords(lang), 0);
+
+            for ws in [b"   ".as_slice(), b"\t\t".as_slice(), b"\n".as_slice(), b"  \n  \n\t\n".as_slice(), b"\r\n\r\n".as_slice()] {
+                let mut ws_stats = LangStats::default();
+                parse_into(lang, ws, &mut ws_stats);
+                assert_eq!(ws_stats.code_lines(lang), 0, "lang {:?}", lang);
+                assert_eq!(ws_stats.comment_lines(lang), 0, "lang {:?}", lang);
+                assert_eq!(ws_stats.total_keywords(lang), 0, "lang {:?}", lang);
+                assert_eq!(ws_stats.lines(lang), ws_stats.blank_lines(lang), "lang {:?}", lang);
+            }
+
+            let cmt: &str = match lang {
+                LangId::Python
+                | LangId::Perl
+                | LangId::Ruby
+                | LangId::Bash
+                | LangId::Nim
+                | LangId::Elixir
+                | LangId::Julia
+                | LangId::R
+                | LangId::Mojo
+                | LangId::Tcl
+                | LangId::Toml
+                | LangId::Yaml
+                | LangId::Dockerfile
+                | LangId::Makefile
+                | LangId::CMake => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada => "--",
+                LangId::OCaml => "(*",
+                LangId::Fortran => "!",
+                LangId::Erlang | LangId::Matlab => "%",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly => ";",
+                LangId::Json => "",
+                _ => "//",
+            };
+
+            let block_open = match lang {
+                LangId::Haskell => "{-",
+                LangId::OCaml | LangId::FSharp => "(*",
+                LangId::Lua => "--[[",
+                LangId::Scheme => "#|",
+                LangId::Fortran
+                | LangId::Bash
+                | LangId::Nim
+                | LangId::Elixir
+                | LangId::Erlang
+                | LangId::Julia
+                | LangId::R
+                | LangId::Matlab
+                | LangId::Python
+                | LangId::Ruby
+                | LangId::Mojo
+                | LangId::Ada
+                | LangId::Clojure
+                | LangId::Tcl
+                | LangId::Json
+                | LangId::Toml
+                | LangId::Yaml
+                | LangId::Dockerfile
+                | LangId::Makefile
+                | LangId::CMake => "",
+                _ => "/*",
+            };
+            let block_close = match lang {
+                LangId::Haskell => "-}",
+                LangId::OCaml | LangId::FSharp => "*)",
+                LangId::Lua => "]]",
+                LangId::Scheme => "|#",
+                LangId::Fortran
+                | LangId::Bash
+                | LangId::Nim
+                | LangId::Elixir
+                | LangId::Erlang
+                | LangId::Julia
+                | LangId::R
+                | LangId::Matlab
+                | LangId::Python
+                | LangId::Ruby
+                | LangId::Mojo
+                | LangId::Ada
+                | LangId::Clojure
+                | LangId::Tcl
+                | LangId::Json
+                | LangId::Toml
+                | LangId::Yaml
+                | LangId::Dockerfile
+                | LangId::Makefile
+                | LangId::CMake => "",
+                _ => "*/",
+            };
+
+            let first_kw = LangStats::keyword_names(lang)[0];
+            let sample = if lang == LangId::Json {
+                format!(
+                    "{first_kw}\n\
+                     \"hello \\\"world\\\" \\n\"\n\
+                     {first_kw}\n\
+                     \n\
+                     {first_kw}\n"
+                )
+            } else {
+                format!(
+                    "{first_kw} foo = \"hello \\\"world\\\" \\n\"\n\
+                     {cmt} single line comment here\n\
+                     {first_kw} bar(x) {{ return x + 1; }}\n\
+                     {block_open} multi line\n\
+                     comment block\n\
+                     {block_close}\n\
+                     \n\
+                     {first_kw} baz = 'c';\n"
+                )
+            };
+
+            let sample_bytes = sample.as_bytes();
+            for offset in 0..=sample_bytes.len() {
+                let slice = &sample_bytes[..offset];
+                let mut stats = LangStats::default();
+                parse_into(lang, slice, &mut stats);
+                let lines = stats.lines(lang);
+                let code = stats.code_lines(lang);
+                let comm = stats.comment_lines(lang);
+                let blnk = stats.blank_lines(lang);
+                assert_eq!(
+                    lines,
+                    code + comm + blnk,
+                    "lang {:?} at offset {offset}/{}: lines={lines}, code={code}, comm={comm}, blnk={blnk}",
+                    lang,
+                    sample_bytes.len()
+                );
             }
         }
     }
