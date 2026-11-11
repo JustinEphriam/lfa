@@ -12,6 +12,7 @@ pub mod go;
 pub mod haskell;
 pub mod java;
 pub mod javascript;
+pub mod julia;
 pub mod kotlin;
 pub mod lua;
 pub mod nim;
@@ -60,9 +61,10 @@ pub enum LangId {
     Fortran = 26,
     Elixir = 27,
     Erlang = 28,
+    Julia = 29,
 }
 
-pub const LANG_COUNT: usize = 29;
+pub const LANG_COUNT: usize = 30;
 pub const LANG_C_MASK: u64 = 1 << (LangId::C as u64);
 pub const LANG_CPP_MASK: u64 = 1 << (LangId::Cpp as u64);
 pub const LANG_RUST_MASK: u64 = 1 << (LangId::Rust as u64);
@@ -92,6 +94,7 @@ pub const LANG_NIM_MASK: u64 = 1 << (LangId::Nim as u64);
 pub const LANG_FORTRAN_MASK: u64 = 1 << (LangId::Fortran as u64);
 pub const LANG_ELIXIR_MASK: u64 = 1 << (LangId::Elixir as u64);
 pub const LANG_ERLANG_MASK: u64 = 1 << (LangId::Erlang as u64);
+pub const LANG_JULIA_MASK: u64 = 1 << (LangId::Julia as u64);
 pub const LANG_ALL_MASK: u64 = if LANG_COUNT == 64 {
     !0u64
 } else {
@@ -128,6 +131,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Fortran,
     LangId::Elixir,
     LangId::Erlang,
+    LangId::Julia,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 64);
@@ -166,6 +170,7 @@ impl LangId {
             Self::Fortran => "Fortran",
             Self::Elixir => "Elixir",
             Self::Erlang => "Erlang",
+            Self::Julia => "Julia",
         }
     }
 
@@ -206,6 +211,7 @@ impl LangId {
             Self::Fortran => &["-f", "--f", "-fortran", "--fortran"],
             Self::Elixir => &["-ex", "--ex", "-elixir", "--elixir"],
             Self::Erlang => &["-erl", "--erl", "-erlang", "--erlang"],
+            Self::Julia => &["-jl", "--jl", "-julia", "--julia"],
         }
     }
 
@@ -262,6 +268,8 @@ impl LangId {
             | b"--ELIXIR" => Some(Self::Elixir),
             b"-erl" | b"--erl" | b"-ERL" | b"--ERL" | b"-erlang" | b"--erlang" | b"-ERLANG"
             | b"--ERLANG" => Some(Self::Erlang),
+            b"-jl" | b"--jl" | b"-JL" | b"--JL" | b"-julia" | b"--julia" | b"-JULIA"
+            | b"--JULIA" => Some(Self::Julia),
             _ => None,
         }
     }
@@ -335,6 +343,7 @@ pub struct LangStats {
     pub fortran: ParseResult<{ fortran::KEYWORD_COUNT }>,
     pub elixir: ParseResult<{ elixir::KEYWORD_COUNT }>,
     pub erlang: ParseResult<{ erlang::KEYWORD_COUNT }>,
+    pub julia: ParseResult<{ julia::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -369,6 +378,7 @@ impl LangStats {
         self.fortran.add(&other.fortran);
         self.elixir.add(&other.elixir);
         self.erlang.add(&other.erlang);
+        self.julia.add(&other.julia);
     }
 
     #[inline(always)]
@@ -403,6 +413,7 @@ impl LangStats {
             LangId::Fortran => self.fortran.lines_processed,
             LangId::Elixir => self.elixir.lines_processed,
             LangId::Erlang => self.erlang.lines_processed,
+            LangId::Julia => self.julia.lines_processed,
         }
     }
 
@@ -438,6 +449,7 @@ impl LangStats {
             LangId::Fortran => self.fortran.code_lines,
             LangId::Elixir => self.elixir.code_lines,
             LangId::Erlang => self.erlang.code_lines,
+            LangId::Julia => self.julia.code_lines,
         }
     }
 
@@ -473,6 +485,7 @@ impl LangStats {
             LangId::Fortran => self.fortran.comment_lines,
             LangId::Elixir => self.elixir.comment_lines,
             LangId::Erlang => self.erlang.comment_lines,
+            LangId::Julia => self.julia.comment_lines,
         }
     }
 
@@ -508,6 +521,7 @@ impl LangStats {
             LangId::Fortran => self.fortran.blank_lines,
             LangId::Elixir => self.elixir.blank_lines,
             LangId::Erlang => self.erlang.blank_lines,
+            LangId::Julia => self.julia.blank_lines,
         }
     }
 
@@ -543,6 +557,7 @@ impl LangStats {
             LangId::Fortran => self.fortran.total_keywords,
             LangId::Elixir => self.elixir.total_keywords,
             LangId::Erlang => self.erlang.total_keywords,
+            LangId::Julia => self.julia.total_keywords,
         }
     }
 
@@ -578,6 +593,7 @@ impl LangStats {
             LangId::Fortran => &fortran::KEYWORD_NAMES,
             LangId::Elixir => &elixir::KEYWORD_NAMES,
             LangId::Erlang => &erlang::KEYWORD_NAMES,
+            LangId::Julia => &julia::KEYWORD_NAMES,
         }
     }
 
@@ -613,6 +629,7 @@ impl LangStats {
             LangId::Fortran => &self.fortran.keyword_counts,
             LangId::Elixir => &self.elixir.keyword_counts,
             LangId::Erlang => &self.erlang.keyword_counts,
+            LangId::Julia => &self.julia.keyword_counts,
         }
     }
 
@@ -648,6 +665,7 @@ impl LangStats {
             LangId::Fortran => &fortran::KEYWORD_LENS,
             LangId::Elixir => &elixir::KEYWORD_LENS,
             LangId::Erlang => &erlang::KEYWORD_LENS,
+            LangId::Julia => &julia::KEYWORD_LENS,
         }
     }
 
@@ -683,6 +701,7 @@ impl LangStats {
             LangId::Fortran => (fortran::KW_MIN_LEN, fortran::KW_MAX_LEN),
             LangId::Elixir => (elixir::KW_MIN_LEN, elixir::KW_MAX_LEN),
             LangId::Erlang => (erlang::KW_MIN_LEN, erlang::KW_MAX_LEN),
+            LangId::Julia => (julia::KW_MIN_LEN, julia::KW_MAX_LEN),
         }
     }
 
@@ -718,6 +737,7 @@ impl LangStats {
             LangId::Fortran => (&fortran::TOKEN_KIND, &fortran::TOKEN_LUT_LO),
             LangId::Elixir => (&elixir::TOKEN_KIND, &elixir::TOKEN_LUT_LO),
             LangId::Erlang => (&erlang::TOKEN_KIND, &erlang::TOKEN_LUT_LO),
+            LangId::Julia => (&julia::TOKEN_KIND, &julia::TOKEN_LUT_LO),
         }
     }
 }
@@ -780,6 +800,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             b"ml" if (enabled_mask & LANG_OCAML_MASK) != 0 => return Some(LangId::OCaml),
             b"di" if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
             b"ex" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
+            b"jl" if (enabled_mask & LANG_JULIA_MASK) != 0 => return Some(LangId::Julia),
             _ => {}
         }
         return None;
@@ -1546,6 +1567,30 @@ pub fn skip_nested_hash_bracket_comment(content: &[u8], start_i: usize) -> usize
 }
 
 #[inline(always)]
+pub fn skip_nested_hash_equal_comment(content: &[u8], start_i: usize) -> usize {
+    let content_len = content.len();
+    let mut i = start_i;
+    let mut depth = 1usize;
+    while i + 1 < content_len {
+        let b0 = content[i];
+        let b1 = content[i + 1];
+        if b0 == b'#' && b1 == b'=' {
+            depth += 1;
+            i += 2;
+        } else if b0 == b'=' && b1 == b'#' {
+            depth -= 1;
+            i += 2;
+            if depth == 0 {
+                return i;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    content_len
+}
+
+#[inline(always)]
 pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
     debug_assert!(start_i <= content.len());
     let content_len = content.len();
@@ -1603,6 +1648,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Fortran => fortran::parse_into(content, &mut stats.fortran),
         LangId::Elixir => elixir::parse_into(content, &mut stats.elixir),
         LangId::Erlang => erlang::parse_into(content, &mut stats.erlang),
+        LangId::Julia => julia::parse_into(content, &mut stats.julia),
     }
 }
 
@@ -1774,7 +1820,7 @@ mod tests {
     fn test_final_line_without_newline_all_languages() {
         for lang in ALL_LANGS {
             let cmt: &str = match lang {
-                LangId::Python | LangId::Perl | LangId::Ruby | LangId::Bash | LangId::Nim | LangId::Elixir => "#",
+                LangId::Python | LangId::Perl | LangId::Ruby | LangId::Bash | LangId::Nim | LangId::Elixir | LangId::Julia => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
@@ -1791,7 +1837,7 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang | LangId::Julia) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
