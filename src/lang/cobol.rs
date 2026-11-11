@@ -89,6 +89,17 @@ const fn len_matches(n: usize, idx: usize) -> bool {
     n == KEYWORD_LENS[idx] as usize
 }
 
+#[inline(always)]
+fn is_column_7_indicator(content: &[u8], i: usize) -> bool {
+    if i == 6 {
+        return true;
+    }
+    if i > 6 && content[i - 7] == b'\n' {
+        return true;
+    }
+    false
+}
+
 pub struct CobolLexer;
 
 impl LangLexer<KEYWORD_COUNT> for CobolLexer {
@@ -135,7 +146,9 @@ impl LangLexer<KEYWORD_COUNT> for CobolLexer {
         let content_len = content.len();
         match kind {
             TOK_STAR => {
-                if (i + 1 < content_len && content[i + 1] == b'>') || (*line_state == STATE_NONE && i == 6) {
+                if (i + 1 < content_len && content[i + 1] == b'>')
+                    || (*line_state == STATE_NONE && is_column_7_indicator(content, i))
+                {
                     *line_state |= STATE_COMMENT;
                     if let Some(pos) = find_byte_avx2(&content[i + 1..], b'\n') {
                         if (*line_state & STATE_CODE) != 0 {
@@ -155,7 +168,7 @@ impl LangLexer<KEYWORD_COUNT> for CobolLexer {
                 }
             }
             TOK_SLASH => {
-                if *line_state == STATE_NONE && i == 6 {
+                if *line_state == STATE_NONE && is_column_7_indicator(content, i) {
                     *line_state |= STATE_COMMENT;
                     if let Some(pos) = find_byte_avx2(&content[i + 1..], b'\n') {
                         acc.comment_lines += 1;
@@ -235,5 +248,16 @@ pub mod tests {
         assert_eq!(res.code_lines, 5);
         assert_eq!(res.blank_lines, 0);
         assert!(res.total_keywords >= 4);
+
+        let fixed_code = b"       IDENTIFICATION DIVISION.
+      *THIS IS A LINE 2 COMMENT
+      /THIS IS A LINE 3 COMMENT
+       PROGRAM-ID. HELLO.
+";
+        let mut fixed_res = ParseResult::default();
+        parse_into(fixed_code, &mut fixed_res);
+        assert_eq!(fixed_res.lines_processed, 4);
+        assert_eq!(fixed_res.comment_lines, 2);
+        assert_eq!(fixed_res.code_lines, 2);
     }
 }
