@@ -7,6 +7,7 @@ pub mod javascript;
 pub mod lua;
 pub mod odin;
 pub mod perl;
+pub mod php;
 pub mod python;
 pub mod ruby;
 pub mod rust;
@@ -30,9 +31,10 @@ pub enum LangId {
     Java = 11,
     CSharp = 12,
     Ruby = 13,
+    Php = 14,
 }
 
-pub const LANG_COUNT: usize = 14;
+pub const LANG_COUNT: usize = 15;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -47,6 +49,7 @@ pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
 pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
 pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
 pub const LANG_RUBY_MASK: u32 = 1 << (LangId::Ruby as u32);
+pub const LANG_PHP_MASK: u32 = 1 << (LangId::Php as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -64,6 +67,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Java,
     LangId::CSharp,
     LangId::Ruby,
+    LangId::Php,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -87,6 +91,7 @@ impl LangId {
             Self::Java => "Java",
             Self::CSharp => "C#",
             Self::Ruby => "Ruby",
+            Self::Php => "PHP",
         }
     }
 
@@ -125,6 +130,7 @@ impl LangId {
             b"-rb" | b"--rb" | b"-RB" | b"--RB" | b"-ruby" | b"--ruby" | b"-RUBY" | b"--RUBY" => {
                 Some(Self::Ruby)
             }
+            b"-php" | b"--php" | b"-PHP" | b"--PHP" => Some(Self::Php),
             _ => None,
         }
     }
@@ -183,6 +189,7 @@ pub struct LangStats {
     pub java: ParseResult<{ java::KEYWORD_COUNT }>,
     pub csharp: ParseResult<{ csharp::KEYWORD_COUNT }>,
     pub ruby: ParseResult<{ ruby::KEYWORD_COUNT }>,
+    pub php: ParseResult<{ php::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -202,6 +209,7 @@ impl LangStats {
         self.java.add(&other.java);
         self.csharp.add(&other.csharp);
         self.ruby.add(&other.ruby);
+        self.php.add(&other.php);
     }
 
     #[inline(always)]
@@ -221,6 +229,7 @@ impl LangStats {
             LangId::Java => self.java.lines_processed,
             LangId::CSharp => self.csharp.lines_processed,
             LangId::Ruby => self.ruby.lines_processed,
+            LangId::Php => self.php.lines_processed,
         }
     }
 
@@ -241,6 +250,7 @@ impl LangStats {
             LangId::Java => self.java.code_lines,
             LangId::CSharp => self.csharp.code_lines,
             LangId::Ruby => self.ruby.code_lines,
+            LangId::Php => self.php.code_lines,
         }
     }
 
@@ -261,6 +271,7 @@ impl LangStats {
             LangId::Java => self.java.comment_lines,
             LangId::CSharp => self.csharp.comment_lines,
             LangId::Ruby => self.ruby.comment_lines,
+            LangId::Php => self.php.comment_lines,
         }
     }
 
@@ -281,6 +292,7 @@ impl LangStats {
             LangId::Java => self.java.blank_lines,
             LangId::CSharp => self.csharp.blank_lines,
             LangId::Ruby => self.ruby.blank_lines,
+            LangId::Php => self.php.blank_lines,
         }
     }
 
@@ -301,6 +313,7 @@ impl LangStats {
             LangId::Java => self.java.total_keywords,
             LangId::CSharp => self.csharp.total_keywords,
             LangId::Ruby => self.ruby.total_keywords,
+            LangId::Php => self.php.total_keywords,
         }
     }
 
@@ -321,6 +334,7 @@ impl LangStats {
             LangId::Java => &java::KEYWORD_NAMES,
             LangId::CSharp => &csharp::KEYWORD_NAMES,
             LangId::Ruby => &ruby::KEYWORD_NAMES,
+            LangId::Php => &php::KEYWORD_NAMES,
         }
     }
 
@@ -341,6 +355,7 @@ impl LangStats {
             LangId::Java => &self.java.keyword_counts,
             LangId::CSharp => &self.csharp.keyword_counts,
             LangId::Ruby => &self.ruby.keyword_counts,
+            LangId::Php => &self.php.keyword_counts,
         }
     }
 
@@ -361,6 +376,7 @@ impl LangStats {
             LangId::Java => &java::KEYWORD_LENS,
             LangId::CSharp => &csharp::KEYWORD_LENS,
             LangId::Ruby => &ruby::KEYWORD_LENS,
+            LangId::Php => &php::KEYWORD_LENS,
         }
     }
 
@@ -381,6 +397,7 @@ impl LangStats {
             LangId::Java => (java::KW_MIN_LEN, java::KW_MAX_LEN),
             LangId::CSharp => (csharp::KW_MIN_LEN, csharp::KW_MAX_LEN),
             LangId::Ruby => (ruby::KW_MIN_LEN, ruby::KW_MAX_LEN),
+            LangId::Php => (php::KW_MIN_LEN, php::KW_MAX_LEN),
         }
     }
 
@@ -401,6 +418,7 @@ impl LangStats {
             LangId::Java => (&java::TOKEN_KIND, &java::TOKEN_LUT_LO),
             LangId::CSharp => (&csharp::TOKEN_KIND, &csharp::TOKEN_LUT_LO),
             LangId::Ruby => (&ruby::TOKEN_KIND, &ruby::TOKEN_LUT_LO),
+            LangId::Php => (&php::TOKEN_KIND, &php::TOKEN_LUT_LO),
         }
     }
 }
@@ -484,6 +502,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"mts" | b"cts" | b"tsx" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
                 return Some(LangId::TypeScript);
             }
+            b"php" if (enabled_mask & LANG_PHP_MASK) != 0 => return Some(LangId::Php),
             _ => {}
         }
         return None;
@@ -503,6 +522,22 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
             b"java" if (enabled_mask & LANG_JAVA_MASK) != 0 => return Some(LangId::Java),
             _ => {}
+        }
+        return None;
+    }
+    if len >= 7 && name[len - 6] == b'.' {
+        if !has_stem(name, len - 6) {
+            return None;
+        }
+        let ext = [
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"phtml" && (enabled_mask & LANG_PHP_MASK) != 0 {
+            return Some(LangId::Php);
         }
     }
     None
@@ -1155,6 +1190,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Java => java::parse_into(content, &mut stats.java),
         LangId::CSharp => csharp::parse_into(content, &mut stats.csharp),
         LangId::Ruby => ruby::parse_into(content, &mut stats.ruby),
+        LangId::Php => php::parse_into(content, &mut stats.php),
     }
 }
 
@@ -1522,6 +1558,11 @@ mod tests {
             Some(LangId::TypeScript)
         );
         assert_eq!(detect_language(b"foo.rb", LANG_ALL_MASK), Some(LangId::Ruby));
+        assert_eq!(detect_language(b"foo.php", LANG_ALL_MASK), Some(LangId::Php));
+        assert_eq!(
+            detect_language(b"foo.phtml", LANG_ALL_MASK),
+            Some(LangId::Php)
+        );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
         assert_eq!(detect_language(b"foo.h", LANG_C_MASK), Some(LangId::C));
