@@ -139,14 +139,14 @@ struct SchedulerState {
 }
 
 struct WorkScheduler {
-    enabled_mask: u64,
+    enabled_mask: u128,
     hidden: bool,
     mutex: Mutex<SchedulerState>,
     cond: Condvar,
 }
 
 impl WorkScheduler {
-    fn new(root: &[u8], enabled_mask: u64, hidden: bool) -> Self {
+    fn new(root: &[u8], enabled_mask: u128, hidden: bool) -> Self {
         assert!(!root.is_empty());
         let mut dirs_arena = Vec::with_capacity(65536);
         dirs_arena.extend_from_slice(root);
@@ -1369,7 +1369,7 @@ impl OutputFormat {
 enum CliResult<'a> {
     Run {
         target: &'a OsStr,
-        mask: u64,
+        mask: u128,
         selected_langs: Vec<LangId>,
         format: OutputFormat,
         hidden: bool,
@@ -1385,7 +1385,7 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     }
 
     let mut target_os: Option<&'a OsStr> = None;
-    let mut flag_mask = 0u64;
+    let mut flag_mask = 0u128;
     let mut selected_langs: Vec<LangId> = Vec::new();
     let mut format = OutputFormat::Table;
     let mut hidden = false;
@@ -1475,7 +1475,7 @@ fn print_error_and_exit(prog: &str, msg: &str) -> ! {
     process::exit(2);
 }
 
-fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>, OutputFormat, bool) {
+fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u128, Vec<LangId>, OutputFormat, bool) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())

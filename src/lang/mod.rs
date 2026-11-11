@@ -111,63 +111,63 @@ pub enum LangId {
 }
 
 pub const LANG_COUNT: usize = 53;
-pub const LANG_C_MASK: u64 = 1 << (LangId::C as u64);
-pub const LANG_CPP_MASK: u64 = 1 << (LangId::Cpp as u64);
-pub const LANG_RUST_MASK: u64 = 1 << (LangId::Rust as u64);
-pub const LANG_PYTHON_MASK: u64 = 1 << (LangId::Python as u64);
-pub const LANG_PERL_MASK: u64 = 1 << (LangId::Perl as u64);
-pub const LANG_GO_MASK: u64 = 1 << (LangId::Go as u64);
-pub const LANG_ZIG_MASK: u64 = 1 << (LangId::Zig as u64);
-pub const LANG_ODIN_MASK: u64 = 1 << (LangId::Odin as u64);
-pub const LANG_JAVASCRIPT_MASK: u64 = 1 << (LangId::JavaScript as u64);
-pub const LANG_TYPESCRIPT_MASK: u64 = 1 << (LangId::TypeScript as u64);
-pub const LANG_LUA_MASK: u64 = 1 << (LangId::Lua as u64);
-pub const LANG_JAVA_MASK: u64 = 1 << (LangId::Java as u64);
-pub const LANG_CSHARP_MASK: u64 = 1 << (LangId::CSharp as u64);
-pub const LANG_RUBY_MASK: u64 = 1 << (LangId::Ruby as u64);
-pub const LANG_PHP_MASK: u64 = 1 << (LangId::Php as u64);
-pub const LANG_SWIFT_MASK: u64 = 1 << (LangId::Swift as u64);
-pub const LANG_KOTLIN_MASK: u64 = 1 << (LangId::Kotlin as u64);
-pub const LANG_BASH_MASK: u64 = 1 << (LangId::Bash as u64);
-pub const LANG_SQL_MASK: u64 = 1 << (LangId::Sql as u64);
-pub const LANG_DART_MASK: u64 = 1 << (LangId::Dart as u64);
-pub const LANG_SCALA_MASK: u64 = 1 << (LangId::Scala as u64);
-pub const LANG_HASKELL_MASK: u64 = 1 << (LangId::Haskell as u64);
-pub const LANG_OCAML_MASK: u64 = 1 << (LangId::OCaml as u64);
-pub const LANG_GLEAM_MASK: u64 = 1 << (LangId::Gleam as u64);
-pub const LANG_D_MASK: u64 = 1 << (LangId::D as u64);
-pub const LANG_NIM_MASK: u64 = 1 << (LangId::Nim as u64);
-pub const LANG_FORTRAN_MASK: u64 = 1 << (LangId::Fortran as u64);
-pub const LANG_ELIXIR_MASK: u64 = 1 << (LangId::Elixir as u64);
-pub const LANG_ERLANG_MASK: u64 = 1 << (LangId::Erlang as u64);
-pub const LANG_JULIA_MASK: u64 = 1 << (LangId::Julia as u64);
-pub const LANG_R_MASK: u64 = 1 << (LangId::R as u64);
-pub const LANG_MATLAB_MASK: u64 = 1 << (LangId::Matlab as u64);
-pub const LANG_SOLIDITY_MASK: u64 = 1 << (LangId::Solidity as u64);
-pub const LANG_FSHARP_MASK: u64 = 1 << (LangId::FSharp as u64);
-pub const LANG_MOJO_MASK: u64 = 1 << (LangId::Mojo as u64);
-pub const LANG_VERILOG_MASK: u64 = 1 << (LangId::Verilog as u64);
-pub const LANG_CUDA_MASK: u64 = 1 << (LangId::Cuda as u64);
-pub const LANG_WGSL_MASK: u64 = 1 << (LangId::Wgsl as u64);
-pub const LANG_ADA_MASK: u64 = 1 << (LangId::Ada as u64);
-pub const LANG_GROOVY_MASK: u64 = 1 << (LangId::Groovy as u64);
-pub const LANG_CLOJURE_MASK: u64 = 1 << (LangId::Clojure as u64);
-pub const LANG_ASSEMBLY_MASK: u64 = 1 << (LangId::Assembly as u64);
-pub const LANG_TCL_MASK: u64 = 1 << (LangId::Tcl as u64);
-pub const LANG_SCHEME_MASK: u64 = 1 << (LangId::Scheme as u64);
-pub const LANG_JSON_MASK: u64 = 1 << (LangId::Json as u64);
-pub const LANG_TOML_MASK: u64 = 1 << (LangId::Toml as u64);
-pub const LANG_YAML_MASK: u64 = 1 << (LangId::Yaml as u64);
-pub const LANG_DOCKERFILE_MASK: u64 = 1 << (LangId::Dockerfile as u64);
-pub const LANG_MAKEFILE_MASK: u64 = 1 << (LangId::Makefile as u64);
-pub const LANG_CMAKE_MASK: u64 = 1 << (LangId::CMake as u64);
-pub const LANG_GLSL_MASK: u64 = 1 << (LangId::Glsl as u64);
-pub const LANG_HLSL_MASK: u64 = 1 << (LangId::Hlsl as u64);
-pub const LANG_OBJECTIVEC_MASK: u64 = 1 << (LangId::ObjectiveC as u64);
-pub const LANG_ALL_MASK: u64 = if LANG_COUNT == 64 {
-    !0u64
+pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
+pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
+pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
+pub const LANG_PYTHON_MASK: u128 = 1 << (LangId::Python as u128);
+pub const LANG_PERL_MASK: u128 = 1 << (LangId::Perl as u128);
+pub const LANG_GO_MASK: u128 = 1 << (LangId::Go as u128);
+pub const LANG_ZIG_MASK: u128 = 1 << (LangId::Zig as u128);
+pub const LANG_ODIN_MASK: u128 = 1 << (LangId::Odin as u128);
+pub const LANG_JAVASCRIPT_MASK: u128 = 1 << (LangId::JavaScript as u128);
+pub const LANG_TYPESCRIPT_MASK: u128 = 1 << (LangId::TypeScript as u128);
+pub const LANG_LUA_MASK: u128 = 1 << (LangId::Lua as u128);
+pub const LANG_JAVA_MASK: u128 = 1 << (LangId::Java as u128);
+pub const LANG_CSHARP_MASK: u128 = 1 << (LangId::CSharp as u128);
+pub const LANG_RUBY_MASK: u128 = 1 << (LangId::Ruby as u128);
+pub const LANG_PHP_MASK: u128 = 1 << (LangId::Php as u128);
+pub const LANG_SWIFT_MASK: u128 = 1 << (LangId::Swift as u128);
+pub const LANG_KOTLIN_MASK: u128 = 1 << (LangId::Kotlin as u128);
+pub const LANG_BASH_MASK: u128 = 1 << (LangId::Bash as u128);
+pub const LANG_SQL_MASK: u128 = 1 << (LangId::Sql as u128);
+pub const LANG_DART_MASK: u128 = 1 << (LangId::Dart as u128);
+pub const LANG_SCALA_MASK: u128 = 1 << (LangId::Scala as u128);
+pub const LANG_HASKELL_MASK: u128 = 1 << (LangId::Haskell as u128);
+pub const LANG_OCAML_MASK: u128 = 1 << (LangId::OCaml as u128);
+pub const LANG_GLEAM_MASK: u128 = 1 << (LangId::Gleam as u128);
+pub const LANG_D_MASK: u128 = 1 << (LangId::D as u128);
+pub const LANG_NIM_MASK: u128 = 1 << (LangId::Nim as u128);
+pub const LANG_FORTRAN_MASK: u128 = 1 << (LangId::Fortran as u128);
+pub const LANG_ELIXIR_MASK: u128 = 1 << (LangId::Elixir as u128);
+pub const LANG_ERLANG_MASK: u128 = 1 << (LangId::Erlang as u128);
+pub const LANG_JULIA_MASK: u128 = 1 << (LangId::Julia as u128);
+pub const LANG_R_MASK: u128 = 1 << (LangId::R as u128);
+pub const LANG_MATLAB_MASK: u128 = 1 << (LangId::Matlab as u128);
+pub const LANG_SOLIDITY_MASK: u128 = 1 << (LangId::Solidity as u128);
+pub const LANG_FSHARP_MASK: u128 = 1 << (LangId::FSharp as u128);
+pub const LANG_MOJO_MASK: u128 = 1 << (LangId::Mojo as u128);
+pub const LANG_VERILOG_MASK: u128 = 1 << (LangId::Verilog as u128);
+pub const LANG_CUDA_MASK: u128 = 1 << (LangId::Cuda as u128);
+pub const LANG_WGSL_MASK: u128 = 1 << (LangId::Wgsl as u128);
+pub const LANG_ADA_MASK: u128 = 1 << (LangId::Ada as u128);
+pub const LANG_GROOVY_MASK: u128 = 1 << (LangId::Groovy as u128);
+pub const LANG_CLOJURE_MASK: u128 = 1 << (LangId::Clojure as u128);
+pub const LANG_ASSEMBLY_MASK: u128 = 1 << (LangId::Assembly as u128);
+pub const LANG_TCL_MASK: u128 = 1 << (LangId::Tcl as u128);
+pub const LANG_SCHEME_MASK: u128 = 1 << (LangId::Scheme as u128);
+pub const LANG_JSON_MASK: u128 = 1 << (LangId::Json as u128);
+pub const LANG_TOML_MASK: u128 = 1 << (LangId::Toml as u128);
+pub const LANG_YAML_MASK: u128 = 1 << (LangId::Yaml as u128);
+pub const LANG_DOCKERFILE_MASK: u128 = 1 << (LangId::Dockerfile as u128);
+pub const LANG_MAKEFILE_MASK: u128 = 1 << (LangId::Makefile as u128);
+pub const LANG_CMAKE_MASK: u128 = 1 << (LangId::CMake as u128);
+pub const LANG_GLSL_MASK: u128 = 1 << (LangId::Glsl as u128);
+pub const LANG_HLSL_MASK: u128 = 1 << (LangId::Hlsl as u128);
+pub const LANG_OBJECTIVEC_MASK: u128 = 1 << (LangId::ObjectiveC as u128);
+pub const LANG_ALL_MASK: u128 = if LANG_COUNT == 128 {
+    !0u128
 } else {
-    (1u64 << LANG_COUNT) - 1
+    (1u128 << LANG_COUNT) - 1
 };
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -297,8 +297,8 @@ impl LangId {
     }
 
     #[inline(always)]
-    pub const fn mask(self) -> u64 {
-        1 << (self as u64)
+    pub const fn mask(self) -> u128 {
+        1 << (self as u128)
     }
 
     #[inline(always)]
@@ -1237,7 +1237,7 @@ fn has_stem(name: &[u8], dot_idx: usize) -> bool {
 }
 
 #[inline(always)]
-pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
+pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
     if (enabled_mask & LANG_MAKEFILE_MASK) != 0 && (name == b"Makefile" || name == b"makefile" || name == b"GNUmakefile") {
         return Some(LangId::Makefile);
     }
