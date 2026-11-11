@@ -1810,6 +1810,103 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
     None
 }
 
+#[inline(always)]
+fn get_basename(w: &[u8]) -> &[u8] {
+    let mut k = w.len();
+    while k > 0 {
+        if w[k - 1] == b'/' {
+            return &w[k..];
+        }
+        k -= 1;
+    }
+    w
+}
+
+#[inline(always)]
+pub fn detect_shebang(content: &[u8], enabled_mask: u128) -> Option<LangId> {
+    if content.len() < 3 || content[0] != b'#' || content[1] != b'!' {
+        return None;
+    }
+
+    let mut i = 2;
+    while i < content.len() && (content[i] == b' ' || content[i] == b'\t') {
+        i += 1;
+    }
+
+    let mut line_end = i;
+    while line_end < content.len() && content[line_end] != b'\n' && content[line_end] != b'\r' {
+        line_end += 1;
+    }
+
+    while line_end > i && (content[line_end - 1] == b' ' || content[line_end - 1] == b'\t') {
+        line_end -= 1;
+    }
+
+    let mut words = [&b""[..]; 8];
+    let mut word_count = 0;
+    let mut p = i;
+    while p < line_end && word_count < 8 {
+        while p < line_end && (content[p] == b' ' || content[p] == b'\t') {
+            p += 1;
+        }
+        if p >= line_end {
+            break;
+        }
+        let start = p;
+        while p < line_end && content[p] != b' ' && content[p] != b'\t' {
+            p += 1;
+        }
+        words[word_count] = &content[start..p];
+        word_count += 1;
+    }
+
+    if word_count == 0 {
+        return None;
+    }
+
+    let mut prog = get_basename(words[0]);
+    if prog == b"env" {
+        let mut idx = 1;
+        while idx < word_count && words[idx].starts_with(b"-") {
+            idx += 1;
+        }
+        if idx < word_count {
+            prog = get_basename(words[idx]);
+        } else {
+            return None;
+        }
+    }
+
+    if (enabled_mask & LANG_BASH_MASK) != 0
+        && (prog == b"bash" || prog == b"sh" || prog == b"zsh" || prog == b"dash" || prog == b"ash")
+    {
+        return Some(LangId::Bash);
+    }
+    if (enabled_mask & LANG_PYTHON_MASK) != 0 && prog.starts_with(b"python") {
+        return Some(LangId::Python);
+    }
+    if (enabled_mask & LANG_PERL_MASK) != 0 && prog.starts_with(b"perl") {
+        return Some(LangId::Perl);
+    }
+    if (enabled_mask & LANG_RUBY_MASK) != 0 && prog == b"ruby" {
+        return Some(LangId::Ruby);
+    }
+    if (enabled_mask & LANG_FISH_MASK) != 0 && prog == b"fish" {
+        return Some(LangId::Fish);
+    }
+    if (enabled_mask & LANG_AWK_MASK) != 0 && (prog == b"awk" || prog == b"gawk" || prog == b"mawk" || prog == b"nawk") {
+        return Some(LangId::Awk);
+    }
+    if (enabled_mask & LANG_TCL_MASK) != 0 && (prog == b"tclsh" || prog == b"wish") {
+        return Some(LangId::Tcl);
+    }
+    if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && (prog == b"node" || prog == b"nodejs") {
+        return Some(LangId::JavaScript);
+    }
+
+    None
+}
+
 pub const TOK_WS: u8 = 0;
 pub const TOK_NL: u8 = 1;
 pub const TOK_CODE: u8 = 2;
@@ -3337,6 +3434,20 @@ mod tests {
         assert_eq!(detect_language(b"foo.c", 0), None);
         assert_eq!(detect_language(b"foo.h", 0), None);
         assert_eq!(detect_language(b"foo.cpp", 0), None);
+
+        assert_eq!(detect_shebang(b"#!/bin/bash\necho 1", LANG_ALL_MASK), Some(LangId::Bash));
+        assert_eq!(detect_shebang(b"#!/bin/sh\necho 1", LANG_ALL_MASK), Some(LangId::Bash));
+        assert_eq!(detect_shebang(b"#!/usr/bin/env python3\nprint(1)", LANG_ALL_MASK), Some(LangId::Python));
+        assert_eq!(detect_shebang(b"#!/usr/bin/env -S python3.11\nprint(1)", LANG_ALL_MASK), Some(LangId::Python));
+        assert_eq!(detect_shebang(b"#!/usr/bin/perl\nprint 1;", LANG_ALL_MASK), Some(LangId::Perl));
+        assert_eq!(detect_shebang(b"#!/usr/bin/ruby\nputs 1", LANG_ALL_MASK), Some(LangId::Ruby));
+        assert_eq!(detect_shebang(b"#!/usr/bin/fish\necho 1", LANG_ALL_MASK), Some(LangId::Fish));
+        assert_eq!(detect_shebang(b"#!/usr/bin/awk -f\nBEGIN{}", LANG_ALL_MASK), Some(LangId::Awk));
+        assert_eq!(detect_shebang(b"#!/usr/bin/tclsh\nputs 1", LANG_ALL_MASK), Some(LangId::Tcl));
+        assert_eq!(detect_shebang(b"#!/usr/bin/env node\nconsole.log(1)", LANG_ALL_MASK), Some(LangId::JavaScript));
+        assert_eq!(detect_shebang(b"hello world\n", LANG_ALL_MASK), None);
+        assert_eq!(detect_shebang(b"#!", LANG_ALL_MASK), None);
+        assert_eq!(detect_shebang(b"#!/bin/bash", LANG_PYTHON_MASK), None);
     }
 
     #[test]

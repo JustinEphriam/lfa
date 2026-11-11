@@ -3,7 +3,8 @@
 mod lang;
 
 use lang::{
-    detect_language, parse_into, LangId, LangStats, ALL_LANGS, LANG_ALL_MASK, LANG_COUNT,
+    detect_language, detect_shebang, parse_into, LangId, LangStats, ALL_LANGS, LANG_ALL_MASK,
+    LANG_COUNT,
 };
 use rustix::buffer::spare_capacity;
 use rustix::fd::{AsFd, OwnedFd};
@@ -467,25 +468,37 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                             }
                             subdirs_arena.extend_from_slice(name);
                             subdirs_spans.push((start_off, sub_len as u32));
-                        } else if ft == FileType::RegularFile
-                            && let Some(lang) = detect_language(name, enabled_mask)
-                        {
-                            let mut too_long = false;
-                            let lb = local_batch.as_mut().unwrap();
-                            if !lb.append(dir_bytes, name, lang, &mut too_long) {
-                                if too_long {
-                                    process_single_path(&fd, name_cstr, lang, &mut res, &mut fb);
-                                } else {
-                                    if batch_started_empty && let Ok(dup_fd) = dup(&fd) {
-                                        lb.dirfd = Some(dup_fd);
+                        } else if ft == FileType::RegularFile {
+                            let lang_opt = detect_language(name, enabled_mask).or_else(|| {
+                                if !name.contains(&b'.') {
+                                    let mut probe_buf = [0u8; 128];
+                                    if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                                        && let Ok(n) = read(&file_fd, &mut probe_buf)
+                                    {
+                                        return detect_shebang(&probe_buf[..n], enabled_mask);
                                     }
-                                    let full = local_batch.take().unwrap();
-                                    let mut next = sched.submit_batch_and_swap(full);
-                                    batch_started_empty = true;
-                                    let mut dummy = false;
-                                    let ok = next.append(dir_bytes, name, lang, &mut dummy);
-                                    assert!(ok);
-                                    local_batch = Some(next);
+                                }
+                                None
+                            });
+
+                            if let Some(lang) = lang_opt {
+                                let mut too_long = false;
+                                let lb = local_batch.as_mut().unwrap();
+                                if !lb.append(dir_bytes, name, lang, &mut too_long) {
+                                    if too_long {
+                                        process_single_path(&fd, name_cstr, lang, &mut res, &mut fb);
+                                    } else {
+                                        if batch_started_empty && let Ok(dup_fd) = dup(&fd) {
+                                            lb.dirfd = Some(dup_fd);
+                                        }
+                                        let full = local_batch.take().unwrap();
+                                        let mut next = sched.submit_batch_and_swap(full);
+                                        batch_started_empty = true;
+                                        let mut dummy = false;
+                                        let ok = next.append(dir_bytes, name, lang, &mut dummy);
+                                        assert!(ok);
+                                        local_batch = Some(next);
+                                    }
                                 }
                             }
                         }
@@ -1551,11 +1564,28 @@ fn main() {
             }
         });
     } else {
-        let Some(lang) = (if ft == FileType::RegularFile {
-            detect_language(target_bytes, enabled_mask)
+        let mut target_nul = Vec::with_capacity(target_bytes.len() + 1);
+        target_nul.extend_from_slice(target_bytes);
+        target_nul.push(0);
+        let target_cstr = CStr::from_bytes_with_nul(&target_nul).unwrap();
+
+        let lang_opt = if ft == FileType::RegularFile {
+            detect_language(target_bytes, enabled_mask).or_else(|| {
+                if !target_bytes.contains(&b'.') {
+                    let mut probe_buf = [0u8; 128];
+                    if let Ok(file_fd) = openat(CWD, target_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                        && let Ok(n) = read(&file_fd, &mut probe_buf)
+                    {
+                        return detect_shebang(&probe_buf[..n], enabled_mask);
+                    }
+                }
+                None
+            })
         } else {
             None
-        }) else {
+        };
+
+        let Some(lang) = lang_opt else {
             eprintln!(
                 "Error: {} is not a supported source file",
                 target_os.to_string_lossy()
@@ -1565,15 +1595,10 @@ fn main() {
         num_workers = 1;
         let idx = lang as usize;
         totals.files_found[idx] = 1;
-        let mut target_nul = Vec::with_capacity(target_bytes.len() + 1);
-        target_nul.extend_from_slice(target_bytes);
-        target_nul.push(0);
-        if let Ok(target_cstr) = CStr::from_bytes_with_nul(&target_nul) {
-            let mut fb = Vec::with_capacity(131072);
-            if read_file_into(CWD, target_cstr, &mut fb) {
-                totals.files_processed[idx] = 1;
-                parse_into(lang, &fb, &mut totals.lang_stats);
-            }
+        let mut fb = Vec::with_capacity(131072);
+        if read_file_into(CWD, target_cstr, &mut fb) {
+            totals.files_processed[idx] = 1;
+            parse_into(lang, &fb, &mut totals.lang_stats);
         }
     }
 
@@ -2292,6 +2317,38 @@ mod tests {
         let res_hidden = unified_worker_proc(&sched_hidden);
         assert_eq!(res_hidden.files_processed[LangId::C as usize], 3);
         assert_eq!(res_hidden.lang_stats.lines(LangId::C), 3);
+
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_shebang_detection_in_scheduler() {
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tmp_dir = format!("/tmp/lfa_shebang_test_{unique_id}");
+        fs::create_dir_all(&tmp_dir).unwrap();
+
+        let bash_script = b"#!/usr/bin/env bash\necho 'hello world'\nexit 0\n";
+        let python_script = b"#!/usr/bin/python3\nimport sys\nsys.stdout.write('hi')\n";
+        let no_shebang = b"random plain text content without extension or shebang\n";
+
+        let bash_path = format!("{tmp_dir}/my-tool");
+        let python_path = format!("{tmp_dir}/runner");
+        let plain_path = format!("{tmp_dir}/LICENSE");
+
+        fs::write(&bash_path, bash_script).unwrap();
+        fs::write(&python_path, python_script).unwrap();
+        fs::write(&plain_path, no_shebang).unwrap();
+
+        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, false);
+        let res = unified_worker_proc(&sched);
+
+        assert_eq!(res.files_processed[LangId::Bash as usize], 1);
+        assert_eq!(res.lang_stats.lines(LangId::Bash), 3);
+        assert_eq!(res.files_processed[LangId::Python as usize], 1);
+        assert_eq!(res.lang_stats.lines(LangId::Python), 3);
 
         let _ = fs::remove_dir_all(&tmp_dir);
     }
