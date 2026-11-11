@@ -4,6 +4,7 @@ pub mod cpp;
 pub mod csharp;
 pub mod dart;
 pub mod go;
+pub mod haskell;
 pub mod java;
 pub mod javascript;
 pub mod kotlin;
@@ -44,9 +45,10 @@ pub enum LangId {
     Sql = 18,
     Dart = 19,
     Scala = 20,
+    Haskell = 21,
 }
 
-pub const LANG_COUNT: usize = 21;
+pub const LANG_COUNT: usize = 22;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -68,6 +70,7 @@ pub const LANG_BASH_MASK: u32 = 1 << (LangId::Bash as u32);
 pub const LANG_SQL_MASK: u32 = 1 << (LangId::Sql as u32);
 pub const LANG_DART_MASK: u32 = 1 << (LangId::Dart as u32);
 pub const LANG_SCALA_MASK: u32 = 1 << (LangId::Scala as u32);
+pub const LANG_HASKELL_MASK: u32 = 1 << (LangId::Haskell as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -92,6 +95,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Sql,
     LangId::Dart,
     LangId::Scala,
+    LangId::Haskell,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -122,6 +126,7 @@ impl LangId {
             Self::Sql => "SQL",
             Self::Dart => "Dart",
             Self::Scala => "Scala",
+            Self::Haskell => "Haskell",
         }
     }
 
@@ -170,6 +175,8 @@ impl LangId {
             b"-sql" | b"--sql" | b"-SQL" | b"--SQL" => Some(Self::Sql),
             b"-dart" | b"--dart" | b"-DART" | b"--DART" => Some(Self::Dart),
             b"-scala" | b"--scala" | b"-SCALA" | b"--SCALA" => Some(Self::Scala),
+            b"-hs" | b"--hs" | b"-HS" | b"--HS" | b"-haskell" | b"--haskell" | b"-HASKELL"
+            | b"--HASKELL" => Some(Self::Haskell),
             _ => None,
         }
     }
@@ -235,6 +242,7 @@ pub struct LangStats {
     pub sql: ParseResult<{ sql::KEYWORD_COUNT }>,
     pub dart: ParseResult<{ dart::KEYWORD_COUNT }>,
     pub scala: ParseResult<{ scala::KEYWORD_COUNT }>,
+    pub haskell: ParseResult<{ haskell::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -261,6 +269,7 @@ impl LangStats {
         self.sql.add(&other.sql);
         self.dart.add(&other.dart);
         self.scala.add(&other.scala);
+        self.haskell.add(&other.haskell);
     }
 
     #[inline(always)]
@@ -287,6 +296,7 @@ impl LangStats {
             LangId::Sql => self.sql.lines_processed,
             LangId::Dart => self.dart.lines_processed,
             LangId::Scala => self.scala.lines_processed,
+            LangId::Haskell => self.haskell.lines_processed,
         }
     }
 
@@ -314,6 +324,7 @@ impl LangStats {
             LangId::Sql => self.sql.code_lines,
             LangId::Dart => self.dart.code_lines,
             LangId::Scala => self.scala.code_lines,
+            LangId::Haskell => self.haskell.code_lines,
         }
     }
 
@@ -341,6 +352,7 @@ impl LangStats {
             LangId::Sql => self.sql.comment_lines,
             LangId::Dart => self.dart.comment_lines,
             LangId::Scala => self.scala.comment_lines,
+            LangId::Haskell => self.haskell.comment_lines,
         }
     }
 
@@ -368,6 +380,7 @@ impl LangStats {
             LangId::Sql => self.sql.blank_lines,
             LangId::Dart => self.dart.blank_lines,
             LangId::Scala => self.scala.blank_lines,
+            LangId::Haskell => self.haskell.blank_lines,
         }
     }
 
@@ -395,6 +408,7 @@ impl LangStats {
             LangId::Sql => self.sql.total_keywords,
             LangId::Dart => self.dart.total_keywords,
             LangId::Scala => self.scala.total_keywords,
+            LangId::Haskell => self.haskell.total_keywords,
         }
     }
 
@@ -422,6 +436,7 @@ impl LangStats {
             LangId::Sql => &sql::KEYWORD_NAMES,
             LangId::Dart => &dart::KEYWORD_NAMES,
             LangId::Scala => &scala::KEYWORD_NAMES,
+            LangId::Haskell => &haskell::KEYWORD_NAMES,
         }
     }
 
@@ -449,6 +464,7 @@ impl LangStats {
             LangId::Sql => &self.sql.keyword_counts,
             LangId::Dart => &self.dart.keyword_counts,
             LangId::Scala => &self.scala.keyword_counts,
+            LangId::Haskell => &self.haskell.keyword_counts,
         }
     }
 
@@ -476,6 +492,7 @@ impl LangStats {
             LangId::Sql => &sql::KEYWORD_LENS,
             LangId::Dart => &dart::KEYWORD_LENS,
             LangId::Scala => &scala::KEYWORD_LENS,
+            LangId::Haskell => &haskell::KEYWORD_LENS,
         }
     }
 
@@ -503,6 +520,7 @@ impl LangStats {
             LangId::Sql => (sql::KW_MIN_LEN, sql::KW_MAX_LEN),
             LangId::Dart => (dart::KW_MIN_LEN, dart::KW_MAX_LEN),
             LangId::Scala => (scala::KW_MIN_LEN, scala::KW_MAX_LEN),
+            LangId::Haskell => (haskell::KW_MIN_LEN, haskell::KW_MAX_LEN),
         }
     }
 
@@ -530,6 +548,7 @@ impl LangStats {
             LangId::Sql => (&sql::TOKEN_KIND, &sql::TOKEN_LUT_LO),
             LangId::Dart => (&dart::TOKEN_KIND, &dart::TOKEN_LUT_LO),
             LangId::Scala => (&scala::TOKEN_KIND, &scala::TOKEN_LUT_LO),
+            LangId::Haskell => (&haskell::TOKEN_KIND, &haskell::TOKEN_LUT_LO),
         }
     }
 }
@@ -571,6 +590,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         let ext = [name[len - 2] | 0x20, name[len - 1] | 0x20];
         match &ext {
             b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 => return Some(LangId::Rust),
+            b"hs" if (enabled_mask & LANG_HASKELL_MASK) != 0 => return Some(LangId::Haskell),
             b"cc" | b"hh" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
             b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => return Some(LangId::Python),
             b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
@@ -609,6 +629,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
                 return Some(LangId::Python);
             }
             b"lua" if (enabled_mask & LANG_LUA_MASK) != 0 => return Some(LangId::Lua),
+            b"lhs" if (enabled_mask & LANG_HASKELL_MASK) != 0 => return Some(LangId::Haskell),
             b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 => return Some(LangId::Zig),
             b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
                 return Some(LangId::JavaScript);
@@ -1321,6 +1342,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Sql => sql::parse_into(content, &mut stats.sql),
         LangId::Dart => dart::parse_into(content, &mut stats.dart),
         LangId::Scala => scala::parse_into(content, &mut stats.scala),
+        LangId::Haskell => haskell::parse_into(content, &mut stats.haskell),
     }
 }
 
@@ -1493,7 +1515,7 @@ mod tests {
         for lang in ALL_LANGS {
             let cmt: &str = match lang {
                 LangId::Python | LangId::Perl | LangId::Ruby | LangId::Bash => "#",
-                LangId::Lua | LangId::Sql => "--",
+                LangId::Lua | LangId::Sql | LangId::Haskell => "--",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -1506,10 +1528,15 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
+            }
+            if lang == LangId::Haskell {
+                samples.push("a\n{- x\ny -}".to_string());
+                samples.push("a {- x\ny".to_string());
+                samples.push("a\n{- x -} b".to_string());
             }
             if lang == LangId::Lua {
                 samples.push("a\n--[[ x\ny ]]".to_string());
@@ -1728,6 +1755,14 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.sc", LANG_ALL_MASK),
             Some(LangId::Scala)
+        );
+        assert_eq!(
+            detect_language(b"foo.hs", LANG_ALL_MASK),
+            Some(LangId::Haskell)
+        );
+        assert_eq!(
+            detect_language(b"foo.lhs", LANG_ALL_MASK),
+            Some(LangId::Haskell)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
