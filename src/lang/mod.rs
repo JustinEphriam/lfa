@@ -14,6 +14,7 @@ pub mod php;
 pub mod python;
 pub mod ruby;
 pub mod rust;
+pub mod scala;
 pub mod sql;
 pub mod swift;
 pub mod typescript;
@@ -42,9 +43,10 @@ pub enum LangId {
     Bash = 17,
     Sql = 18,
     Dart = 19,
+    Scala = 20,
 }
 
-pub const LANG_COUNT: usize = 20;
+pub const LANG_COUNT: usize = 21;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -65,6 +67,7 @@ pub const LANG_KOTLIN_MASK: u32 = 1 << (LangId::Kotlin as u32);
 pub const LANG_BASH_MASK: u32 = 1 << (LangId::Bash as u32);
 pub const LANG_SQL_MASK: u32 = 1 << (LangId::Sql as u32);
 pub const LANG_DART_MASK: u32 = 1 << (LangId::Dart as u32);
+pub const LANG_SCALA_MASK: u32 = 1 << (LangId::Scala as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -88,6 +91,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Bash,
     LangId::Sql,
     LangId::Dart,
+    LangId::Scala,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -117,6 +121,7 @@ impl LangId {
             Self::Bash => "Bash",
             Self::Sql => "SQL",
             Self::Dart => "Dart",
+            Self::Scala => "Scala",
         }
     }
 
@@ -164,6 +169,7 @@ impl LangId {
             }
             b"-sql" | b"--sql" | b"-SQL" | b"--SQL" => Some(Self::Sql),
             b"-dart" | b"--dart" | b"-DART" | b"--DART" => Some(Self::Dart),
+            b"-scala" | b"--scala" | b"-SCALA" | b"--SCALA" => Some(Self::Scala),
             _ => None,
         }
     }
@@ -228,6 +234,7 @@ pub struct LangStats {
     pub bash: ParseResult<{ bash::KEYWORD_COUNT }>,
     pub sql: ParseResult<{ sql::KEYWORD_COUNT }>,
     pub dart: ParseResult<{ dart::KEYWORD_COUNT }>,
+    pub scala: ParseResult<{ scala::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -253,6 +260,7 @@ impl LangStats {
         self.bash.add(&other.bash);
         self.sql.add(&other.sql);
         self.dart.add(&other.dart);
+        self.scala.add(&other.scala);
     }
 
     #[inline(always)]
@@ -278,6 +286,7 @@ impl LangStats {
             LangId::Bash => self.bash.lines_processed,
             LangId::Sql => self.sql.lines_processed,
             LangId::Dart => self.dart.lines_processed,
+            LangId::Scala => self.scala.lines_processed,
         }
     }
 
@@ -304,6 +313,7 @@ impl LangStats {
             LangId::Bash => self.bash.code_lines,
             LangId::Sql => self.sql.code_lines,
             LangId::Dart => self.dart.code_lines,
+            LangId::Scala => self.scala.code_lines,
         }
     }
 
@@ -330,6 +340,7 @@ impl LangStats {
             LangId::Bash => self.bash.comment_lines,
             LangId::Sql => self.sql.comment_lines,
             LangId::Dart => self.dart.comment_lines,
+            LangId::Scala => self.scala.comment_lines,
         }
     }
 
@@ -356,6 +367,7 @@ impl LangStats {
             LangId::Bash => self.bash.blank_lines,
             LangId::Sql => self.sql.blank_lines,
             LangId::Dart => self.dart.blank_lines,
+            LangId::Scala => self.scala.blank_lines,
         }
     }
 
@@ -382,6 +394,7 @@ impl LangStats {
             LangId::Bash => self.bash.total_keywords,
             LangId::Sql => self.sql.total_keywords,
             LangId::Dart => self.dart.total_keywords,
+            LangId::Scala => self.scala.total_keywords,
         }
     }
 
@@ -408,6 +421,7 @@ impl LangStats {
             LangId::Bash => &bash::KEYWORD_NAMES,
             LangId::Sql => &sql::KEYWORD_NAMES,
             LangId::Dart => &dart::KEYWORD_NAMES,
+            LangId::Scala => &scala::KEYWORD_NAMES,
         }
     }
 
@@ -434,6 +448,7 @@ impl LangStats {
             LangId::Bash => &self.bash.keyword_counts,
             LangId::Sql => &self.sql.keyword_counts,
             LangId::Dart => &self.dart.keyword_counts,
+            LangId::Scala => &self.scala.keyword_counts,
         }
     }
 
@@ -460,6 +475,7 @@ impl LangStats {
             LangId::Bash => &bash::KEYWORD_LENS,
             LangId::Sql => &sql::KEYWORD_LENS,
             LangId::Dart => &dart::KEYWORD_LENS,
+            LangId::Scala => &scala::KEYWORD_LENS,
         }
     }
 
@@ -486,6 +502,7 @@ impl LangStats {
             LangId::Bash => (bash::KW_MIN_LEN, bash::KW_MAX_LEN),
             LangId::Sql => (sql::KW_MIN_LEN, sql::KW_MAX_LEN),
             LangId::Dart => (dart::KW_MIN_LEN, dart::KW_MAX_LEN),
+            LangId::Scala => (scala::KW_MIN_LEN, scala::KW_MAX_LEN),
         }
     }
 
@@ -512,6 +529,7 @@ impl LangStats {
             LangId::Bash => (&bash::TOKEN_KIND, &bash::TOKEN_LUT_LO),
             LangId::Sql => (&sql::TOKEN_KIND, &sql::TOKEN_LUT_LO),
             LangId::Dart => (&dart::TOKEN_KIND, &dart::TOKEN_LUT_LO),
+            LangId::Scala => (&scala::TOKEN_KIND, &scala::TOKEN_LUT_LO),
         }
     }
 }
@@ -567,6 +585,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"rb" if (enabled_mask & LANG_RUBY_MASK) != 0 => return Some(LangId::Ruby),
             b"kt" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
             b"sh" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
+            b"sc" if (enabled_mask & LANG_SCALA_MASK) != 0 => return Some(LangId::Scala),
             _ => {}
         }
         return None;
@@ -640,6 +659,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         }
         if &ext == b"swift" && (enabled_mask & LANG_SWIFT_MASK) != 0 {
             return Some(LangId::Swift);
+        }
+        if &ext == b"scala" && (enabled_mask & LANG_SCALA_MASK) != 0 {
+            return Some(LangId::Scala);
         }
     }
     None
@@ -1298,6 +1320,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Bash => bash::parse_into(content, &mut stats.bash),
         LangId::Sql => sql::parse_into(content, &mut stats.sql),
         LangId::Dart => dart::parse_into(content, &mut stats.dart),
+        LangId::Scala => scala::parse_into(content, &mut stats.scala),
     }
 }
 
@@ -1697,6 +1720,14 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.dart", LANG_ALL_MASK),
             Some(LangId::Dart)
+        );
+        assert_eq!(
+            detect_language(b"foo.scala", LANG_ALL_MASK),
+            Some(LangId::Scala)
+        );
+        assert_eq!(
+            detect_language(b"foo.sc", LANG_ALL_MASK),
+            Some(LangId::Scala)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
