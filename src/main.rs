@@ -134,13 +134,13 @@ struct SchedulerState {
 }
 
 struct WorkScheduler {
-    enabled_mask: u32,
+    enabled_mask: u64,
     mutex: Mutex<SchedulerState>,
     cond: Condvar,
 }
 
 impl WorkScheduler {
-    fn new(root: &[u8], enabled_mask: u32) -> Self {
+    fn new(root: &[u8], enabled_mask: u64) -> Self {
         let mut dirs_arena = Vec::with_capacity(65536);
         dirs_arena.extend_from_slice(root);
         let mut dirs_spans = Vec::with_capacity(256);
@@ -852,7 +852,7 @@ fn print_usage(prog: &str) {
 enum CliResult<'a> {
     Run {
         target: &'a OsStr,
-        mask: u32,
+        mask: u64,
         selected_langs: Vec<LangId>,
     },
     Help,
@@ -866,7 +866,7 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     }
 
     let mut target_os: Option<&'a OsStr> = None;
-    let mut flag_mask = 0u32;
+    let mut flag_mask = 0u64;
     let mut selected_langs: Vec<LangId> = Vec::new();
 
     for arg in &args[1..] {
@@ -924,7 +924,7 @@ fn print_error_and_exit(prog: &str, msg: &str) -> ! {
     process::exit(2);
 }
 
-fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u32, Vec<LangId>) {
+fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u64, Vec<LangId>) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())

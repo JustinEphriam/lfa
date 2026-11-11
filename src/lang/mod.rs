@@ -63,36 +63,40 @@ pub enum LangId {
 }
 
 pub const LANG_COUNT: usize = 29;
-pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
-pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
-pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
-pub const LANG_PYTHON_MASK: u32 = 1 << (LangId::Python as u32);
-pub const LANG_PERL_MASK: u32 = 1 << (LangId::Perl as u32);
-pub const LANG_GO_MASK: u32 = 1 << (LangId::Go as u32);
-pub const LANG_ZIG_MASK: u32 = 1 << (LangId::Zig as u32);
-pub const LANG_ODIN_MASK: u32 = 1 << (LangId::Odin as u32);
-pub const LANG_JAVASCRIPT_MASK: u32 = 1 << (LangId::JavaScript as u32);
-pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
-pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
-pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
-pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
-pub const LANG_RUBY_MASK: u32 = 1 << (LangId::Ruby as u32);
-pub const LANG_PHP_MASK: u32 = 1 << (LangId::Php as u32);
-pub const LANG_SWIFT_MASK: u32 = 1 << (LangId::Swift as u32);
-pub const LANG_KOTLIN_MASK: u32 = 1 << (LangId::Kotlin as u32);
-pub const LANG_BASH_MASK: u32 = 1 << (LangId::Bash as u32);
-pub const LANG_SQL_MASK: u32 = 1 << (LangId::Sql as u32);
-pub const LANG_DART_MASK: u32 = 1 << (LangId::Dart as u32);
-pub const LANG_SCALA_MASK: u32 = 1 << (LangId::Scala as u32);
-pub const LANG_HASKELL_MASK: u32 = 1 << (LangId::Haskell as u32);
-pub const LANG_OCAML_MASK: u32 = 1 << (LangId::OCaml as u32);
-pub const LANG_GLEAM_MASK: u32 = 1 << (LangId::Gleam as u32);
-pub const LANG_D_MASK: u32 = 1 << (LangId::D as u32);
-pub const LANG_NIM_MASK: u32 = 1 << (LangId::Nim as u32);
-pub const LANG_FORTRAN_MASK: u32 = 1 << (LangId::Fortran as u32);
-pub const LANG_ELIXIR_MASK: u32 = 1 << (LangId::Elixir as u32);
-pub const LANG_ERLANG_MASK: u32 = 1 << (LangId::Erlang as u32);
-pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
+pub const LANG_C_MASK: u64 = 1 << (LangId::C as u64);
+pub const LANG_CPP_MASK: u64 = 1 << (LangId::Cpp as u64);
+pub const LANG_RUST_MASK: u64 = 1 << (LangId::Rust as u64);
+pub const LANG_PYTHON_MASK: u64 = 1 << (LangId::Python as u64);
+pub const LANG_PERL_MASK: u64 = 1 << (LangId::Perl as u64);
+pub const LANG_GO_MASK: u64 = 1 << (LangId::Go as u64);
+pub const LANG_ZIG_MASK: u64 = 1 << (LangId::Zig as u64);
+pub const LANG_ODIN_MASK: u64 = 1 << (LangId::Odin as u64);
+pub const LANG_JAVASCRIPT_MASK: u64 = 1 << (LangId::JavaScript as u64);
+pub const LANG_TYPESCRIPT_MASK: u64 = 1 << (LangId::TypeScript as u64);
+pub const LANG_LUA_MASK: u64 = 1 << (LangId::Lua as u64);
+pub const LANG_JAVA_MASK: u64 = 1 << (LangId::Java as u64);
+pub const LANG_CSHARP_MASK: u64 = 1 << (LangId::CSharp as u64);
+pub const LANG_RUBY_MASK: u64 = 1 << (LangId::Ruby as u64);
+pub const LANG_PHP_MASK: u64 = 1 << (LangId::Php as u64);
+pub const LANG_SWIFT_MASK: u64 = 1 << (LangId::Swift as u64);
+pub const LANG_KOTLIN_MASK: u64 = 1 << (LangId::Kotlin as u64);
+pub const LANG_BASH_MASK: u64 = 1 << (LangId::Bash as u64);
+pub const LANG_SQL_MASK: u64 = 1 << (LangId::Sql as u64);
+pub const LANG_DART_MASK: u64 = 1 << (LangId::Dart as u64);
+pub const LANG_SCALA_MASK: u64 = 1 << (LangId::Scala as u64);
+pub const LANG_HASKELL_MASK: u64 = 1 << (LangId::Haskell as u64);
+pub const LANG_OCAML_MASK: u64 = 1 << (LangId::OCaml as u64);
+pub const LANG_GLEAM_MASK: u64 = 1 << (LangId::Gleam as u64);
+pub const LANG_D_MASK: u64 = 1 << (LangId::D as u64);
+pub const LANG_NIM_MASK: u64 = 1 << (LangId::Nim as u64);
+pub const LANG_FORTRAN_MASK: u64 = 1 << (LangId::Fortran as u64);
+pub const LANG_ELIXIR_MASK: u64 = 1 << (LangId::Elixir as u64);
+pub const LANG_ERLANG_MASK: u64 = 1 << (LangId::Erlang as u64);
+pub const LANG_ALL_MASK: u64 = if LANG_COUNT == 64 {
+    !0u64
+} else {
+    (1u64 << LANG_COUNT) - 1
+};
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::C,
@@ -126,7 +130,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Erlang,
 ];
 
-const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
+const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 64);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
 
 impl LangId {
@@ -166,8 +170,8 @@ impl LangId {
     }
 
     #[inline(always)]
-    pub const fn mask(self) -> u32 {
-        1 << (self as u32)
+    pub const fn mask(self) -> u64 {
+        1 << (self as u64)
     }
 
     #[inline(always)]
@@ -724,7 +728,7 @@ fn has_stem(name: &[u8], dot_idx: usize) -> bool {
 }
 
 #[inline(always)]
-pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
+pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
     let len = name.len();
     if len < 3 {
         return None;
