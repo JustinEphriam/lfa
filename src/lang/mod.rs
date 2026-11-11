@@ -1,5 +1,6 @@
 pub mod c;
 pub mod cpp;
+pub mod csharp;
 pub mod go;
 pub mod java;
 pub mod javascript;
@@ -26,9 +27,10 @@ pub enum LangId {
     TypeScript = 9,
     Lua = 10,
     Java = 11,
+    CSharp = 12,
 }
 
-pub const LANG_COUNT: usize = 12;
+pub const LANG_COUNT: usize = 13;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -41,6 +43,7 @@ pub const LANG_JAVASCRIPT_MASK: u32 = 1 << (LangId::JavaScript as u32);
 pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
 pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
 pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
+pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -56,6 +59,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::TypeScript,
     LangId::Lua,
     LangId::Java,
+    LangId::CSharp,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -77,6 +81,7 @@ impl LangId {
             Self::TypeScript => "TypeScript",
             Self::Lua => "Lua",
             Self::Java => "Java",
+            Self::CSharp => "C#",
         }
     }
 
@@ -110,6 +115,8 @@ impl LangId {
             | b"-TYPESCRIPT" | b"--TYPESCRIPT" => Some(Self::TypeScript),
             b"-lua" | b"--lua" | b"-LUA" | b"--LUA" => Some(Self::Lua),
             b"-java" | b"--java" | b"-JAVA" | b"--JAVA" => Some(Self::Java),
+            b"-cs" | b"--cs" | b"-CS" | b"--CS" | b"-csharp" | b"--csharp" | b"-CSHARP"
+            | b"--CSHARP" | b"-c#" | b"--c#" | b"-C#" | b"--C#" => Some(Self::CSharp),
             _ => None,
         }
     }
@@ -166,6 +173,7 @@ pub struct LangStats {
     pub typescript: ParseResult<{ typescript::KEYWORD_COUNT }>,
     pub lua: ParseResult<{ lua::KEYWORD_COUNT }>,
     pub java: ParseResult<{ java::KEYWORD_COUNT }>,
+    pub csharp: ParseResult<{ csharp::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -183,6 +191,7 @@ impl LangStats {
         self.typescript.add(&other.typescript);
         self.lua.add(&other.lua);
         self.java.add(&other.java);
+        self.csharp.add(&other.csharp);
     }
 
     #[inline(always)]
@@ -200,6 +209,7 @@ impl LangStats {
             LangId::TypeScript => self.typescript.lines_processed,
             LangId::Lua => self.lua.lines_processed,
             LangId::Java => self.java.lines_processed,
+            LangId::CSharp => self.csharp.lines_processed,
         }
     }
 
@@ -218,6 +228,7 @@ impl LangStats {
             LangId::TypeScript => self.typescript.code_lines,
             LangId::Lua => self.lua.code_lines,
             LangId::Java => self.java.code_lines,
+            LangId::CSharp => self.csharp.code_lines,
         }
     }
 
@@ -236,6 +247,7 @@ impl LangStats {
             LangId::TypeScript => self.typescript.comment_lines,
             LangId::Lua => self.lua.comment_lines,
             LangId::Java => self.java.comment_lines,
+            LangId::CSharp => self.csharp.comment_lines,
         }
     }
 
@@ -254,6 +266,7 @@ impl LangStats {
             LangId::TypeScript => self.typescript.blank_lines,
             LangId::Lua => self.lua.blank_lines,
             LangId::Java => self.java.blank_lines,
+            LangId::CSharp => self.csharp.blank_lines,
         }
     }
 
@@ -272,6 +285,7 @@ impl LangStats {
             LangId::TypeScript => self.typescript.total_keywords,
             LangId::Lua => self.lua.total_keywords,
             LangId::Java => self.java.total_keywords,
+            LangId::CSharp => self.csharp.total_keywords,
         }
     }
 
@@ -290,6 +304,7 @@ impl LangStats {
             LangId::TypeScript => &typescript::KEYWORD_NAMES,
             LangId::Lua => &lua::KEYWORD_NAMES,
             LangId::Java => &java::KEYWORD_NAMES,
+            LangId::CSharp => &csharp::KEYWORD_NAMES,
         }
     }
 
@@ -308,6 +323,7 @@ impl LangStats {
             LangId::TypeScript => &self.typescript.keyword_counts,
             LangId::Lua => &self.lua.keyword_counts,
             LangId::Java => &self.java.keyword_counts,
+            LangId::CSharp => &self.csharp.keyword_counts,
         }
     }
 
@@ -326,6 +342,7 @@ impl LangStats {
             LangId::TypeScript => &typescript::KEYWORD_LENS,
             LangId::Lua => &lua::KEYWORD_LENS,
             LangId::Java => &java::KEYWORD_LENS,
+            LangId::CSharp => &csharp::KEYWORD_LENS,
         }
     }
 
@@ -344,6 +361,7 @@ impl LangStats {
             LangId::TypeScript => (typescript::KW_MIN_LEN, typescript::KW_MAX_LEN),
             LangId::Lua => (lua::KW_MIN_LEN, lua::KW_MAX_LEN),
             LangId::Java => (java::KW_MIN_LEN, java::KW_MAX_LEN),
+            LangId::CSharp => (csharp::KW_MIN_LEN, csharp::KW_MAX_LEN),
         }
     }
 
@@ -362,6 +380,7 @@ impl LangStats {
             LangId::TypeScript => (&typescript::TOKEN_KIND, &typescript::TOKEN_LUT_LO),
             LangId::Lua => (&lua::TOKEN_KIND, &lua::TOKEN_LUT_LO),
             LangId::Java => (&java::TOKEN_KIND, &java::TOKEN_LUT_LO),
+            LangId::CSharp => (&csharp::TOKEN_KIND, &csharp::TOKEN_LUT_LO),
         }
     }
 }
@@ -413,6 +432,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             b"ts" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
                 return Some(LangId::TypeScript);
             }
+            b"cs" if (enabled_mask & LANG_CSHARP_MASK) != 0 => return Some(LangId::CSharp),
             _ => {}
         }
         return None;
@@ -1112,6 +1132,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::TypeScript => typescript::parse_into(content, &mut stats.typescript),
         LangId::Lua => lua::parse_into(content, &mut stats.lua),
         LangId::Java => java::parse_into(content, &mut stats.java),
+        LangId::CSharp => csharp::parse_into(content, &mut stats.csharp),
     }
 }
 
