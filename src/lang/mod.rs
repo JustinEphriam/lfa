@@ -1678,7 +1678,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"yml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
             b"vsh" if (enabled_mask & LANG_V_MASK) != 0 => return Some(LangId::V),
             b"lsp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
-            b"pas" | b"inc" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
+            b"pas" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
             b"ps1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
             b"awk" if (enabled_mask & LANG_AWK_MASK) != 0 => return Some(LangId::Awk),
             b"htm" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
