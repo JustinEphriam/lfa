@@ -11,6 +11,7 @@ pub mod php;
 pub mod python;
 pub mod ruby;
 pub mod rust;
+pub mod swift;
 pub mod typescript;
 pub mod zig;
 
@@ -32,9 +33,10 @@ pub enum LangId {
     CSharp = 12,
     Ruby = 13,
     Php = 14,
+    Swift = 15,
 }
 
-pub const LANG_COUNT: usize = 15;
+pub const LANG_COUNT: usize = 16;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -50,6 +52,7 @@ pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
 pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
 pub const LANG_RUBY_MASK: u32 = 1 << (LangId::Ruby as u32);
 pub const LANG_PHP_MASK: u32 = 1 << (LangId::Php as u32);
+pub const LANG_SWIFT_MASK: u32 = 1 << (LangId::Swift as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -68,6 +71,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::CSharp,
     LangId::Ruby,
     LangId::Php,
+    LangId::Swift,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -92,6 +96,7 @@ impl LangId {
             Self::CSharp => "C#",
             Self::Ruby => "Ruby",
             Self::Php => "PHP",
+            Self::Swift => "Swift",
         }
     }
 
@@ -131,6 +136,7 @@ impl LangId {
                 Some(Self::Ruby)
             }
             b"-php" | b"--php" | b"-PHP" | b"--PHP" => Some(Self::Php),
+            b"-swift" | b"--swift" | b"-SWIFT" | b"--SWIFT" => Some(Self::Swift),
             _ => None,
         }
     }
@@ -190,6 +196,7 @@ pub struct LangStats {
     pub csharp: ParseResult<{ csharp::KEYWORD_COUNT }>,
     pub ruby: ParseResult<{ ruby::KEYWORD_COUNT }>,
     pub php: ParseResult<{ php::KEYWORD_COUNT }>,
+    pub swift: ParseResult<{ swift::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -210,6 +217,7 @@ impl LangStats {
         self.csharp.add(&other.csharp);
         self.ruby.add(&other.ruby);
         self.php.add(&other.php);
+        self.swift.add(&other.swift);
     }
 
     #[inline(always)]
@@ -230,6 +238,7 @@ impl LangStats {
             LangId::CSharp => self.csharp.lines_processed,
             LangId::Ruby => self.ruby.lines_processed,
             LangId::Php => self.php.lines_processed,
+            LangId::Swift => self.swift.lines_processed,
         }
     }
 
@@ -251,6 +260,7 @@ impl LangStats {
             LangId::CSharp => self.csharp.code_lines,
             LangId::Ruby => self.ruby.code_lines,
             LangId::Php => self.php.code_lines,
+            LangId::Swift => self.swift.code_lines,
         }
     }
 
@@ -272,6 +282,7 @@ impl LangStats {
             LangId::CSharp => self.csharp.comment_lines,
             LangId::Ruby => self.ruby.comment_lines,
             LangId::Php => self.php.comment_lines,
+            LangId::Swift => self.swift.comment_lines,
         }
     }
 
@@ -293,6 +304,7 @@ impl LangStats {
             LangId::CSharp => self.csharp.blank_lines,
             LangId::Ruby => self.ruby.blank_lines,
             LangId::Php => self.php.blank_lines,
+            LangId::Swift => self.swift.blank_lines,
         }
     }
 
@@ -314,6 +326,7 @@ impl LangStats {
             LangId::CSharp => self.csharp.total_keywords,
             LangId::Ruby => self.ruby.total_keywords,
             LangId::Php => self.php.total_keywords,
+            LangId::Swift => self.swift.total_keywords,
         }
     }
 
@@ -335,6 +348,7 @@ impl LangStats {
             LangId::CSharp => &csharp::KEYWORD_NAMES,
             LangId::Ruby => &ruby::KEYWORD_NAMES,
             LangId::Php => &php::KEYWORD_NAMES,
+            LangId::Swift => &swift::KEYWORD_NAMES,
         }
     }
 
@@ -356,6 +370,7 @@ impl LangStats {
             LangId::CSharp => &self.csharp.keyword_counts,
             LangId::Ruby => &self.ruby.keyword_counts,
             LangId::Php => &self.php.keyword_counts,
+            LangId::Swift => &self.swift.keyword_counts,
         }
     }
 
@@ -377,6 +392,7 @@ impl LangStats {
             LangId::CSharp => &csharp::KEYWORD_LENS,
             LangId::Ruby => &ruby::KEYWORD_LENS,
             LangId::Php => &php::KEYWORD_LENS,
+            LangId::Swift => &swift::KEYWORD_LENS,
         }
     }
 
@@ -398,6 +414,7 @@ impl LangStats {
             LangId::CSharp => (csharp::KW_MIN_LEN, csharp::KW_MAX_LEN),
             LangId::Ruby => (ruby::KW_MIN_LEN, ruby::KW_MAX_LEN),
             LangId::Php => (php::KW_MIN_LEN, php::KW_MAX_LEN),
+            LangId::Swift => (swift::KW_MIN_LEN, swift::KW_MAX_LEN),
         }
     }
 
@@ -419,6 +436,7 @@ impl LangStats {
             LangId::CSharp => (&csharp::TOKEN_KIND, &csharp::TOKEN_LUT_LO),
             LangId::Ruby => (&ruby::TOKEN_KIND, &ruby::TOKEN_LUT_LO),
             LangId::Php => (&php::TOKEN_KIND, &php::TOKEN_LUT_LO),
+            LangId::Swift => (&swift::TOKEN_KIND, &swift::TOKEN_LUT_LO),
         }
     }
 }
@@ -538,6 +556,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         ];
         if &ext == b"phtml" && (enabled_mask & LANG_PHP_MASK) != 0 {
             return Some(LangId::Php);
+        }
+        if &ext == b"swift" && (enabled_mask & LANG_SWIFT_MASK) != 0 {
+            return Some(LangId::Swift);
         }
     }
     None
@@ -1191,6 +1212,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::CSharp => csharp::parse_into(content, &mut stats.csharp),
         LangId::Ruby => ruby::parse_into(content, &mut stats.ruby),
         LangId::Php => php::parse_into(content, &mut stats.php),
+        LangId::Swift => swift::parse_into(content, &mut stats.swift),
     }
 }
 
@@ -1562,6 +1584,10 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.phtml", LANG_ALL_MASK),
             Some(LangId::Php)
+        );
+        assert_eq!(
+            detect_language(b"foo.swift", LANG_ALL_MASK),
+            Some(LangId::Swift)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
