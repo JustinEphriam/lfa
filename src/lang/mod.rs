@@ -1,6 +1,7 @@
 pub mod c;
 pub mod cpp;
 pub mod go;
+pub mod java;
 pub mod javascript;
 pub mod lua;
 pub mod odin;
@@ -24,9 +25,10 @@ pub enum LangId {
     JavaScript = 8,
     TypeScript = 9,
     Lua = 10,
+    Java = 11,
 }
 
-pub const LANG_COUNT: usize = 11;
+pub const LANG_COUNT: usize = 12;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -38,6 +40,7 @@ pub const LANG_ODIN_MASK: u32 = 1 << (LangId::Odin as u32);
 pub const LANG_JAVASCRIPT_MASK: u32 = 1 << (LangId::JavaScript as u32);
 pub const LANG_TYPESCRIPT_MASK: u32 = 1 << (LangId::TypeScript as u32);
 pub const LANG_LUA_MASK: u32 = 1 << (LangId::Lua as u32);
+pub const LANG_JAVA_MASK: u32 = 1 << (LangId::Java as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -52,6 +55,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::JavaScript,
     LangId::TypeScript,
     LangId::Lua,
+    LangId::Java,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -72,6 +76,7 @@ impl LangId {
             Self::JavaScript => "JavaScript",
             Self::TypeScript => "TypeScript",
             Self::Lua => "Lua",
+            Self::Java => "Java",
         }
     }
 
@@ -104,6 +109,7 @@ impl LangId {
             b"-ts" | b"--ts" | b"-TS" | b"--TS" | b"-typescript" | b"--typescript"
             | b"-TYPESCRIPT" | b"--TYPESCRIPT" => Some(Self::TypeScript),
             b"-lua" | b"--lua" | b"-LUA" | b"--LUA" => Some(Self::Lua),
+            b"-java" | b"--java" | b"-JAVA" | b"--JAVA" => Some(Self::Java),
             _ => None,
         }
     }
@@ -159,6 +165,7 @@ pub struct LangStats {
     pub javascript: ParseResult<{ javascript::KEYWORD_COUNT }>,
     pub typescript: ParseResult<{ typescript::KEYWORD_COUNT }>,
     pub lua: ParseResult<{ lua::KEYWORD_COUNT }>,
+    pub java: ParseResult<{ java::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -175,6 +182,7 @@ impl LangStats {
         self.javascript.add(&other.javascript);
         self.typescript.add(&other.typescript);
         self.lua.add(&other.lua);
+        self.java.add(&other.java);
     }
 
     #[inline(always)]
@@ -191,6 +199,7 @@ impl LangStats {
             LangId::JavaScript => self.javascript.lines_processed,
             LangId::TypeScript => self.typescript.lines_processed,
             LangId::Lua => self.lua.lines_processed,
+            LangId::Java => self.java.lines_processed,
         }
     }
 
@@ -208,6 +217,7 @@ impl LangStats {
             LangId::JavaScript => self.javascript.code_lines,
             LangId::TypeScript => self.typescript.code_lines,
             LangId::Lua => self.lua.code_lines,
+            LangId::Java => self.java.code_lines,
         }
     }
 
@@ -225,6 +235,7 @@ impl LangStats {
             LangId::JavaScript => self.javascript.comment_lines,
             LangId::TypeScript => self.typescript.comment_lines,
             LangId::Lua => self.lua.comment_lines,
+            LangId::Java => self.java.comment_lines,
         }
     }
 
@@ -242,6 +253,7 @@ impl LangStats {
             LangId::JavaScript => self.javascript.blank_lines,
             LangId::TypeScript => self.typescript.blank_lines,
             LangId::Lua => self.lua.blank_lines,
+            LangId::Java => self.java.blank_lines,
         }
     }
 
@@ -259,6 +271,7 @@ impl LangStats {
             LangId::JavaScript => self.javascript.total_keywords,
             LangId::TypeScript => self.typescript.total_keywords,
             LangId::Lua => self.lua.total_keywords,
+            LangId::Java => self.java.total_keywords,
         }
     }
 
@@ -276,6 +289,7 @@ impl LangStats {
             LangId::JavaScript => &javascript::KEYWORD_NAMES,
             LangId::TypeScript => &typescript::KEYWORD_NAMES,
             LangId::Lua => &lua::KEYWORD_NAMES,
+            LangId::Java => &java::KEYWORD_NAMES,
         }
     }
 
@@ -293,6 +307,7 @@ impl LangStats {
             LangId::JavaScript => &self.javascript.keyword_counts,
             LangId::TypeScript => &self.typescript.keyword_counts,
             LangId::Lua => &self.lua.keyword_counts,
+            LangId::Java => &self.java.keyword_counts,
         }
     }
 
@@ -310,6 +325,7 @@ impl LangStats {
             LangId::JavaScript => &javascript::KEYWORD_LENS,
             LangId::TypeScript => &typescript::KEYWORD_LENS,
             LangId::Lua => &lua::KEYWORD_LENS,
+            LangId::Java => &java::KEYWORD_LENS,
         }
     }
 
@@ -327,6 +343,7 @@ impl LangStats {
             LangId::JavaScript => (javascript::KW_MIN_LEN, javascript::KW_MAX_LEN),
             LangId::TypeScript => (typescript::KW_MIN_LEN, typescript::KW_MAX_LEN),
             LangId::Lua => (lua::KW_MIN_LEN, lua::KW_MAX_LEN),
+            LangId::Java => (java::KW_MIN_LEN, java::KW_MAX_LEN),
         }
     }
 
@@ -344,6 +361,7 @@ impl LangStats {
             LangId::JavaScript => (&javascript::TOKEN_KIND, &javascript::TOKEN_LUT_LO),
             LangId::TypeScript => (&typescript::TOKEN_KIND, &typescript::TOKEN_LUT_LO),
             LangId::Lua => (&lua::TOKEN_KIND, &lua::TOKEN_LUT_LO),
+            LangId::Java => (&java::TOKEN_KIND, &java::TOKEN_LUT_LO),
         }
     }
 }
@@ -442,6 +460,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
         match &ext {
             b"odin" if (enabled_mask & LANG_ODIN_MASK) != 0 => return Some(LangId::Odin),
             b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
+            b"java" if (enabled_mask & LANG_JAVA_MASK) != 0 => return Some(LangId::Java),
             _ => {}
         }
     }
@@ -1092,6 +1111,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::JavaScript => javascript::parse_into(content, &mut stats.javascript),
         LangId::TypeScript => typescript::parse_into(content, &mut stats.typescript),
         LangId::Lua => lua::parse_into(content, &mut stats.lua),
+        LangId::Java => java::parse_into(content, &mut stats.java),
     }
 }
 

@@ -782,7 +782,7 @@ fn get_cpu_count() -> usize {
 
 fn print_usage(prog: &str) -> ! {
     println!(
-        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies\n  -lua        Show detailed Lua keyword frequencies",
+        "Usage: {} [FLAGS] <file_or_directory>\nAnalyzes source code keyword frequencies\n\nFlags:\n  -c          Show detailed C keyword frequencies\n  -cpp        Show detailed C++ keyword frequencies\n  -rs, -rust  Show detailed Rust keyword frequencies\n  -py, -python Show detailed Python keyword frequencies\n  -pl, -perl  Show detailed Perl keyword frequencies\n  -go, -golang Show detailed Go keyword frequencies\n  -zig        Show detailed Zig keyword frequencies\n  -odin       Show detailed Odin keyword frequencies\n  -js, -javascript Show detailed JavaScript keyword frequencies\n  -ts, -typescript Show detailed TypeScript keyword frequencies\n  -lua        Show detailed Lua keyword frequencies\n  -java       Show detailed Java keyword frequencies",
         prog
     );
     process::exit(1);
