@@ -1,25 +1,33 @@
 pub mod ada;
 pub mod assembly;
+pub mod awk;
 pub mod bash;
 pub mod c;
+pub mod clisp;
 pub mod clojure;
 pub mod cmake;
+pub mod cobol;
 pub mod cpp;
 pub mod csharp;
+pub mod css;
 pub mod cuda;
 pub mod d;
 pub mod dart;
 pub mod dockerfile;
 pub mod elixir;
 pub mod erlang;
+pub mod fish;
 pub mod fortran;
 pub mod fsharp;
 pub mod gleam;
 pub mod glsl;
 pub mod go;
+pub mod graphql;
 pub mod groovy;
+pub mod hare;
 pub mod haskell;
 pub mod hlsl;
+pub mod html;
 pub mod java;
 pub mod javascript;
 pub mod json;
@@ -33,8 +41,11 @@ pub mod nim;
 pub mod objc;
 pub mod ocaml;
 pub mod odin;
+pub mod pascal;
 pub mod perl;
 pub mod php;
+pub mod powershell;
+pub mod protobuf;
 pub mod python;
 pub mod r;
 pub mod ruby;
@@ -47,8 +58,11 @@ pub mod swift;
 pub mod tcl;
 pub mod toml;
 pub mod typescript;
+pub mod v;
 pub mod verilog;
+pub mod vhdl;
 pub mod wgsl;
+pub mod xml;
 pub mod yaml;
 pub mod zig;
 
@@ -108,9 +122,23 @@ pub enum LangId {
     Glsl = 50,
     Hlsl = 51,
     ObjectiveC = 52,
+    V = 53,
+    CommonLisp = 54,
+    Pascal = 55,
+    PowerShell = 56,
+    Fish = 57,
+    Awk = 58,
+    Hare = 59,
+    Html = 60,
+    Xml = 61,
+    Css = 62,
+    Graphql = 63,
+    Protobuf = 64,
+    Cobol = 65,
+    Vhdl = 66,
 }
 
-pub const LANG_COUNT: usize = 53;
+pub const LANG_COUNT: usize = 67;
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -164,6 +192,20 @@ pub const LANG_CMAKE_MASK: u128 = 1 << (LangId::CMake as u128);
 pub const LANG_GLSL_MASK: u128 = 1 << (LangId::Glsl as u128);
 pub const LANG_HLSL_MASK: u128 = 1 << (LangId::Hlsl as u128);
 pub const LANG_OBJECTIVEC_MASK: u128 = 1 << (LangId::ObjectiveC as u128);
+pub const LANG_V_MASK: u128 = 1 << (LangId::V as u128);
+pub const LANG_COMMONLISP_MASK: u128 = 1 << (LangId::CommonLisp as u128);
+pub const LANG_PASCAL_MASK: u128 = 1 << (LangId::Pascal as u128);
+pub const LANG_POWERSHELL_MASK: u128 = 1 << (LangId::PowerShell as u128);
+pub const LANG_FISH_MASK: u128 = 1 << (LangId::Fish as u128);
+pub const LANG_AWK_MASK: u128 = 1 << (LangId::Awk as u128);
+pub const LANG_HARE_MASK: u128 = 1 << (LangId::Hare as u128);
+pub const LANG_HTML_MASK: u128 = 1 << (LangId::Html as u128);
+pub const LANG_XML_MASK: u128 = 1 << (LangId::Xml as u128);
+pub const LANG_CSS_MASK: u128 = 1 << (LangId::Css as u128);
+pub const LANG_GRAPHQL_MASK: u128 = 1 << (LangId::Graphql as u128);
+pub const LANG_PROTOBUF_MASK: u128 = 1 << (LangId::Protobuf as u128);
+pub const LANG_COBOL_MASK: u128 = 1 << (LangId::Cobol as u128);
+pub const LANG_VHDL_MASK: u128 = 1 << (LangId::Vhdl as u128);
 pub const LANG_ALL_MASK: u128 = if LANG_COUNT == 128 {
     !0u128
 } else {
@@ -224,9 +266,23 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Glsl,
     LangId::Hlsl,
     LangId::ObjectiveC,
+    LangId::V,
+    LangId::CommonLisp,
+    LangId::Pascal,
+    LangId::PowerShell,
+    LangId::Fish,
+    LangId::Awk,
+    LangId::Hare,
+    LangId::Html,
+    LangId::Xml,
+    LangId::Css,
+    LangId::Graphql,
+    LangId::Protobuf,
+    LangId::Cobol,
+    LangId::Vhdl,
 ];
 
-const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 64);
+const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
 const _: () = {
     let mut i = 0;
@@ -293,6 +349,20 @@ impl LangId {
             Self::Glsl => "GLSL",
             Self::Hlsl => "HLSL",
             Self::ObjectiveC => "Objective-C",
+            Self::V => "V",
+            Self::CommonLisp => "Common Lisp",
+            Self::Pascal => "Pascal",
+            Self::PowerShell => "PowerShell",
+            Self::Fish => "Fish",
+            Self::Awk => "AWK",
+            Self::Hare => "Hare",
+            Self::Html => "HTML",
+            Self::Xml => "XML",
+            Self::Css => "CSS",
+            Self::Graphql => "GraphQL",
+            Self::Protobuf => "Protobuf",
+            Self::Cobol => "COBOL",
+            Self::Vhdl => "VHDL",
         }
     }
 
@@ -339,7 +409,7 @@ impl LangId {
             Self::Solidity => &["-sol", "--sol", "-solidity", "--solidity"],
             Self::FSharp => &["-fs", "--fs", "-fsharp", "--fsharp", "-f#", "--f#"],
             Self::Mojo => &["-mojo", "--mojo"],
-            Self::Verilog => &["-v", "--v", "-verilog", "--verilog", "-sv", "--sv"],
+            Self::Verilog => &["-verilog", "--verilog", "-sv", "--sv"],
             Self::Cuda => &["-cu", "--cu", "-cuda", "--cuda"],
             Self::Wgsl => &["-wgsl", "--wgsl"],
             Self::Ada => &["-ada", "--ada"],
@@ -357,6 +427,20 @@ impl LangId {
             Self::Glsl => &["-glsl", "--glsl"],
             Self::Hlsl => &["-hlsl", "--hlsl"],
             Self::ObjectiveC => &["-objc", "--objc", "-m", "--m"],
+            Self::V => &["-vlang", "--vlang", "-v", "--v"],
+            Self::CommonLisp => &["-lisp", "--lisp", "-clisp", "--clisp", "-common-lisp", "--common-lisp", "-common lisp", "--common lisp"],
+            Self::Pascal => &["-pas", "--pas", "-pascal", "--pascal"],
+            Self::PowerShell => &["-ps1", "--ps1", "-powershell", "--powershell", "-pwsh", "--pwsh"],
+            Self::Fish => &["-fish", "--fish"],
+            Self::Awk => &["-awk", "--awk"],
+            Self::Hare => &["-ha", "--ha", "-hare", "--hare"],
+            Self::Html => &["-html", "--html", "-htm", "--htm"],
+            Self::Xml => &["-xml", "--xml"],
+            Self::Css => &["-css", "--css", "-scss", "--scss", "-sass", "--sass", "-less", "--less"],
+            Self::Graphql => &["-graphql", "--graphql", "-gql", "--gql"],
+            Self::Protobuf => &["-proto", "--proto", "-protobuf", "--protobuf"],
+            Self::Cobol => &["-cobol", "--cobol", "-cbl", "--cbl"],
+            Self::Vhdl => &["-vhdl", "--vhdl", "-vhd", "--vhd"],
         }
     }
 
@@ -429,7 +513,7 @@ impl LangId {
             b"-mojo" | b"--mojo" | b"-MOJO" | b"--MOJO" => {
                 Some(Self::Mojo)
             }
-            b"-v" | b"--v" | b"-V_LOG" | b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
+            b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
                 Some(Self::Verilog)
             }
             b"-cu" | b"--cu" | b"-CU" | b"--CU" | b"-cuda" | b"--cuda" | b"-CUDA" | b"--CUDA" => {
@@ -482,6 +566,48 @@ impl LangId {
             }
             b"-objc" | b"--objc" | b"-OBJC" | b"--OBJC" | b"-objective-c" | b"--objective-c" | b"-OBJECTIVE-C" | b"--OBJECTIVE-C" => {
                 Some(Self::ObjectiveC)
+            }
+            b"-vlang" | b"--vlang" | b"-VLANG" | b"--VLANG" | b"-v" | b"--v" | b"-V" | b"--V" => {
+                Some(Self::V)
+            }
+            b"-lisp" | b"--lisp" | b"-clisp" | b"--clisp" | b"-LISP" | b"--LISP" | b"-CLISP" | b"--CLISP" | b"-common-lisp" | b"--common-lisp" | b"-common lisp" | b"--common lisp" => {
+                Some(Self::CommonLisp)
+            }
+            b"-pas" | b"--pas" | b"-PAS" | b"--PAS" | b"-pascal" | b"--pascal" | b"-PASCAL" | b"--PASCAL" => {
+                Some(Self::Pascal)
+            }
+            b"-ps1" | b"--ps1" | b"-PS1" | b"--PS1" | b"-powershell" | b"--powershell" | b"-POWERSHELL" | b"--POWERSHELL" | b"-pwsh" | b"--pwsh" | b"-PWSH" | b"--PWSH" => {
+                Some(Self::PowerShell)
+            }
+            b"-fish" | b"--fish" | b"-FISH" | b"--FISH" => {
+                Some(Self::Fish)
+            }
+            b"-awk" | b"--awk" | b"-AWK" | b"--AWK" => {
+                Some(Self::Awk)
+            }
+            b"-ha" | b"--ha" | b"-HA" | b"--HA" | b"-hare" | b"--hare" | b"-HARE" | b"--HARE" => {
+                Some(Self::Hare)
+            }
+            b"-html" | b"--html" | b"-HTML" | b"--HTML" | b"-htm" | b"--htm" | b"-HTM" | b"--HTM" => {
+                Some(Self::Html)
+            }
+            b"-xml" | b"--xml" | b"-XML" | b"--XML" => {
+                Some(Self::Xml)
+            }
+            b"-css" | b"--css" | b"-CSS" | b"--CSS" | b"-scss" | b"--scss" | b"-SCSS" | b"--SCSS" | b"-sass" | b"--sass" | b"-SASS" | b"--SASS" | b"-less" | b"--less" | b"-LESS" | b"--LESS" => {
+                Some(Self::Css)
+            }
+            b"-graphql" | b"--graphql" | b"-GRAPHQL" | b"--GRAPHQL" | b"-gql" | b"--gql" | b"-GQL" | b"--GQL" => {
+                Some(Self::Graphql)
+            }
+            b"-proto" | b"--proto" | b"-PROTO" | b"--PROTO" | b"-protobuf" | b"--protobuf" | b"-PROTOBUF" | b"--PROTOBUF" => {
+                Some(Self::Protobuf)
+            }
+            b"-cobol" | b"--cobol" | b"-COBOL" | b"--COBOL" | b"-cbl" | b"--cbl" | b"-CBL" | b"--CBL" => {
+                Some(Self::Cobol)
+            }
+            b"-vhdl" | b"--vhdl" | b"-VHDL" | b"--VHDL" | b"-vhd" | b"--vhd" | b"-VHD" | b"--VHD" => {
+                Some(Self::Vhdl)
             }
             _ => None,
         }
@@ -580,6 +706,20 @@ pub struct LangStats {
     pub glsl: ParseResult<{ glsl::KEYWORD_COUNT }>,
     pub hlsl: ParseResult<{ hlsl::KEYWORD_COUNT }>,
     pub objc: ParseResult<{ objc::KEYWORD_COUNT }>,
+    pub v: ParseResult<{ v::KEYWORD_COUNT }>,
+    pub clisp: ParseResult<{ clisp::KEYWORD_COUNT }>,
+    pub pascal: ParseResult<{ pascal::KEYWORD_COUNT }>,
+    pub powershell: ParseResult<{ powershell::KEYWORD_COUNT }>,
+    pub fish: ParseResult<{ fish::KEYWORD_COUNT }>,
+    pub awk: ParseResult<{ awk::KEYWORD_COUNT }>,
+    pub hare: ParseResult<{ hare::KEYWORD_COUNT }>,
+    pub html: ParseResult<{ html::KEYWORD_COUNT }>,
+    pub xml: ParseResult<{ xml::KEYWORD_COUNT }>,
+    pub css: ParseResult<{ css::KEYWORD_COUNT }>,
+    pub graphql: ParseResult<{ graphql::KEYWORD_COUNT }>,
+    pub protobuf: ParseResult<{ protobuf::KEYWORD_COUNT }>,
+    pub cobol: ParseResult<{ cobol::KEYWORD_COUNT }>,
+    pub vhdl: ParseResult<{ vhdl::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -638,6 +778,20 @@ impl LangStats {
         self.glsl.add(&other.glsl);
         self.hlsl.add(&other.hlsl);
         self.objc.add(&other.objc);
+        self.v.add(&other.v);
+        self.clisp.add(&other.clisp);
+        self.pascal.add(&other.pascal);
+        self.powershell.add(&other.powershell);
+        self.fish.add(&other.fish);
+        self.awk.add(&other.awk);
+        self.hare.add(&other.hare);
+        self.html.add(&other.html);
+        self.xml.add(&other.xml);
+        self.css.add(&other.css);
+        self.graphql.add(&other.graphql);
+        self.protobuf.add(&other.protobuf);
+        self.cobol.add(&other.cobol);
+        self.vhdl.add(&other.vhdl);
     }
 
     #[inline(always)]
@@ -696,6 +850,20 @@ impl LangStats {
             LangId::Glsl => self.glsl.lines_processed,
             LangId::Hlsl => self.hlsl.lines_processed,
             LangId::ObjectiveC => self.objc.lines_processed,
+            LangId::V => self.v.lines_processed,
+            LangId::CommonLisp => self.clisp.lines_processed,
+            LangId::Pascal => self.pascal.lines_processed,
+            LangId::PowerShell => self.powershell.lines_processed,
+            LangId::Fish => self.fish.lines_processed,
+            LangId::Awk => self.awk.lines_processed,
+            LangId::Hare => self.hare.lines_processed,
+            LangId::Html => self.html.lines_processed,
+            LangId::Xml => self.xml.lines_processed,
+            LangId::Css => self.css.lines_processed,
+            LangId::Graphql => self.graphql.lines_processed,
+            LangId::Protobuf => self.protobuf.lines_processed,
+            LangId::Cobol => self.cobol.lines_processed,
+            LangId::Vhdl => self.vhdl.lines_processed,
         }
     }
 
@@ -755,6 +923,20 @@ impl LangStats {
             LangId::Glsl => self.glsl.code_lines,
             LangId::Hlsl => self.hlsl.code_lines,
             LangId::ObjectiveC => self.objc.code_lines,
+            LangId::V => self.v.code_lines,
+            LangId::CommonLisp => self.clisp.code_lines,
+            LangId::Pascal => self.pascal.code_lines,
+            LangId::PowerShell => self.powershell.code_lines,
+            LangId::Fish => self.fish.code_lines,
+            LangId::Awk => self.awk.code_lines,
+            LangId::Hare => self.hare.code_lines,
+            LangId::Html => self.html.code_lines,
+            LangId::Xml => self.xml.code_lines,
+            LangId::Css => self.css.code_lines,
+            LangId::Graphql => self.graphql.code_lines,
+            LangId::Protobuf => self.protobuf.code_lines,
+            LangId::Cobol => self.cobol.code_lines,
+            LangId::Vhdl => self.vhdl.code_lines,
         }
     }
 
@@ -814,6 +996,20 @@ impl LangStats {
             LangId::Glsl => self.glsl.comment_lines,
             LangId::Hlsl => self.hlsl.comment_lines,
             LangId::ObjectiveC => self.objc.comment_lines,
+            LangId::V => self.v.comment_lines,
+            LangId::CommonLisp => self.clisp.comment_lines,
+            LangId::Pascal => self.pascal.comment_lines,
+            LangId::PowerShell => self.powershell.comment_lines,
+            LangId::Fish => self.fish.comment_lines,
+            LangId::Awk => self.awk.comment_lines,
+            LangId::Hare => self.hare.comment_lines,
+            LangId::Html => self.html.comment_lines,
+            LangId::Xml => self.xml.comment_lines,
+            LangId::Css => self.css.comment_lines,
+            LangId::Graphql => self.graphql.comment_lines,
+            LangId::Protobuf => self.protobuf.comment_lines,
+            LangId::Cobol => self.cobol.comment_lines,
+            LangId::Vhdl => self.vhdl.comment_lines,
         }
     }
 
@@ -873,6 +1069,20 @@ impl LangStats {
             LangId::Glsl => self.glsl.blank_lines,
             LangId::Hlsl => self.hlsl.blank_lines,
             LangId::ObjectiveC => self.objc.blank_lines,
+            LangId::V => self.v.blank_lines,
+            LangId::CommonLisp => self.clisp.blank_lines,
+            LangId::Pascal => self.pascal.blank_lines,
+            LangId::PowerShell => self.powershell.blank_lines,
+            LangId::Fish => self.fish.blank_lines,
+            LangId::Awk => self.awk.blank_lines,
+            LangId::Hare => self.hare.blank_lines,
+            LangId::Html => self.html.blank_lines,
+            LangId::Xml => self.xml.blank_lines,
+            LangId::Css => self.css.blank_lines,
+            LangId::Graphql => self.graphql.blank_lines,
+            LangId::Protobuf => self.protobuf.blank_lines,
+            LangId::Cobol => self.cobol.blank_lines,
+            LangId::Vhdl => self.vhdl.blank_lines,
         }
     }
 
@@ -932,6 +1142,20 @@ impl LangStats {
             LangId::Glsl => self.glsl.total_keywords,
             LangId::Hlsl => self.hlsl.total_keywords,
             LangId::ObjectiveC => self.objc.total_keywords,
+            LangId::V => self.v.total_keywords,
+            LangId::CommonLisp => self.clisp.total_keywords,
+            LangId::Pascal => self.pascal.total_keywords,
+            LangId::PowerShell => self.powershell.total_keywords,
+            LangId::Fish => self.fish.total_keywords,
+            LangId::Awk => self.awk.total_keywords,
+            LangId::Hare => self.hare.total_keywords,
+            LangId::Html => self.html.total_keywords,
+            LangId::Xml => self.xml.total_keywords,
+            LangId::Css => self.css.total_keywords,
+            LangId::Graphql => self.graphql.total_keywords,
+            LangId::Protobuf => self.protobuf.total_keywords,
+            LangId::Cobol => self.cobol.total_keywords,
+            LangId::Vhdl => self.vhdl.total_keywords,
         }
     }
 
@@ -991,6 +1215,20 @@ impl LangStats {
             LangId::Glsl => &glsl::KEYWORD_NAMES,
             LangId::Hlsl => &hlsl::KEYWORD_NAMES,
             LangId::ObjectiveC => &objc::KEYWORD_NAMES,
+            LangId::V => &v::KEYWORD_NAMES,
+            LangId::CommonLisp => &clisp::KEYWORD_NAMES,
+            LangId::Pascal => &pascal::KEYWORD_NAMES,
+            LangId::PowerShell => &powershell::KEYWORD_NAMES,
+            LangId::Fish => &fish::KEYWORD_NAMES,
+            LangId::Awk => &awk::KEYWORD_NAMES,
+            LangId::Hare => &hare::KEYWORD_NAMES,
+            LangId::Html => &html::KEYWORD_NAMES,
+            LangId::Xml => &xml::KEYWORD_NAMES,
+            LangId::Css => &css::KEYWORD_NAMES,
+            LangId::Graphql => &graphql::KEYWORD_NAMES,
+            LangId::Protobuf => &protobuf::KEYWORD_NAMES,
+            LangId::Cobol => &cobol::KEYWORD_NAMES,
+            LangId::Vhdl => &vhdl::KEYWORD_NAMES,
         }
     }
 
@@ -1050,6 +1288,20 @@ impl LangStats {
             LangId::Glsl => &self.glsl.keyword_counts,
             LangId::Hlsl => &self.hlsl.keyword_counts,
             LangId::ObjectiveC => &self.objc.keyword_counts,
+            LangId::V => &self.v.keyword_counts,
+            LangId::CommonLisp => &self.clisp.keyword_counts,
+            LangId::Pascal => &self.pascal.keyword_counts,
+            LangId::PowerShell => &self.powershell.keyword_counts,
+            LangId::Fish => &self.fish.keyword_counts,
+            LangId::Awk => &self.awk.keyword_counts,
+            LangId::Hare => &self.hare.keyword_counts,
+            LangId::Html => &self.html.keyword_counts,
+            LangId::Xml => &self.xml.keyword_counts,
+            LangId::Css => &self.css.keyword_counts,
+            LangId::Graphql => &self.graphql.keyword_counts,
+            LangId::Protobuf => &self.protobuf.keyword_counts,
+            LangId::Cobol => &self.cobol.keyword_counts,
+            LangId::Vhdl => &self.vhdl.keyword_counts,
         }
     }
 
@@ -1109,6 +1361,20 @@ impl LangStats {
             LangId::Glsl => &glsl::KEYWORD_LENS,
             LangId::Hlsl => &hlsl::KEYWORD_LENS,
             LangId::ObjectiveC => &objc::KEYWORD_LENS,
+            LangId::V => &v::KEYWORD_LENS,
+            LangId::CommonLisp => &clisp::KEYWORD_LENS,
+            LangId::Pascal => &pascal::KEYWORD_LENS,
+            LangId::PowerShell => &powershell::KEYWORD_LENS,
+            LangId::Fish => &fish::KEYWORD_LENS,
+            LangId::Awk => &awk::KEYWORD_LENS,
+            LangId::Hare => &hare::KEYWORD_LENS,
+            LangId::Html => &html::KEYWORD_LENS,
+            LangId::Xml => &xml::KEYWORD_LENS,
+            LangId::Css => &css::KEYWORD_LENS,
+            LangId::Graphql => &graphql::KEYWORD_LENS,
+            LangId::Protobuf => &protobuf::KEYWORD_LENS,
+            LangId::Cobol => &cobol::KEYWORD_LENS,
+            LangId::Vhdl => &vhdl::KEYWORD_LENS,
         }
     }
 
@@ -1168,6 +1434,20 @@ impl LangStats {
             LangId::Glsl => (glsl::KW_MIN_LEN, glsl::KW_MAX_LEN),
             LangId::Hlsl => (hlsl::KW_MIN_LEN, hlsl::KW_MAX_LEN),
             LangId::ObjectiveC => (objc::KW_MIN_LEN, objc::KW_MAX_LEN),
+            LangId::V => (v::KW_MIN_LEN, v::KW_MAX_LEN),
+            LangId::CommonLisp => (clisp::KW_MIN_LEN, clisp::KW_MAX_LEN),
+            LangId::Pascal => (pascal::KW_MIN_LEN, pascal::KW_MAX_LEN),
+            LangId::PowerShell => (powershell::KW_MIN_LEN, powershell::KW_MAX_LEN),
+            LangId::Fish => (fish::KW_MIN_LEN, fish::KW_MAX_LEN),
+            LangId::Awk => (awk::KW_MIN_LEN, awk::KW_MAX_LEN),
+            LangId::Hare => (hare::KW_MIN_LEN, hare::KW_MAX_LEN),
+            LangId::Html => (html::KW_MIN_LEN, html::KW_MAX_LEN),
+            LangId::Xml => (xml::KW_MIN_LEN, xml::KW_MAX_LEN),
+            LangId::Css => (css::KW_MIN_LEN, css::KW_MAX_LEN),
+            LangId::Graphql => (graphql::KW_MIN_LEN, graphql::KW_MAX_LEN),
+            LangId::Protobuf => (protobuf::KW_MIN_LEN, protobuf::KW_MAX_LEN),
+            LangId::Cobol => (cobol::KW_MIN_LEN, cobol::KW_MAX_LEN),
+            LangId::Vhdl => (vhdl::KW_MIN_LEN, vhdl::KW_MAX_LEN),
         }
     }
 
@@ -1227,6 +1507,20 @@ impl LangStats {
             LangId::Glsl => (&glsl::TOKEN_KIND, &glsl::TOKEN_LUT_LO),
             LangId::Hlsl => (&hlsl::TOKEN_KIND, &hlsl::TOKEN_LUT_LO),
             LangId::ObjectiveC => (&objc::TOKEN_KIND, &objc::TOKEN_LUT_LO),
+            LangId::V => (&v::TOKEN_KIND, &v::TOKEN_LUT_LO),
+            LangId::CommonLisp => (&clisp::TOKEN_KIND, &clisp::TOKEN_LUT_LO),
+            LangId::Pascal => (&pascal::TOKEN_KIND, &pascal::TOKEN_LUT_LO),
+            LangId::PowerShell => (&powershell::TOKEN_KIND, &powershell::TOKEN_LUT_LO),
+            LangId::Fish => (&fish::TOKEN_KIND, &fish::TOKEN_LUT_LO),
+            LangId::Awk => (&awk::TOKEN_KIND, &awk::TOKEN_LUT_LO),
+            LangId::Hare => (&hare::TOKEN_KIND, &hare::TOKEN_LUT_LO),
+            LangId::Html => (&html::TOKEN_KIND, &html::TOKEN_LUT_LO),
+            LangId::Xml => (&xml::TOKEN_KIND, &xml::TOKEN_LUT_LO),
+            LangId::Css => (&css::TOKEN_KIND, &css::TOKEN_LUT_LO),
+            LangId::Graphql => (&graphql::TOKEN_KIND, &graphql::TOKEN_LUT_LO),
+            LangId::Protobuf => (&protobuf::TOKEN_KIND, &protobuf::TOKEN_LUT_LO),
+            LangId::Cobol => (&cobol::TOKEN_KIND, &cobol::TOKEN_LUT_LO),
+            LangId::Vhdl => (&vhdl::TOKEN_KIND, &vhdl::TOKEN_LUT_LO),
         }
     }
 }
@@ -1277,7 +1571,14 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
                     return Some(LangId::ObjectiveC);
                 }
             }
-            b'v' if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b'v' => {
+                if (enabled_mask & LANG_VERILOG_MASK) != 0 {
+                    return Some(LangId::Verilog);
+                }
+                if (enabled_mask & LANG_V_MASK) != 0 {
+                    return Some(LangId::V);
+                }
+            }
             b's' if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
             _ => {}
         }
@@ -1316,6 +1617,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"ss" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
             b"mk" if (enabled_mask & LANG_MAKEFILE_MASK) != 0 => return Some(LangId::Makefile),
             b"mm" if (enabled_mask & LANG_OBJECTIVEC_MASK) != 0 => return Some(LangId::ObjectiveC),
+            b"ha" if (enabled_mask & LANG_HARE_MASK) != 0 => return Some(LangId::Hare),
+            b"cl" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
+            b"pp" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
             _ => {}
         }
         return None;
@@ -1372,6 +1676,17 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"tcl" if (enabled_mask & LANG_TCL_MASK) != 0 => return Some(LangId::Tcl),
             b"scm" | b"rkt" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
             b"yml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
+            b"vsh" if (enabled_mask & LANG_V_MASK) != 0 => return Some(LangId::V),
+            b"lsp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
+            b"pas" | b"inc" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
+            b"ps1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
+            b"awk" if (enabled_mask & LANG_AWK_MASK) != 0 => return Some(LangId::Awk),
+            b"htm" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
+            b"xml" | b"svg" if (enabled_mask & LANG_XML_MASK) != 0 => return Some(LangId::Xml),
+            b"css" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
+            b"gql" if (enabled_mask & LANG_GRAPHQL_MASK) != 0 => return Some(LangId::Graphql),
+            b"cbl" | b"cob" | b"cpy" if (enabled_mask & LANG_COBOL_MASK) != 0 => return Some(LangId::Cobol),
+            b"vhd" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
             _ => {}
         }
         return None;
@@ -1401,6 +1716,12 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"yaml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
             b"glsl" | b"vert" | b"frag" | b"geom" | b"comp" if (enabled_mask & LANG_GLSL_MASK) != 0 => return Some(LangId::Glsl),
             b"hlsl" if (enabled_mask & LANG_HLSL_MASK) != 0 => return Some(LangId::Hlsl),
+            b"lisp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
+            b"psm1" | b"psd1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
+            b"fish" if (enabled_mask & LANG_FISH_MASK) != 0 => return Some(LangId::Fish),
+            b"html" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
+            b"scss" | b"sass" | b"less" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
+            b"vhdl" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
             _ => {}
         }
         return None;
@@ -1428,6 +1749,12 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         if &ext == b"gleam" && (enabled_mask & LANG_GLEAM_MASK) != 0 {
             return Some(LangId::Gleam);
         }
+        if &ext == b"xhtml" && (enabled_mask & LANG_HTML_MASK) != 0 {
+            return Some(LangId::Html);
+        }
+        if &ext == b"proto" && (enabled_mask & LANG_PROTOBUF_MASK) != 0 {
+            return Some(LangId::Protobuf);
+        }
     }
     if len >= 8 && name[len - 7] == b'.' {
         if !has_stem(name, len - 7) {
@@ -1449,6 +1776,23 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         if &ext == b"gradle" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
             return Some(LangId::Groovy);
+        }
+    }
+    if len >= 8 && name[len - 7] == b'.' {
+        if !has_stem(name, len - 7) {
+            return None;
+        }
+        let ext = [
+            name[len - 7] | 0x20,
+            name[len - 6] | 0x20,
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"graphql" && (enabled_mask & LANG_GRAPHQL_MASK) != 0 {
+            return Some(LangId::Graphql);
         }
     }
     if len >= 7 && name[len - 6] == b'.' {
@@ -2230,6 +2574,20 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Glsl => glsl::parse_into(content, &mut stats.glsl),
         LangId::Hlsl => hlsl::parse_into(content, &mut stats.hlsl),
         LangId::ObjectiveC => objc::parse_into(content, &mut stats.objc),
+        LangId::V => v::parse_into(content, &mut stats.v),
+        LangId::CommonLisp => clisp::parse_into(content, &mut stats.clisp),
+        LangId::Pascal => pascal::parse_into(content, &mut stats.pascal),
+        LangId::PowerShell => powershell::parse_into(content, &mut stats.powershell),
+        LangId::Fish => fish::parse_into(content, &mut stats.fish),
+        LangId::Awk => awk::parse_into(content, &mut stats.awk),
+        LangId::Hare => hare::parse_into(content, &mut stats.hare),
+        LangId::Html => html::parse_into(content, &mut stats.html),
+        LangId::Xml => xml::parse_into(content, &mut stats.xml),
+        LangId::Css => css::parse_into(content, &mut stats.css),
+        LangId::Graphql => graphql::parse_into(content, &mut stats.graphql),
+        LangId::Protobuf => protobuf::parse_into(content, &mut stats.protobuf),
+        LangId::Cobol => cobol::parse_into(content, &mut stats.cobol),
+        LangId::Vhdl => vhdl::parse_into(content, &mut stats.vhdl),
     }
 }
 
@@ -2422,7 +2780,11 @@ mod tests {
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
                 LangId::Erlang | LangId::Matlab => "%",
-                LangId::Clojure | LangId::Scheme | LangId::Assembly => ";",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp => ";",
+                LangId::Fish | LangId::Awk | LangId::PowerShell | LangId::Graphql => "#",
+                LangId::Vhdl => "--",
+                LangId::Cobol => "*>",
+                LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "//",
                 _ => "//",
             };
@@ -2468,6 +2830,16 @@ mod tests {
                     | LangId::Dockerfile
                     | LangId::Makefile
                     | LangId::CMake
+                    | LangId::CommonLisp
+                    | LangId::Fish
+                    | LangId::Awk
+                    | LangId::Html
+                    | LangId::Xml
+                    | LangId::Graphql
+                    | LangId::Cobol
+                    | LangId::Vhdl
+                    | LangId::PowerShell
+                    | LangId::Pascal
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
