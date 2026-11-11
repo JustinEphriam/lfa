@@ -2059,20 +2059,24 @@ mod tests {
         assert!(!hidden);
 
         for lang in ALL_LANGS {
-            let flag = format!("-{}", lang.name().to_lowercase());
-            let args_lang = vec![
-                OsString::from("lfa"),
-                OsString::from(flag),
-                OsString::from("/tmp"),
-            ];
-            let res = try_parse_cli_args(&args_lang);
-            match res {
-                CliResult::Run { target, mask, selected_langs, .. } => {
-                    assert_eq!(target.as_bytes(), b"/tmp");
-                    assert_eq!(mask, lang.mask());
-                    assert_eq!(selected_langs, vec![lang]);
+            for &alias in lang.flag_aliases() {
+                if alias == "-f" {
+                    continue;
                 }
-                _ => panic!("Expected CliResult::Run"),
+                let args_lang = vec![
+                    OsString::from("lfa"),
+                    OsString::from(alias),
+                    OsString::from("/tmp"),
+                ];
+                let res = try_parse_cli_args(&args_lang);
+                match res {
+                    CliResult::Run { target, mask, selected_langs, .. } => {
+                        assert_eq!(target.as_bytes(), b"/tmp");
+                        assert_eq!(mask, lang.mask());
+                        assert_eq!(selected_langs, vec![lang]);
+                    }
+                    _ => panic!("Expected CliResult::Run for lang {:?} flag {alias}", lang),
+                }
             }
         }
 

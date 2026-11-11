@@ -409,7 +409,7 @@ impl LangId {
             Self::Solidity => &["-sol", "--sol", "-solidity", "--solidity"],
             Self::FSharp => &["-fs", "--fs", "-fsharp", "--fsharp", "-f#", "--f#"],
             Self::Mojo => &["-mojo", "--mojo"],
-            Self::Verilog => &["-verilog", "--verilog", "-sv", "--sv"],
+            Self::Verilog => &["-v", "--v", "-verilog", "--verilog", "-sv", "--sv"],
             Self::Cuda => &["-cu", "--cu", "-cuda", "--cuda"],
             Self::Wgsl => &["-wgsl", "--wgsl"],
             Self::Ada => &["-ada", "--ada"],
@@ -426,9 +426,9 @@ impl LangId {
             Self::CMake => &["-cmake", "--cmake"],
             Self::Glsl => &["-glsl", "--glsl"],
             Self::Hlsl => &["-hlsl", "--hlsl"],
-            Self::ObjectiveC => &["-objc", "--objc", "-m", "--m"],
-            Self::V => &["-vlang", "--vlang", "-v", "--v"],
-            Self::CommonLisp => &["-lisp", "--lisp", "-clisp", "--clisp", "-common-lisp", "--common-lisp", "-common lisp", "--common lisp"],
+            Self::ObjectiveC => &["-objc", "--objc"],
+            Self::V => &["-vlang", "--vlang"],
+            Self::CommonLisp => &["-lisp", "--lisp", "-clisp", "--clisp", "-common-lisp", "--common-lisp"],
             Self::Pascal => &["-pas", "--pas", "-pascal", "--pascal"],
             Self::PowerShell => &["-ps1", "--ps1", "-powershell", "--powershell", "-pwsh", "--pwsh"],
             Self::Fish => &["-fish", "--fish"],
@@ -513,7 +513,7 @@ impl LangId {
             b"-mojo" | b"--mojo" | b"-MOJO" | b"--MOJO" => {
                 Some(Self::Mojo)
             }
-            b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
+            b"-v" | b"--v" | b"-V" | b"--V" | b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
                 Some(Self::Verilog)
             }
             b"-cu" | b"--cu" | b"-CU" | b"--CU" | b"-cuda" | b"--cuda" | b"-CUDA" | b"--CUDA" => {
@@ -567,10 +567,10 @@ impl LangId {
             b"-objc" | b"--objc" | b"-OBJC" | b"--OBJC" | b"-objective-c" | b"--objective-c" | b"-OBJECTIVE-C" | b"--OBJECTIVE-C" => {
                 Some(Self::ObjectiveC)
             }
-            b"-vlang" | b"--vlang" | b"-VLANG" | b"--VLANG" | b"-v" | b"--v" | b"-V" | b"--V" => {
+            b"-vlang" | b"--vlang" | b"-VLANG" | b"--VLANG" => {
                 Some(Self::V)
             }
-            b"-lisp" | b"--lisp" | b"-clisp" | b"--clisp" | b"-LISP" | b"--LISP" | b"-CLISP" | b"--CLISP" | b"-common-lisp" | b"--common-lisp" | b"-common lisp" | b"--common lisp" => {
+            b"-lisp" | b"--lisp" | b"-clisp" | b"--clisp" | b"-LISP" | b"--LISP" | b"-CLISP" | b"--CLISP" | b"-common-lisp" | b"--common-lisp" => {
                 Some(Self::CommonLisp)
             }
             b"-pas" | b"--pas" | b"-PAS" | b"--PAS" | b"-pascal" | b"--pascal" | b"-PASCAL" | b"--PASCAL" => {
