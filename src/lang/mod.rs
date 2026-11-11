@@ -15,6 +15,7 @@ pub mod javascript;
 pub mod julia;
 pub mod kotlin;
 pub mod lua;
+pub mod matlab;
 pub mod nim;
 pub mod ocaml;
 pub mod odin;
@@ -64,9 +65,10 @@ pub enum LangId {
     Erlang = 28,
     Julia = 29,
     R = 30,
+    Matlab = 31,
 }
 
-pub const LANG_COUNT: usize = 31;
+pub const LANG_COUNT: usize = 32;
 pub const LANG_C_MASK: u64 = 1 << (LangId::C as u64);
 pub const LANG_CPP_MASK: u64 = 1 << (LangId::Cpp as u64);
 pub const LANG_RUST_MASK: u64 = 1 << (LangId::Rust as u64);
@@ -98,6 +100,7 @@ pub const LANG_ELIXIR_MASK: u64 = 1 << (LangId::Elixir as u64);
 pub const LANG_ERLANG_MASK: u64 = 1 << (LangId::Erlang as u64);
 pub const LANG_JULIA_MASK: u64 = 1 << (LangId::Julia as u64);
 pub const LANG_R_MASK: u64 = 1 << (LangId::R as u64);
+pub const LANG_MATLAB_MASK: u64 = 1 << (LangId::Matlab as u64);
 pub const LANG_ALL_MASK: u64 = if LANG_COUNT == 64 {
     !0u64
 } else {
@@ -136,6 +139,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Erlang,
     LangId::Julia,
     LangId::R,
+    LangId::Matlab,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 64);
@@ -176,6 +180,7 @@ impl LangId {
             Self::Erlang => "Erlang",
             Self::Julia => "Julia",
             Self::R => "R",
+            Self::Matlab => "MATLAB",
         }
     }
 
@@ -218,6 +223,7 @@ impl LangId {
             Self::Erlang => &["-erl", "--erl", "-erlang", "--erlang"],
             Self::Julia => &["-jl", "--jl", "-julia", "--julia"],
             Self::R => &["-r", "--r"],
+            Self::Matlab => &["-m", "--m", "-matlab", "--matlab", "-octave", "--octave"],
         }
     }
 
@@ -277,6 +283,10 @@ impl LangId {
             b"-jl" | b"--jl" | b"-JL" | b"--JL" | b"-julia" | b"--julia" | b"-JULIA"
             | b"--JULIA" => Some(Self::Julia),
             b"-r" | b"--r" | b"-R" | b"--R" => Some(Self::R),
+            b"-m" | b"--m" | b"-M" | b"--M" | b"-matlab" | b"--matlab" | b"-MATLAB"
+            | b"--MATLAB" | b"-octave" | b"--octave" | b"-OCTAVE" | b"--OCTAVE" => {
+                Some(Self::Matlab)
+            }
             _ => None,
         }
     }
@@ -352,6 +362,7 @@ pub struct LangStats {
     pub erlang: ParseResult<{ erlang::KEYWORD_COUNT }>,
     pub julia: ParseResult<{ julia::KEYWORD_COUNT }>,
     pub r: ParseResult<{ r::KEYWORD_COUNT }>,
+    pub matlab: ParseResult<{ matlab::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -388,6 +399,7 @@ impl LangStats {
         self.erlang.add(&other.erlang);
         self.julia.add(&other.julia);
         self.r.add(&other.r);
+        self.matlab.add(&other.matlab);
     }
 
     #[inline(always)]
@@ -424,6 +436,7 @@ impl LangStats {
             LangId::Erlang => self.erlang.lines_processed,
             LangId::Julia => self.julia.lines_processed,
             LangId::R => self.r.lines_processed,
+            LangId::Matlab => self.matlab.lines_processed,
         }
     }
 
@@ -461,6 +474,7 @@ impl LangStats {
             LangId::Erlang => self.erlang.code_lines,
             LangId::Julia => self.julia.code_lines,
             LangId::R => self.r.code_lines,
+            LangId::Matlab => self.matlab.code_lines,
         }
     }
 
@@ -498,6 +512,7 @@ impl LangStats {
             LangId::Erlang => self.erlang.comment_lines,
             LangId::Julia => self.julia.comment_lines,
             LangId::R => self.r.comment_lines,
+            LangId::Matlab => self.matlab.comment_lines,
         }
     }
 
@@ -535,6 +550,7 @@ impl LangStats {
             LangId::Erlang => self.erlang.blank_lines,
             LangId::Julia => self.julia.blank_lines,
             LangId::R => self.r.blank_lines,
+            LangId::Matlab => self.matlab.blank_lines,
         }
     }
 
@@ -572,6 +588,7 @@ impl LangStats {
             LangId::Erlang => self.erlang.total_keywords,
             LangId::Julia => self.julia.total_keywords,
             LangId::R => self.r.total_keywords,
+            LangId::Matlab => self.matlab.total_keywords,
         }
     }
 
@@ -609,6 +626,7 @@ impl LangStats {
             LangId::Erlang => &erlang::KEYWORD_NAMES,
             LangId::Julia => &julia::KEYWORD_NAMES,
             LangId::R => &r::KEYWORD_NAMES,
+            LangId::Matlab => &matlab::KEYWORD_NAMES,
         }
     }
 
@@ -646,6 +664,7 @@ impl LangStats {
             LangId::Erlang => &self.erlang.keyword_counts,
             LangId::Julia => &self.julia.keyword_counts,
             LangId::R => &self.r.keyword_counts,
+            LangId::Matlab => &self.matlab.keyword_counts,
         }
     }
 
@@ -683,6 +702,7 @@ impl LangStats {
             LangId::Erlang => &erlang::KEYWORD_LENS,
             LangId::Julia => &julia::KEYWORD_LENS,
             LangId::R => &r::KEYWORD_LENS,
+            LangId::Matlab => &matlab::KEYWORD_LENS,
         }
     }
 
@@ -720,6 +740,7 @@ impl LangStats {
             LangId::Erlang => (erlang::KW_MIN_LEN, erlang::KW_MAX_LEN),
             LangId::Julia => (julia::KW_MIN_LEN, julia::KW_MAX_LEN),
             LangId::R => (r::KW_MIN_LEN, r::KW_MAX_LEN),
+            LangId::Matlab => (matlab::KW_MIN_LEN, matlab::KW_MAX_LEN),
         }
     }
 
@@ -757,6 +778,7 @@ impl LangStats {
             LangId::Erlang => (&erlang::TOKEN_KIND, &erlang::TOKEN_LUT_LO),
             LangId::Julia => (&julia::TOKEN_KIND, &julia::TOKEN_LUT_LO),
             LangId::R => (&r::TOKEN_KIND, &r::TOKEN_LUT_LO),
+            LangId::Matlab => (&matlab::TOKEN_KIND, &matlab::TOKEN_LUT_LO),
         }
     }
 }
@@ -790,6 +812,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u64) -> Option<LangId> {
             }
             b't' if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
             b'r' if (enabled_mask & LANG_R_MASK) != 0 => return Some(LangId::R),
+            b'm' if (enabled_mask & LANG_MATLAB_MASK) != 0 => return Some(LangId::Matlab),
             _ => {}
         }
         return None;
@@ -1670,6 +1693,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Erlang => erlang::parse_into(content, &mut stats.erlang),
         LangId::Julia => julia::parse_into(content, &mut stats.julia),
         LangId::R => r::parse_into(content, &mut stats.r),
+        LangId::Matlab => matlab::parse_into(content, &mut stats.matlab),
     }
 }
 
@@ -1845,7 +1869,7 @@ mod tests {
                 LangId::Lua | LangId::Sql | LangId::Haskell => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
-                LangId::Erlang => "%",
+                LangId::Erlang | LangId::Matlab => "%",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -1858,7 +1882,7 @@ mod tests {
                 "a".to_string(),
                 format!("{cmt} c"),
             ];
-            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang | LangId::Julia | LangId::R) {
+            if !matches!(lang, LangId::Python | LangId::Perl | LangId::Zig | LangId::Lua | LangId::Ruby | LangId::Bash | LangId::Haskell | LangId::OCaml | LangId::Gleam | LangId::Nim | LangId::Fortran | LangId::Elixir | LangId::Erlang | LangId::Julia | LangId::R | LangId::Matlab) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
