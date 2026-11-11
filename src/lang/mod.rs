@@ -4,6 +4,7 @@ pub mod csharp;
 pub mod go;
 pub mod java;
 pub mod javascript;
+pub mod kotlin;
 pub mod lua;
 pub mod odin;
 pub mod perl;
@@ -34,9 +35,10 @@ pub enum LangId {
     Ruby = 13,
     Php = 14,
     Swift = 15,
+    Kotlin = 16,
 }
 
-pub const LANG_COUNT: usize = 16;
+pub const LANG_COUNT: usize = 17;
 pub const LANG_C_MASK: u32 = 1 << (LangId::C as u32);
 pub const LANG_CPP_MASK: u32 = 1 << (LangId::Cpp as u32);
 pub const LANG_RUST_MASK: u32 = 1 << (LangId::Rust as u32);
@@ -53,6 +55,7 @@ pub const LANG_CSHARP_MASK: u32 = 1 << (LangId::CSharp as u32);
 pub const LANG_RUBY_MASK: u32 = 1 << (LangId::Ruby as u32);
 pub const LANG_PHP_MASK: u32 = 1 << (LangId::Php as u32);
 pub const LANG_SWIFT_MASK: u32 = 1 << (LangId::Swift as u32);
+pub const LANG_KOTLIN_MASK: u32 = 1 << (LangId::Kotlin as u32);
 pub const LANG_ALL_MASK: u32 = (1 << LANG_COUNT) - 1;
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
@@ -72,6 +75,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Ruby,
     LangId::Php,
     LangId::Swift,
+    LangId::Kotlin,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 32);
@@ -97,6 +101,7 @@ impl LangId {
             Self::Ruby => "Ruby",
             Self::Php => "PHP",
             Self::Swift => "Swift",
+            Self::Kotlin => "Kotlin",
         }
     }
 
@@ -137,6 +142,8 @@ impl LangId {
             }
             b"-php" | b"--php" | b"-PHP" | b"--PHP" => Some(Self::Php),
             b"-swift" | b"--swift" | b"-SWIFT" | b"--SWIFT" => Some(Self::Swift),
+            b"-kt" | b"--kt" | b"-KT" | b"--KT" | b"-kotlin" | b"--kotlin" | b"-KOTLIN"
+            | b"--KOTLIN" => Some(Self::Kotlin),
             _ => None,
         }
     }
@@ -197,6 +204,7 @@ pub struct LangStats {
     pub ruby: ParseResult<{ ruby::KEYWORD_COUNT }>,
     pub php: ParseResult<{ php::KEYWORD_COUNT }>,
     pub swift: ParseResult<{ swift::KEYWORD_COUNT }>,
+    pub kotlin: ParseResult<{ kotlin::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -218,6 +226,7 @@ impl LangStats {
         self.ruby.add(&other.ruby);
         self.php.add(&other.php);
         self.swift.add(&other.swift);
+        self.kotlin.add(&other.kotlin);
     }
 
     #[inline(always)]
@@ -239,6 +248,7 @@ impl LangStats {
             LangId::Ruby => self.ruby.lines_processed,
             LangId::Php => self.php.lines_processed,
             LangId::Swift => self.swift.lines_processed,
+            LangId::Kotlin => self.kotlin.lines_processed,
         }
     }
 
@@ -261,6 +271,7 @@ impl LangStats {
             LangId::Ruby => self.ruby.code_lines,
             LangId::Php => self.php.code_lines,
             LangId::Swift => self.swift.code_lines,
+            LangId::Kotlin => self.kotlin.code_lines,
         }
     }
 
@@ -283,6 +294,7 @@ impl LangStats {
             LangId::Ruby => self.ruby.comment_lines,
             LangId::Php => self.php.comment_lines,
             LangId::Swift => self.swift.comment_lines,
+            LangId::Kotlin => self.kotlin.comment_lines,
         }
     }
 
@@ -305,6 +317,7 @@ impl LangStats {
             LangId::Ruby => self.ruby.blank_lines,
             LangId::Php => self.php.blank_lines,
             LangId::Swift => self.swift.blank_lines,
+            LangId::Kotlin => self.kotlin.blank_lines,
         }
     }
 
@@ -327,6 +340,7 @@ impl LangStats {
             LangId::Ruby => self.ruby.total_keywords,
             LangId::Php => self.php.total_keywords,
             LangId::Swift => self.swift.total_keywords,
+            LangId::Kotlin => self.kotlin.total_keywords,
         }
     }
 
@@ -349,6 +363,7 @@ impl LangStats {
             LangId::Ruby => &ruby::KEYWORD_NAMES,
             LangId::Php => &php::KEYWORD_NAMES,
             LangId::Swift => &swift::KEYWORD_NAMES,
+            LangId::Kotlin => &kotlin::KEYWORD_NAMES,
         }
     }
 
@@ -371,6 +386,7 @@ impl LangStats {
             LangId::Ruby => &self.ruby.keyword_counts,
             LangId::Php => &self.php.keyword_counts,
             LangId::Swift => &self.swift.keyword_counts,
+            LangId::Kotlin => &self.kotlin.keyword_counts,
         }
     }
 
@@ -393,6 +409,7 @@ impl LangStats {
             LangId::Ruby => &ruby::KEYWORD_LENS,
             LangId::Php => &php::KEYWORD_LENS,
             LangId::Swift => &swift::KEYWORD_LENS,
+            LangId::Kotlin => &kotlin::KEYWORD_LENS,
         }
     }
 
@@ -415,6 +432,7 @@ impl LangStats {
             LangId::Ruby => (ruby::KW_MIN_LEN, ruby::KW_MAX_LEN),
             LangId::Php => (php::KW_MIN_LEN, php::KW_MAX_LEN),
             LangId::Swift => (swift::KW_MIN_LEN, swift::KW_MAX_LEN),
+            LangId::Kotlin => (kotlin::KW_MIN_LEN, kotlin::KW_MAX_LEN),
         }
     }
 
@@ -437,6 +455,7 @@ impl LangStats {
             LangId::Ruby => (&ruby::TOKEN_KIND, &ruby::TOKEN_LUT_LO),
             LangId::Php => (&php::TOKEN_KIND, &php::TOKEN_LUT_LO),
             LangId::Swift => (&swift::TOKEN_KIND, &swift::TOKEN_LUT_LO),
+            LangId::Kotlin => (&kotlin::TOKEN_KIND, &kotlin::TOKEN_LUT_LO),
         }
     }
 }
@@ -490,6 +509,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
             }
             b"cs" if (enabled_mask & LANG_CSHARP_MASK) != 0 => return Some(LangId::CSharp),
             b"rb" if (enabled_mask & LANG_RUBY_MASK) != 0 => return Some(LangId::Ruby),
+            b"kt" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
             _ => {}
         }
         return None;
@@ -521,6 +541,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u32) -> Option<LangId> {
                 return Some(LangId::TypeScript);
             }
             b"php" if (enabled_mask & LANG_PHP_MASK) != 0 => return Some(LangId::Php),
+            b"kts" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
             _ => {}
         }
         return None;
@@ -1213,6 +1234,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Ruby => ruby::parse_into(content, &mut stats.ruby),
         LangId::Php => php::parse_into(content, &mut stats.php),
         LangId::Swift => swift::parse_into(content, &mut stats.swift),
+        LangId::Kotlin => kotlin::parse_into(content, &mut stats.kotlin),
     }
 }
 
@@ -1588,6 +1610,14 @@ mod tests {
         assert_eq!(
             detect_language(b"foo.swift", LANG_ALL_MASK),
             Some(LangId::Swift)
+        );
+        assert_eq!(
+            detect_language(b"foo.kt", LANG_ALL_MASK),
+            Some(LangId::Kotlin)
+        );
+        assert_eq!(
+            detect_language(b"foo.kts", LANG_ALL_MASK),
+            Some(LangId::Kotlin)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
