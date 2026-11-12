@@ -1,3 +1,4 @@
+pub mod doc;
 pub mod ada;
 pub mod assembly;
 pub mod awk;
@@ -1726,7 +1727,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"ps1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
             b"awk" if (enabled_mask & LANG_AWK_MASK) != 0 => return Some(LangId::Awk),
             b"htm" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
-            b"xml" | b"svg" if (enabled_mask & LANG_XML_MASK) != 0 => return Some(LangId::Xml),
+            b"xml" if (enabled_mask & LANG_XML_MASK) != 0 => return Some(LangId::Xml),
             b"css" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
             b"gql" if (enabled_mask & LANG_GRAPHQL_MASK) != 0 => return Some(LangId::Graphql),
             b"cbl" | b"cob" | b"cpy" if (enabled_mask & LANG_COBOL_MASK) != 0 => return Some(LangId::Cobol),
@@ -3529,7 +3530,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.htm", LANG_ALL_MASK), Some(LangId::Html));
         assert_eq!(detect_language(b"foo.xhtml", LANG_ALL_MASK), Some(LangId::Html));
         assert_eq!(detect_language(b"foo.xml", LANG_ALL_MASK), Some(LangId::Xml));
-        assert_eq!(detect_language(b"foo.svg", LANG_ALL_MASK), Some(LangId::Xml));
+        assert_eq!(detect_language(b"foo.svg", LANG_ALL_MASK), None);
         assert_eq!(detect_language(b"foo.css", LANG_ALL_MASK), Some(LangId::Css));
         assert_eq!(detect_language(b"foo.scss", LANG_ALL_MASK), Some(LangId::Css));
         assert_eq!(detect_language(b"foo.sass", LANG_ALL_MASK), Some(LangId::Css));

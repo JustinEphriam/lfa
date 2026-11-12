@@ -2,6 +2,12 @@
 
 mod lang;
 
+use lang::doc::{
+    detect_doc_format, parse_doc_into, AllDocStats, DocFormatId, FileTarget, ALL_DOC_FORMATS,
+    DOC_FORMAT_COUNT,
+};
+#[cfg(test)]
+use lang::doc::DocStats;
 use lang::{
     detect_language, detect_shebang, parse_into, LangId, LangStats, ALL_LANGS, LANG_ALL_MASK,
     LANG_COUNT,
@@ -37,7 +43,7 @@ struct Batch {
     offsets: [u16; BATCH_SIZE],
     name_offsets: [u16; BATCH_SIZE],
     lens: [u16; BATCH_SIZE],
-    langs: [LangId; BATCH_SIZE],
+    targets: [FileTarget; BATCH_SIZE],
     data_len: usize,
     count: usize,
 }
@@ -50,7 +56,7 @@ impl Batch {
             offsets: [0u16; BATCH_SIZE],
             name_offsets: [0u16; BATCH_SIZE],
             lens: [0u16; BATCH_SIZE],
-            langs: [LangId::C; BATCH_SIZE],
+            targets: [FileTarget::from_lang(LangId::C as u8); BATCH_SIZE],
             data_len: 0,
             count: 0,
         })
@@ -64,7 +70,7 @@ impl Batch {
     }
 
     #[inline(always)]
-    fn append(&mut self, dir: &[u8], name: &[u8], lang: LangId, too_long: &mut bool) -> bool {
+    fn append(&mut self, dir: &[u8], name: &[u8], target: FileTarget, too_long: &mut bool) -> bool {
         assert!(!name.is_empty());
         assert!(self.count <= BATCH_SIZE);
         assert!(self.data_len <= BATCH_BUF_SIZE);
@@ -94,7 +100,7 @@ impl Batch {
         self.offsets[self.count] = off as u16;
         self.name_offsets[self.count] = name_off as u16;
         self.lens[self.count] = path_len as u16;
-        self.langs[self.count] = lang;
+        self.targets[self.count] = target;
         self.data_len = off + needed;
         self.count += 1;
         assert!(self.count <= BATCH_SIZE);
@@ -290,16 +296,22 @@ impl WorkScheduler {
 #[derive(Clone, Copy)]
 struct WorkerResult {
     lang_stats: LangStats,
+    doc_stats: AllDocStats,
     files_found: [i64; LANG_COUNT],
     files_processed: [i64; LANG_COUNT],
+    doc_files_found: [i64; DOC_FORMAT_COUNT],
+    doc_files_processed: [i64; DOC_FORMAT_COUNT],
 }
 
 impl Default for WorkerResult {
     fn default() -> Self {
         Self {
             lang_stats: LangStats::default(),
+            doc_stats: AllDocStats::default(),
             files_found: [0; LANG_COUNT],
             files_processed: [0; LANG_COUNT],
+            doc_files_found: [0; DOC_FORMAT_COUNT],
+            doc_files_processed: [0; DOC_FORMAT_COUNT],
         }
     }
 }
@@ -307,15 +319,23 @@ impl Default for WorkerResult {
 impl WorkerResult {
     fn add(&mut self, other: &Self) {
         self.lang_stats.add(&other.lang_stats);
+        self.doc_stats.add(&other.doc_stats);
         for i in 0..LANG_COUNT {
             self.files_found[i] += other.files_found[i];
             self.files_processed[i] += other.files_processed[i];
             assert!(self.files_processed[i] <= self.files_found[i]);
         }
+        for i in 0..DOC_FORMAT_COUNT {
+            self.doc_files_found[i] += other.doc_files_found[i];
+            self.doc_files_processed[i] += other.doc_files_processed[i];
+            assert!(self.doc_files_processed[i] <= self.doc_files_found[i]);
+        }
     }
 
     fn total_files_found(&self) -> i64 {
-        let total: i64 = self.files_found.iter().sum();
+        let lang_total: i64 = self.files_found.iter().sum();
+        let doc_total: i64 = self.doc_files_found.iter().sum();
+        let total = lang_total + doc_total;
         assert!(total >= 0);
         total
     }
@@ -361,18 +381,34 @@ fn read_file_into<Fd: AsFd>(dirfd: Fd, path: &CStr, fb: &mut Vec<u8>) -> bool {
 fn process_single_path<Fd: AsFd>(
     dirfd: Fd,
     path: &CStr,
-    lang: LangId,
+    target: FileTarget,
     res: &mut WorkerResult,
     fb: &mut Vec<u8>,
 ) {
-    let idx = lang as usize;
-    res.files_found[idx] += 1;
-    if read_file_into(dirfd, path, fb) {
-        res.files_processed[idx] += 1;
-        parse_into(lang, fb, &mut res.lang_stats);
-        if fb.capacity() > 524_288 {
-            fb.clear();
-            fb.shrink_to(131_072);
+    if target.is_doc() {
+        if let Some(doc) = target.doc_format() {
+            let idx = doc as usize;
+            res.doc_files_found[idx] += 1;
+            if read_file_into(dirfd, path, fb) {
+                res.doc_files_processed[idx] += 1;
+                parse_doc_into(doc, fb, &mut res.doc_stats.stats[idx]);
+                if fb.capacity() > 524_288 {
+                    fb.clear();
+                    fb.shrink_to(131_072);
+                }
+            }
+        }
+    } else {
+        let lang = ALL_LANGS[target.lang_id() as usize];
+        let idx = lang as usize;
+        res.files_found[idx] += 1;
+        if read_file_into(dirfd, path, fb) {
+            res.files_processed[idx] += 1;
+            parse_into(lang, fb, &mut res.lang_stats);
+            if fb.capacity() > 524_288 {
+                fb.clear();
+                fb.shrink_to(131_072);
+            }
         }
     }
 }
@@ -403,12 +439,12 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                 if let Some(dirfd) = b.dirfd.take() {
                     for i in 0..b.count {
                         let name = b.get_rel_name_cstr(i);
-                        process_single_path(&dirfd, name, b.langs[i], &mut res, &mut fb);
+                        process_single_path(&dirfd, name, b.targets[i], &mut res, &mut fb);
                     }
                 } else {
                     for i in 0..b.count {
                         let path = b.get_path_cstr(i);
-                        process_single_path(CWD, path, b.langs[i], &mut res, &mut fb);
+                        process_single_path(CWD, path, b.targets[i], &mut res, &mut fb);
                     }
                 }
                 prev_finished_batch = Some(b);
@@ -469,24 +505,34 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                             subdirs_arena.extend_from_slice(name);
                             subdirs_spans.push((start_off, sub_len as u32));
                         } else if ft == FileType::RegularFile {
-                            let lang_opt = detect_language(name, enabled_mask).or_else(|| {
-                                if !name.contains(&b'.') {
-                                    let mut probe_buf = [0u8; 128];
-                                    if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
-                                        && let Ok(n) = read(&file_fd, &mut probe_buf)
-                                    {
-                                        return detect_shebang(&probe_buf[..n], enabled_mask);
+                            let target_opt = detect_language(name, enabled_mask)
+                                .map(|l| FileTarget::from_lang(l as u8))
+                                .or_else(|| {
+                                    if enabled_mask == LANG_ALL_MASK {
+                                        detect_doc_format(name).map(FileTarget::from_doc)
+                                    } else {
+                                        None
                                     }
-                                }
-                                None
-                            });
+                                })
+                                .or_else(|| {
+                                    if !name.contains(&b'.') {
+                                        let mut probe_buf = [0u8; 128];
+                                        if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                                            && let Ok(n) = read(&file_fd, &mut probe_buf)
+                                        {
+                                            return detect_shebang(&probe_buf[..n], enabled_mask)
+                                                .map(|l| FileTarget::from_lang(l as u8));
+                                        }
+                                    }
+                                    None
+                                });
 
-                            if let Some(lang) = lang_opt {
+                            if let Some(target) = target_opt {
                                 let mut too_long = false;
                                 let lb = local_batch.as_mut().unwrap();
-                                if !lb.append(dir_bytes, name, lang, &mut too_long) {
+                                if !lb.append(dir_bytes, name, target, &mut too_long) {
                                     if too_long {
-                                        process_single_path(&fd, name_cstr, lang, &mut res, &mut fb);
+                                        process_single_path(&fd, name_cstr, target, &mut res, &mut fb);
                                     } else {
                                         if batch_started_empty && let Ok(dup_fd) = dup(&fd) {
                                             lb.dirfd = Some(dup_fd);
@@ -495,7 +541,7 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                         let mut next = sched.submit_batch_and_swap(full);
                                         batch_started_empty = true;
                                         let mut dummy = false;
-                                        let ok = next.append(dir_bytes, name, lang, &mut dummy);
+                                        let ok = next.append(dir_bytes, name, target, &mut dummy);
                                         assert!(ok);
                                         local_batch = Some(next);
                                     }
@@ -748,7 +794,7 @@ fn write_summary_markdown<W: std::io::Write>(
 
     rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
 
-    for (lang, files, lines, code, comments, blanks, kws) in rows {
+    for &(lang, files, lines, code, comments, blanks, kws) in &rows {
         let _ = writeln!(
             out,
             "| {} | {} | {} | {} | {} | {} | {} |",
@@ -891,7 +937,7 @@ fn write_summary_csv<W: std::io::Write>(
 
     rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
 
-    for (lang, files, lines, code, comments, blanks, kws) in rows {
+    for &(lang, files, lines, code, comments, blanks, kws) in &rows {
         let _ = writeln!(
             out,
             "{},{},{},{},{},{},{}",
@@ -1197,7 +1243,7 @@ fn print_summary_results(
 
     rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
 
-    for (lang, files, lines, code, comments, blanks, kws) in rows {
+    for &(lang, files, lines, code, comments, blanks, kws) in &rows {
         let _ = writeln!(
             out,
             "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
@@ -1212,20 +1258,97 @@ fn print_summary_results(
         );
     }
 
-    let _ = writeln!(out, "{}{}{}", c_gray, border_sep, c_reset);
-    let _ = writeln!(
-        out,
-        "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
-        c_gray, c_green, "Total",
-        c_gray, c_white, format_number(total_files),
-        c_gray, c_white, format_number(total_lines),
-        c_gray, c_white, format_number(total_code),
-        c_gray, c_white, format_number(total_comments),
-        c_gray, c_white, format_number(total_blanks),
-        c_gray, c_white, format_number(total_keywords),
-        c_gray
-    );
-    let _ = writeln!(out, "{}{}{}", c_gray, border_bot, c_reset);
+    let has_lang_rows = !rows.is_empty();
+    if has_lang_rows {
+        let _ = writeln!(out, "{}{}{}", c_gray, border_sep, c_reset);
+        let _ = writeln!(
+            out,
+            "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+            c_gray, c_green, "Total",
+            c_gray, c_white, format_number(total_files),
+            c_gray, c_white, format_number(total_lines),
+            c_gray, c_white, format_number(total_code),
+            c_gray, c_white, format_number(total_comments),
+            c_gray, c_white, format_number(total_blanks),
+            c_gray, c_white, format_number(total_keywords),
+            c_gray
+        );
+        let _ = writeln!(out, "{}{}{}", c_gray, border_bot, c_reset);
+    } else {
+        out.clear();
+    }
+
+    let mut doc_rows: Vec<(DocFormatId, i64, i64, i64, i64, i64)> = Vec::with_capacity(DOC_FORMAT_COUNT);
+    let mut doc_total_files = 0i64;
+    let mut doc_total_lines = 0i64;
+    let mut doc_total_content = 0i64;
+    let mut doc_total_comments = 0i64;
+    let mut doc_total_blanks = 0i64;
+
+    for doc in ALL_DOC_FORMATS {
+        let idx = doc as usize;
+        let files = totals.doc_files_processed[idx];
+        if files > 0 {
+            let st = &totals.doc_stats.stats[idx];
+            doc_total_files += files;
+            doc_total_lines += st.lines;
+            doc_total_content += st.content_lines;
+            doc_total_comments += st.comment_lines;
+            doc_total_blanks += st.blank_lines;
+            doc_rows.push((doc, files, st.lines, st.content_lines, st.comment_lines, st.blank_lines));
+        }
+    }
+
+    if !doc_rows.is_empty() {
+        doc_rows.sort_unstable_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.name().cmp(b.0.name())));
+
+        let d_border_top = "┌────────────────────┬──────────┬──────────────┬──────────────┬──────────────┬──────────────┐";
+        let d_border_sep = "├────────────────────┼──────────┼──────────────┼──────────────┼──────────────┼──────────────┤";
+        let d_border_bot = "└────────────────────┴──────────┴──────────────┴──────────────┴──────────────┴──────────────┘";
+
+        let _ = writeln!(out, "{}{}{}", c_gray, d_border_top, c_reset);
+        let _ = writeln!(
+            out,
+            "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+            c_gray, c_white, "Document / Data",
+            c_gray, c_white, "Files",
+            c_gray, c_white, "Lines",
+            c_gray, c_white, "Content",
+            c_gray, c_white, "Comments",
+            c_gray, c_white, "Blanks",
+            c_gray
+        );
+        let _ = writeln!(out, "{}{}{}", c_gray, d_border_sep, c_reset);
+
+        for (doc, files, lines, content, comments, blanks) in doc_rows {
+            let _ = writeln!(
+                out,
+                "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+                c_gray, c_cyan, doc.name(),
+                c_gray, c_reset, format_number(files),
+                c_gray, c_reset, format_number(lines),
+                c_gray, c_reset, format_number(content),
+                c_gray, c_reset, format_number(comments),
+                c_gray, c_reset, format_number(blanks),
+                c_gray
+            );
+        }
+
+        let _ = writeln!(out, "{}{}{}", c_gray, d_border_sep, c_reset);
+        let _ = writeln!(
+            out,
+            "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+            c_gray, c_green, "Total",
+            c_gray, c_white, format_number(doc_total_files),
+            c_gray, c_white, format_number(doc_total_lines),
+            c_gray, c_white, format_number(doc_total_content),
+            c_gray, c_white, format_number(doc_total_comments),
+            c_gray, c_white, format_number(doc_total_blanks),
+            c_gray
+        );
+        let _ = writeln!(out, "{}{}{}", c_gray, d_border_bot, c_reset);
+    }
+
     let _ = writeln!(
         out,
         "{}Processed {} files with {} worker threads (CPU cores: {}) in {:.3}s{}",
@@ -1815,33 +1938,92 @@ mod tests {
     }
 
     #[test]
+    fn test_doc_format_detection_and_parsing() {
+        assert_eq!(detect_doc_format(b"README"), Some(DocFormatId::PlainText));
+        assert_eq!(detect_doc_format(b"LICENSE"), Some(DocFormatId::PlainText));
+        assert_eq!(detect_doc_format(b"notes.txt"), Some(DocFormatId::PlainText));
+        assert_eq!(detect_doc_format(b"guide.md"), Some(DocFormatId::Markdown));
+        assert_eq!(detect_doc_format(b"data.csv"), Some(DocFormatId::Csv));
+        assert_eq!(detect_doc_format(b"data.tsv"), Some(DocFormatId::Csv));
+        assert_eq!(detect_doc_format(b"image.svg"), Some(DocFormatId::Svg));
+        assert_eq!(detect_doc_format(b"config.ini"), Some(DocFormatId::Ini));
+        assert_eq!(detect_doc_format(b"app.conf"), Some(DocFormatId::Ini));
+        assert_eq!(detect_doc_format(b"my.service"), Some(DocFormatId::Ini));
+        assert_eq!(detect_doc_format(b"my.socket"), Some(DocFormatId::Ini));
+        assert_eq!(detect_doc_format(b"doc.rst"), Some(DocFormatId::RestructuredText));
+        assert_eq!(detect_doc_format(b"changes.diff"), Some(DocFormatId::Patch));
+        assert_eq!(detect_doc_format(b"changes.patch"), Some(DocFormatId::Patch));
+        assert_eq!(detect_doc_format(b"settings.json5"), Some(DocFormatId::Json5));
+        assert_eq!(detect_doc_format(b"settings.jsonc"), Some(DocFormatId::Json5));
+        assert_eq!(detect_doc_format(b"unknown.xyz"), None);
+
+        for doc in ALL_DOC_FORMATS {
+            let mut st = DocStats::default();
+            parse_doc_into(doc, b"", &mut st);
+            assert_eq!(st.lines, 0);
+            assert_eq!(st.content_lines, 0);
+            assert_eq!(st.comment_lines, 0);
+            assert_eq!(st.blank_lines, 0);
+
+            let mut st_content = DocStats::default();
+            let sample = b"line 1
+
+line 2
+";
+            parse_doc_into(doc, sample, &mut st_content);
+            assert_eq!(st_content.lines, 3);
+            assert_eq!(st_content.blank_lines, 1);
+            assert_eq!(st_content.lines, st_content.content_lines + st_content.comment_lines + st_content.blank_lines);
+        }
+
+        let mut md_st = DocStats::default();
+        parse_doc_into(DocFormatId::Markdown, b"# Header
+<!-- comment -->
+Content
+", &mut md_st);
+        assert_eq!(md_st.lines, 3);
+        assert_eq!(md_st.content_lines, 2);
+        assert_eq!(md_st.comment_lines, 1);
+
+        let mut ini_st = DocStats::default();
+        parse_doc_into(DocFormatId::Ini, b"# comment
+; comment 2
+key=val
+", &mut ini_st);
+        assert_eq!(ini_st.lines, 3);
+        assert_eq!(ini_st.content_lines, 1);
+        assert_eq!(ini_st.comment_lines, 2);
+    }
+
+    #[test]
     fn test_batch_limits_and_slash_normalization() {
         let mut batch = Batch::new();
         let mut too_long = false;
+        let target_c = FileTarget::from_lang(LangId::C as u8);
 
-        assert!(batch.append(b"/tmp/dir", b"a.c", LangId::C, &mut too_long));
+        assert!(batch.append(b"/tmp/dir", b"a.c", target_c, &mut too_long));
         assert!(!too_long);
         assert_eq!(batch.get_path_cstr(0).to_bytes(), b"/tmp/dir/a.c");
         assert_eq!(batch.get_rel_name_cstr(0).to_bytes(), b"a.c");
 
-        assert!(batch.append(b"/tmp/dir/", b"b.h", LangId::C, &mut too_long));
+        assert!(batch.append(b"/tmp/dir/", b"b.h", target_c, &mut too_long));
         assert!(!too_long);
         assert_eq!(batch.get_path_cstr(1).to_bytes(), b"/tmp/dir/b.h");
         assert_eq!(batch.get_rel_name_cstr(1).to_bytes(), b"b.h");
 
         let huge_dir = vec![b'x'; BATCH_BUF_SIZE];
-        assert!(!batch.append(&huge_dir, b"c.c", LangId::C, &mut too_long));
+        assert!(!batch.append(&huge_dir, b"c.c", target_c, &mut too_long));
         assert!(too_long);
         assert_eq!(batch.count, 2);
 
         batch.reset();
         for i in 0..BATCH_SIZE {
             let name = format!("f{}.c", i);
-            assert!(batch.append(b"/d", name.as_bytes(), LangId::C, &mut too_long));
+            assert!(batch.append(b"/d", name.as_bytes(), target_c, &mut too_long));
             assert!(!too_long);
         }
         assert_eq!(batch.count, BATCH_SIZE);
-        assert!(!batch.append(b"/d", b"overflow.c", LangId::C, &mut too_long));
+        assert!(!batch.append(b"/d", b"overflow.c", target_c, &mut too_long));
         assert!(!too_long);
     }
 
