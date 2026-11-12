@@ -505,7 +505,7 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                             subdirs_arena.extend_from_slice(name);
                             subdirs_spans.push((start_off, sub_len as u32));
                         } else if ft == FileType::RegularFile {
-                            let target_opt = detect_language(name, enabled_mask)
+                            let mut target_opt = detect_language(name, enabled_mask)
                                 .map(|l| FileTarget::from_lang(l as u8))
                                 .or_else(|| {
                                     if enabled_mask == LANG_ALL_MASK {
@@ -526,6 +526,20 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                     }
                                     None
                                 });
+
+                            if let Some(target) = target_opt
+                                && !target.is_doc()
+                                && target.lang_id() == LangId::D as u8
+                                && name.ends_with(b".d")
+                            {
+                                let mut probe_buf = [0u8; 128];
+                                if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                                    && let Ok(n) = read(&file_fd, &mut probe_buf)
+                                    && lang::d::is_d_dep_file(&probe_buf[..n])
+                                {
+                                    target_opt = None;
+                                }
+                            }
 
                             if let Some(target) = target_opt {
                                 let mut too_long = false;
@@ -1692,7 +1706,7 @@ fn main() {
         target_nul.push(0);
         let target_cstr = CStr::from_bytes_with_nul(&target_nul).unwrap();
 
-        let lang_opt = if ft == FileType::RegularFile {
+        let mut lang_opt = if ft == FileType::RegularFile {
             detect_language(target_bytes, enabled_mask).or_else(|| {
                 if !target_bytes.contains(&b'.') {
                     let mut probe_buf = [0u8; 128];
@@ -1707,6 +1721,18 @@ fn main() {
         } else {
             None
         };
+
+        if let Some(LangId::D) = lang_opt
+            && target_bytes.ends_with(b".d")
+        {
+            let mut probe_buf = [0u8; 128];
+            if let Ok(file_fd) = openat(CWD, target_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                && let Ok(n) = read(&file_fd, &mut probe_buf)
+                && lang::d::is_d_dep_file(&probe_buf[..n])
+            {
+                lang_opt = None;
+            }
+        }
 
         let Some(lang) = lang_opt else {
             eprintln!(

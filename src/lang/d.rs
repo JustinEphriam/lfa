@@ -186,6 +186,28 @@ const fn len_matches(n: usize, idx: usize) -> bool {
     n == KEYWORD_LENS[idx] as usize
 }
 
+pub fn is_d_dep_file(probe: &[u8]) -> bool {
+    let mut i = 0;
+    while i < probe.len() && probe[i] != b'\n' {
+        i += 1;
+    }
+    let first_line = &probe[..i];
+    let mut has_colon_space = false;
+    let mut j = 0;
+    while j + 1 < first_line.len() {
+        if first_line[j] == b':' && (first_line[j + 1] == b' ' || first_line[j + 1] == b'\t') {
+            has_colon_space = true;
+            break;
+        }
+        j += 1;
+    }
+    if !has_colon_space {
+        return false;
+    }
+    let target_part = &first_line[..j];
+    !target_part.is_empty() && !target_part.contains(&b' ') && !target_part.contains(&b'\t')
+}
+
 #[cfg(test)]
 #[inline(always)]
 pub fn is_d_extension(name: &[u8]) -> bool {
@@ -365,5 +387,16 @@ mod tests {
         assert_eq!(acc.comment_lines, 2);
         assert_eq!(acc.code_lines, 7);
         assert_eq!(acc.total_keywords, 3);
+    }
+
+    #[test]
+    fn test_d_dep_file_detection() {
+        assert!(is_d_dep_file(b"/path/to/foo.d: src/main.rs\n"));
+        assert!(is_d_dep_file(b"target/debug/foo.o: foo.c\n"));
+        assert!(is_d_dep_file(b"foo.rlib: bar.rs\n"));
+        assert!(is_d_dep_file(b"libfoo.a: foo.o bar.o\n"));
+        assert!(!is_d_dep_file(b"import std.stdio;\nvoid main() {}\n"));
+        assert!(!is_d_dep_file(b"module test.d;\n"));
+        assert!(!is_d_dep_file(b"// a comment\nint x = 10;\n"));
     }
 }
