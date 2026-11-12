@@ -136,9 +136,11 @@ pub enum LangId {
     Protobuf = 64,
     Cobol = 65,
     Vhdl = 66,
+    CHeader = 67,
+    CppHeader = 68,
 }
 
-pub const LANG_COUNT: usize = 67;
+pub const LANG_COUNT: usize = 69;
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -206,6 +208,8 @@ pub const LANG_GRAPHQL_MASK: u128 = 1 << (LangId::Graphql as u128);
 pub const LANG_PROTOBUF_MASK: u128 = 1 << (LangId::Protobuf as u128);
 pub const LANG_COBOL_MASK: u128 = 1 << (LangId::Cobol as u128);
 pub const LANG_VHDL_MASK: u128 = 1 << (LangId::Vhdl as u128);
+pub const LANG_CHEADER_MASK: u128 = 1 << (LangId::CHeader as u128);
+pub const LANG_CPPHEADER_MASK: u128 = 1 << (LangId::CppHeader as u128);
 pub const LANG_ALL_MASK: u128 = if LANG_COUNT == 128 {
     !0u128
 } else {
@@ -280,6 +284,8 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Protobuf,
     LangId::Cobol,
     LangId::Vhdl,
+    LangId::CHeader,
+    LangId::CppHeader,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -363,6 +369,8 @@ impl LangId {
             Self::Protobuf => "Protobuf",
             Self::Cobol => "COBOL",
             Self::Vhdl => "VHDL",
+            Self::CHeader => "C Header",
+            Self::CppHeader => "C++ Header",
         }
     }
 
@@ -441,6 +449,8 @@ impl LangId {
             Self::Protobuf => &["-proto", "--proto", "-protobuf", "--protobuf"],
             Self::Cobol => &["-cobol", "--cobol", "-cbl", "--cbl"],
             Self::Vhdl => &["-vhdl", "--vhdl", "-vhd", "--vhd"],
+            Self::CHeader => &["-ch", "--ch", "-c-header", "--c-header"],
+            Self::CppHeader => &["-cxxh", "--cxxh", "-cpp-header", "--cpp-header"],
         }
     }
 
@@ -609,6 +619,12 @@ impl LangId {
             b"-vhdl" | b"--vhdl" | b"-VHDL" | b"--VHDL" | b"-vhd" | b"--vhd" | b"-VHD" | b"--VHD" => {
                 Some(Self::Vhdl)
             }
+            b"-ch" | b"--ch" | b"-CH" | b"--CH" | b"-c-header" | b"--c-header" | b"-C-HEADER" | b"--C-HEADER" => {
+                Some(Self::CHeader)
+            }
+            b"-cxxh" | b"--cxxh" | b"-CXXH" | b"--CXXH" | b"-cpp-header" | b"--cpp-header" | b"-CPP-HEADER" | b"--CPP-HEADER" => {
+                Some(Self::CppHeader)
+            }
             _ => None,
         }
     }
@@ -720,6 +736,8 @@ pub struct LangStats {
     pub protobuf: ParseResult<{ protobuf::KEYWORD_COUNT }>,
     pub cobol: ParseResult<{ cobol::KEYWORD_COUNT }>,
     pub vhdl: ParseResult<{ vhdl::KEYWORD_COUNT }>,
+    pub c_header: ParseResult<{ c::KEYWORD_COUNT }>,
+    pub cpp_header: ParseResult<{ cpp::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -792,6 +810,8 @@ impl LangStats {
         self.protobuf.add(&other.protobuf);
         self.cobol.add(&other.cobol);
         self.vhdl.add(&other.vhdl);
+        self.c_header.add(&other.c_header);
+        self.cpp_header.add(&other.cpp_header);
     }
 
     #[inline(always)]
@@ -864,6 +884,8 @@ impl LangStats {
             LangId::Protobuf => self.protobuf.lines_processed,
             LangId::Cobol => self.cobol.lines_processed,
             LangId::Vhdl => self.vhdl.lines_processed,
+            LangId::CHeader => self.c_header.lines_processed,
+            LangId::CppHeader => self.cpp_header.lines_processed,
         }
     }
 
@@ -937,6 +959,8 @@ impl LangStats {
             LangId::Protobuf => self.protobuf.code_lines,
             LangId::Cobol => self.cobol.code_lines,
             LangId::Vhdl => self.vhdl.code_lines,
+            LangId::CHeader => self.c_header.code_lines,
+            LangId::CppHeader => self.cpp_header.code_lines,
         }
     }
 
@@ -1010,6 +1034,8 @@ impl LangStats {
             LangId::Protobuf => self.protobuf.comment_lines,
             LangId::Cobol => self.cobol.comment_lines,
             LangId::Vhdl => self.vhdl.comment_lines,
+            LangId::CHeader => self.c_header.comment_lines,
+            LangId::CppHeader => self.cpp_header.comment_lines,
         }
     }
 
@@ -1083,6 +1109,8 @@ impl LangStats {
             LangId::Protobuf => self.protobuf.blank_lines,
             LangId::Cobol => self.cobol.blank_lines,
             LangId::Vhdl => self.vhdl.blank_lines,
+            LangId::CHeader => self.c_header.blank_lines,
+            LangId::CppHeader => self.cpp_header.blank_lines,
         }
     }
 
@@ -1156,6 +1184,8 @@ impl LangStats {
             LangId::Protobuf => self.protobuf.total_keywords,
             LangId::Cobol => self.cobol.total_keywords,
             LangId::Vhdl => self.vhdl.total_keywords,
+            LangId::CHeader => self.c_header.total_keywords,
+            LangId::CppHeader => self.cpp_header.total_keywords,
         }
     }
 
@@ -1229,6 +1259,8 @@ impl LangStats {
             LangId::Protobuf => &protobuf::KEYWORD_NAMES,
             LangId::Cobol => &cobol::KEYWORD_NAMES,
             LangId::Vhdl => &vhdl::KEYWORD_NAMES,
+            LangId::CHeader => &c::KEYWORD_NAMES,
+            LangId::CppHeader => &cpp::KEYWORD_NAMES,
         }
     }
 
@@ -1302,6 +1334,8 @@ impl LangStats {
             LangId::Protobuf => &self.protobuf.keyword_counts,
             LangId::Cobol => &self.cobol.keyword_counts,
             LangId::Vhdl => &self.vhdl.keyword_counts,
+            LangId::CHeader => &self.c_header.keyword_counts,
+            LangId::CppHeader => &self.cpp_header.keyword_counts,
         }
     }
 
@@ -1375,6 +1409,8 @@ impl LangStats {
             LangId::Protobuf => &protobuf::KEYWORD_LENS,
             LangId::Cobol => &cobol::KEYWORD_LENS,
             LangId::Vhdl => &vhdl::KEYWORD_LENS,
+            LangId::CHeader => &c::KEYWORD_LENS,
+            LangId::CppHeader => &cpp::KEYWORD_LENS,
         }
     }
 
@@ -1448,6 +1484,8 @@ impl LangStats {
             LangId::Protobuf => (protobuf::KW_MIN_LEN, protobuf::KW_MAX_LEN),
             LangId::Cobol => (cobol::KW_MIN_LEN, cobol::KW_MAX_LEN),
             LangId::Vhdl => (vhdl::KW_MIN_LEN, vhdl::KW_MAX_LEN),
+            LangId::CHeader => (c::KW_MIN_LEN, c::KW_MAX_LEN),
+            LangId::CppHeader => (cpp::KW_MIN_LEN, cpp::KW_MAX_LEN),
         }
     }
 
@@ -1521,6 +1559,8 @@ impl LangStats {
             LangId::Protobuf => (&protobuf::TOKEN_KIND, &protobuf::TOKEN_LUT_LO),
             LangId::Cobol => (&cobol::TOKEN_KIND, &cobol::TOKEN_LUT_LO),
             LangId::Vhdl => (&vhdl::TOKEN_KIND, &vhdl::TOKEN_LUT_LO),
+            LangId::CHeader => (&c::TOKEN_KIND, &c::TOKEN_LUT_LO),
+            LangId::CppHeader => (&cpp::TOKEN_KIND, &cpp::TOKEN_LUT_LO),
         }
     }
 }
@@ -1554,11 +1594,11 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b'd' if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
             b'f' if (enabled_mask & LANG_FORTRAN_MASK) != 0 => return Some(LangId::Fortran),
             b'h' => {
-                if (enabled_mask & LANG_C_MASK) != 0 {
-                    return Some(LangId::C);
+                if (enabled_mask & LANG_CHEADER_MASK) != 0 {
+                    return Some(LangId::CHeader);
                 }
-                if (enabled_mask & LANG_CPP_MASK) != 0 {
-                    return Some(LangId::Cpp);
+                if (enabled_mask & LANG_CPPHEADER_MASK) != 0 {
+                    return Some(LangId::CppHeader);
                 }
             }
             b't' if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
@@ -1592,7 +1632,8 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         match &ext {
             b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 => return Some(LangId::Rust),
             b"hs" if (enabled_mask & LANG_HASKELL_MASK) != 0 => return Some(LangId::Haskell),
-            b"cc" | b"hh" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
+            b"cc" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
+            b"hh" if (enabled_mask & LANG_CPPHEADER_MASK) != 0 => return Some(LangId::CppHeader),
             b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => return Some(LangId::Python),
             b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
             b"go" if (enabled_mask & LANG_GO_MASK) != 0 => return Some(LangId::Go),
@@ -1634,10 +1675,13 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 1] | 0x20,
         ];
         match &ext {
-            b"cpp" | b"cxx" | b"c++" | b"hpp" | b"hxx" | b"h++" | b"ipp" | b"inl" | b"ixx"
-                if (enabled_mask & LANG_CPP_MASK) != 0 =>
-            {
+            b"cpp" | b"cxx" | b"c++" if (enabled_mask & LANG_CPP_MASK) != 0 => {
                 return Some(LangId::Cpp);
+            }
+            b"hpp" | b"hxx" | b"h++" | b"ipp" | b"inl" | b"ixx"
+                if (enabled_mask & LANG_CPPHEADER_MASK) != 0 =>
+            {
+                return Some(LangId::CppHeader);
             }
             b"pyi" | b"pyw" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
                 return Some(LangId::Python);
@@ -2685,6 +2729,8 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Protobuf => protobuf::parse_into(content, &mut stats.protobuf),
         LangId::Cobol => cobol::parse_into(content, &mut stats.cobol),
         LangId::Vhdl => vhdl::parse_into(content, &mut stats.vhdl),
+        LangId::CHeader => c::parse_into(content, &mut stats.c_header),
+        LangId::CppHeader => cpp::parse_into(content, &mut stats.cpp_header),
     }
 }
 
@@ -3072,15 +3118,15 @@ mod tests {
     #[test]
     fn test_detect_language_and_header_routing() {
         assert_eq!(detect_language(b"foo.c", LANG_ALL_MASK), Some(LangId::C));
-        assert_eq!(detect_language(b"foo.h", LANG_ALL_MASK), Some(LangId::C));
-        assert_eq!(detect_language(b"foo.H", LANG_ALL_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.h", LANG_ALL_MASK), Some(LangId::CHeader));
+        assert_eq!(detect_language(b"foo.H", LANG_ALL_MASK), Some(LangId::CHeader));
         assert_eq!(
             detect_language(b"foo.cpp", LANG_ALL_MASK),
             Some(LangId::Cpp)
         );
         assert_eq!(
             detect_language(b"foo.hpp", LANG_ALL_MASK),
-            Some(LangId::Cpp)
+            Some(LangId::CppHeader)
         );
         assert_eq!(
             detect_language(b"foo.rs", LANG_ALL_MASK),
@@ -3406,7 +3452,7 @@ mod tests {
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
-        assert_eq!(detect_language(b"foo.h", LANG_C_MASK), Some(LangId::C));
+        assert_eq!(detect_language(b"foo.h", LANG_CHEADER_MASK), Some(LangId::CHeader));
         assert_eq!(detect_language(b"foo.cpp", LANG_C_MASK), None);
         assert_eq!(detect_language(b"foo.hpp", LANG_C_MASK), None);
         assert_eq!(detect_language(b"foo.py", LANG_C_MASK), None);
@@ -3414,15 +3460,15 @@ mod tests {
         assert_eq!(detect_language(b"foo.go", LANG_C_MASK), None);
 
         assert_eq!(detect_language(b"foo.c", LANG_CPP_MASK), None);
-        assert_eq!(detect_language(b"foo.h", LANG_CPP_MASK), Some(LangId::Cpp));
-        assert_eq!(detect_language(b"foo.H", LANG_CPP_MASK), Some(LangId::Cpp));
+        assert_eq!(detect_language(b"foo.h", LANG_CPPHEADER_MASK), Some(LangId::CppHeader));
+        assert_eq!(detect_language(b"foo.H", LANG_CPPHEADER_MASK), Some(LangId::CppHeader));
         assert_eq!(
             detect_language(b"foo.cpp", LANG_CPP_MASK),
             Some(LangId::Cpp)
         );
         assert_eq!(
-            detect_language(b"foo.hpp", LANG_CPP_MASK),
-            Some(LangId::Cpp)
+            detect_language(b"foo.hpp", LANG_CPPHEADER_MASK),
+            Some(LangId::CppHeader)
         );
         assert_eq!(detect_language(b"foo.py", LANG_CPP_MASK), None);
         assert_eq!(detect_language(b"foo.pl", LANG_CPP_MASK), None);

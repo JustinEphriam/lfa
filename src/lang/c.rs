@@ -144,6 +144,12 @@ pub fn is_c_extension(name: &[u8]) -> bool {
     super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::C)
 }
 
+#[cfg(test)]
+#[inline(always)]
+pub fn is_c_header_extension(name: &[u8]) -> bool {
+    super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::CHeader)
+}
+
 pub struct CLexer;
 
 impl LangLexer<KEYWORD_COUNT> for CLexer {
@@ -437,9 +443,9 @@ mod tests {
     #[test]
     fn test_extensions() {
         assert!(is_c_extension(b"main.c"));
-        assert!(is_c_extension(b"header.h"));
+        assert!(is_c_header_extension(b"header.h"));
         assert!(is_c_extension(b"UPPER.C"));
-        assert!(is_c_extension(b"UPPER.H"));
+        assert!(is_c_header_extension(b"UPPER.H"));
         assert!(is_c_extension(b"a/b/c/foo.bar.c"));
 
         assert!(!is_c_extension(b"main.cpp"));

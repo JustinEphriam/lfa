@@ -1736,12 +1736,18 @@ mod tests {
         });
 
         let c_idx = LangId::C as usize;
+        let ch_idx = LangId::CHeader as usize;
         let cpp_idx = LangId::Cpp as usize;
-        assert_eq!(totals.files_found[c_idx], 3);
-        assert_eq!(totals.files_processed[c_idx], 3);
-        assert_eq!(totals.lang_stats.c.lines_processed, 3);
-        assert_eq!(totals.lang_stats.c.total_keywords, 15);
-        assert_eq!(totals.lang_stats.c.keyword_counts[find_c_kw_id("int")], 2);
+        assert_eq!(totals.files_found[c_idx], 2);
+        assert_eq!(totals.files_processed[c_idx], 2);
+        assert_eq!(totals.files_found[ch_idx], 1);
+        assert_eq!(totals.files_processed[ch_idx], 1);
+        assert_eq!(totals.lang_stats.c.lines_processed, 2);
+        assert_eq!(totals.lang_stats.c_header.lines_processed, 1);
+        assert_eq!(totals.lang_stats.c.total_keywords, 11);
+        assert_eq!(totals.lang_stats.c_header.total_keywords, 4);
+        assert_eq!(totals.lang_stats.c.keyword_counts[find_c_kw_id("int")], 1);
+        assert_eq!(totals.lang_stats.c_header.keyword_counts[find_c_kw_id("int")], 1);
         assert_eq!(totals.lang_stats.c.keyword_counts[find_c_kw_id("void")], 2);
         assert_eq!(
             totals.lang_stats.c.keyword_counts[find_c_kw_id("return")],
@@ -1750,7 +1756,7 @@ mod tests {
         assert_eq!(totals.lang_stats.c.keyword_counts[find_c_kw_id("true")], 1);
         assert_eq!(totals.lang_stats.c.keyword_counts[find_c_kw_id("false")], 1);
         assert_eq!(
-            totals.lang_stats.c.keyword_counts[find_c_kw_id("constexpr")],
+            totals.lang_stats.c_header.keyword_counts[find_c_kw_id("constexpr")],
             1
         );
 
@@ -1785,13 +1791,18 @@ mod tests {
 
         let c_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::C.mask(), true);
         let c_only_res = unified_worker_proc(&c_only_sched);
-        assert_eq!(c_only_res.files_found[c_idx], 3);
+        assert_eq!(c_only_res.files_found[c_idx], 2);
         assert_eq!(c_only_res.files_found[cpp_idx], 0);
+
+        let ch_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::CHeader.mask(), true);
+        let ch_only_res = unified_worker_proc(&ch_only_sched);
+        assert_eq!(ch_only_res.files_found[ch_idx], 1);
+        assert_eq!(ch_only_res.files_found[c_idx], 0);
 
         let cpp_only_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangId::Cpp.mask(), true);
         let cpp_only_res = unified_worker_proc(&cpp_only_sched);
         assert_eq!(cpp_only_res.files_found[c_idx], 0);
-        assert_eq!(cpp_only_res.files_found[cpp_idx], 2);
+        assert_eq!(cpp_only_res.files_found[cpp_idx], 1);
 
         unlinkat(CWD, sub_c.as_bytes(), AtFlags::empty()).unwrap();
         unlinkat(CWD, sub_dir.as_bytes(), AtFlags::REMOVEDIR).unwrap();

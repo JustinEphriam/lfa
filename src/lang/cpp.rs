@@ -245,6 +245,12 @@ pub fn is_cpp_extension(name: &[u8]) -> bool {
     super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::Cpp)
 }
 
+#[cfg(test)]
+#[inline(always)]
+pub fn is_cpp_header_extension(name: &[u8]) -> bool {
+    super::detect_language(name, super::LANG_ALL_MASK) == Some(super::LangId::CppHeader)
+}
+
 pub struct CppLexer;
 
 impl LangLexer<KEYWORD_COUNT> for CppLexer {
@@ -500,21 +506,26 @@ mod tests {
             b"main.cc",
             b"main.cxx",
             b"main.c++",
-            b"header.hpp",
+            b"mod.cppm",
+            b"UPPER.CPP",
+            b"UPPER.CC",
+            b"UPPER.CPPM",
+        ] {
+            assert!(is_cpp_extension(valid));
+        }
+
+        for valid_h in [
+            b"header.hpp".as_slice(),
             b"header.hh",
             b"header.hxx",
             b"header.h++",
             b"impl.ipp",
             b"math.inl",
             b"mod.ixx",
-            b"mod.cppm",
-            b"UPPER.CPP",
             b"UPPER.HPP",
-            b"UPPER.CC",
             b"UPPER.HH",
-            b"UPPER.CPPM",
         ] {
-            assert!(is_cpp_extension(valid));
+            assert!(is_cpp_header_extension(valid_h));
         }
 
         for invalid in [
