@@ -1581,6 +1581,17 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
                 if !selected_langs.contains(&lang) {
                     selected_langs.push(lang);
                 }
+                if lang == LangId::C {
+                    flag_mask |= LangId::CHeader.mask();
+                    if !selected_langs.contains(&LangId::CHeader) {
+                        selected_langs.push(LangId::CHeader);
+                    }
+                } else if lang == LangId::Cpp {
+                    flag_mask |= LangId::CppHeader.mask();
+                    if !selected_langs.contains(&LangId::CppHeader) {
+                        selected_langs.push(LangId::CppHeader);
+                    }
+                }
             } else {
                 return CliResult::Err(format!("Unknown flag '{}'", arg.to_string_lossy()));
             }
@@ -2129,8 +2140,8 @@ key=val
         ];
         let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c);
         assert_eq!(target.as_bytes(), b"/tmp");
-        assert_eq!(mask, LangId::C.mask());
-        assert_eq!(detailed, vec![LangId::C]);
+        assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
+        assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
         assert_eq!(format, OutputFormat::Table);
         assert!(!hidden);
 
@@ -2141,8 +2152,8 @@ key=val
         ];
         let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c_first);
         assert_eq!(target.as_bytes(), b"/tmp");
-        assert_eq!(mask, LangId::C.mask());
-        assert_eq!(detailed, vec![LangId::C]);
+        assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
+        assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
         assert_eq!(format, OutputFormat::Table);
         assert!(!hidden);
 
@@ -2153,8 +2164,8 @@ key=val
         ];
         let (target, mask, detailed, format, hidden) = parse_cli_args(&args_cpp);
         assert_eq!(target.as_bytes(), b"/tmp");
-        assert_eq!(mask, LangId::Cpp.mask());
-        assert_eq!(detailed, vec![LangId::Cpp]);
+        assert_eq!(mask, LangId::Cpp.mask() | LangId::CppHeader.mask());
+        assert_eq!(detailed, vec![LangId::Cpp, LangId::CppHeader]);
         assert_eq!(format, OutputFormat::Table);
         assert!(!hidden);
 
@@ -2296,9 +2307,9 @@ key=val
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(
             mask,
-            LangId::Zig.mask() | LangId::C.mask() | LangId::Odin.mask()
+            LangId::Zig.mask() | LangId::C.mask() | LangId::CHeader.mask() | LangId::Odin.mask()
         );
-        assert_eq!(detailed, vec![LangId::Zig, LangId::C, LangId::Odin]);
+        assert_eq!(detailed, vec![LangId::Zig, LangId::C, LangId::CHeader, LangId::Odin]);
         assert_eq!(format, OutputFormat::Table);
         assert!(!hidden);
 
@@ -2316,8 +2327,22 @@ key=val
                 match res {
                     CliResult::Run { target, mask, selected_langs, .. } => {
                         assert_eq!(target.as_bytes(), b"/tmp");
-                        assert_eq!(mask, lang.mask());
-                        assert_eq!(selected_langs, vec![lang]);
+                        let expected_mask = if lang == LangId::C {
+                            LangId::C.mask() | LangId::CHeader.mask()
+                        } else if lang == LangId::Cpp {
+                            LangId::Cpp.mask() | LangId::CppHeader.mask()
+                        } else {
+                            lang.mask()
+                        };
+                        let expected_selected = if lang == LangId::C {
+                            vec![LangId::C, LangId::CHeader]
+                        } else if lang == LangId::Cpp {
+                            vec![LangId::Cpp, LangId::CppHeader]
+                        } else {
+                            vec![lang]
+                        };
+                        assert_eq!(mask, expected_mask);
+                        assert_eq!(selected_langs, expected_selected);
                     }
                     _ => panic!("Expected CliResult::Run for lang {:?} flag {alias}", lang),
                 }
