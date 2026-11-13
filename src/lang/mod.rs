@@ -72,6 +72,21 @@ pub mod wgsl;
 pub mod xml;
 pub mod yaml;
 pub mod zig;
+pub mod actionscript;
+pub mod apex;
+pub mod astro;
+pub mod autohotkey;
+pub mod elm;
+pub mod just;
+pub mod meson;
+pub mod objcpp;
+pub mod purescript;
+pub mod racket;
+pub mod sml;
+pub mod starlark;
+pub mod svelte;
+pub mod systemverilog;
+pub mod vue;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -151,9 +166,39 @@ pub enum LangId {
     Llvm = 72,
     Wat = 73,
     Tex = 74,
+    Elm = 75,
+    PureScript = 76,
+    Racket = 77,
+    Sml = 78,
+    SystemVerilog = 79,
+    Meson = 80,
+    Starlark = 81,
+    Justfile = 82,
+    Svelte = 83,
+    Vue = 84,
+    Astro = 85,
+    ObjectiveCpp = 86,
+    ActionScript = 87,
+    Apex = 88,
+    AutoHotkey = 89,
 }
 
-pub const LANG_COUNT: usize = 75;
+pub const LANG_COUNT: usize = 90;
+pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
+pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
+pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
+pub const LANG_SML_MASK: u128 = 1 << (LangId::Sml as u128);
+pub const LANG_SYSTEMVERILOG_MASK: u128 = 1 << (LangId::SystemVerilog as u128);
+pub const LANG_MESON_MASK: u128 = 1 << (LangId::Meson as u128);
+pub const LANG_STARLARK_MASK: u128 = 1 << (LangId::Starlark as u128);
+pub const LANG_JUSTFILE_MASK: u128 = 1 << (LangId::Justfile as u128);
+pub const LANG_SVELTE_MASK: u128 = 1 << (LangId::Svelte as u128);
+pub const LANG_VUE_MASK: u128 = 1 << (LangId::Vue as u128);
+pub const LANG_ASTRO_MASK: u128 = 1 << (LangId::Astro as u128);
+pub const LANG_OBJECTIVECPP_MASK: u128 = 1 << (LangId::ObjectiveCpp as u128);
+pub const LANG_ACTIONSCRIPT_MASK: u128 = 1 << (LangId::ActionScript as u128);
+pub const LANG_APEX_MASK: u128 = 1 << (LangId::Apex as u128);
+pub const LANG_AUTOHOTKEY_MASK: u128 = 1 << (LangId::AutoHotkey as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -311,6 +356,21 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Llvm,
     LangId::Wat,
     LangId::Tex,
+    LangId::Elm,
+    LangId::PureScript,
+    LangId::Racket,
+    LangId::Sml,
+    LangId::SystemVerilog,
+    LangId::Meson,
+    LangId::Starlark,
+    LangId::Justfile,
+    LangId::Svelte,
+    LangId::Vue,
+    LangId::Astro,
+    LangId::ObjectiveCpp,
+    LangId::ActionScript,
+    LangId::Apex,
+    LangId::AutoHotkey,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -402,6 +462,21 @@ impl LangId {
             Self::Llvm => "LLVM",
             Self::Wat => "WebAssembly",
             Self::Tex => "TeX",
+            Self::Elm => "Elm",
+            Self::PureScript => "PureScript",
+            Self::Racket => "Racket",
+            Self::Sml => "Standard ML",
+            Self::SystemVerilog => "SystemVerilog",
+            Self::Meson => "Meson",
+            Self::Starlark => "Starlark",
+            Self::Justfile => "Justfile",
+            Self::Svelte => "Svelte",
+            Self::Vue => "Vue",
+            Self::Astro => "Astro",
+            Self::ObjectiveCpp => "Objective-C++",
+            Self::ActionScript => "ActionScript",
+            Self::Apex => "Apex",
+            Self::AutoHotkey => "AutoHotkey",
         }
     }
 
@@ -448,7 +523,7 @@ impl LangId {
             Self::Solidity => &["-sol", "--sol", "-solidity", "--solidity"],
             Self::FSharp => &["-fs", "--fs", "-fsharp", "--fsharp", "-f#", "--f#"],
             Self::Mojo => &["-mojo", "--mojo"],
-            Self::Verilog => &["-v", "--v", "-verilog", "--verilog", "-sv", "--sv"],
+            Self::Verilog => &["-v", "--v", "-verilog", "--verilog"],
             Self::Cuda => &["-cu", "--cu", "-cuda", "--cuda"],
             Self::Wgsl => &["-wgsl", "--wgsl"],
             Self::Ada => &["-ada", "--ada"],
@@ -456,7 +531,7 @@ impl LangId {
             Self::Clojure => &["-clj", "--clj", "-clojure", "--clojure"],
             Self::Assembly => &["-asm", "--asm", "-s", "--s", "-assembly", "--assembly"],
             Self::Tcl => &["-tcl", "--tcl"],
-            Self::Scheme => &["-scm", "--scm", "-scheme", "--scheme", "-rkt", "--rkt"],
+            Self::Scheme => &["-scm", "--scm", "-scheme", "--scheme"],
             Self::Json => &["-json", "--json-lang"],
             Self::Toml => &["-toml", "--toml"],
             Self::Yaml => &["-yaml", "--yaml", "-yml", "--yml"],
@@ -488,6 +563,21 @@ impl LangId {
             Self::Llvm => &["-llvm", "--llvm", "-ll", "--ll"],
             Self::Wat => &["-wat", "--wat", "-wast", "--wast", "-wasm-text", "--wasm-text"],
             Self::Tex => &["-tex", "--tex", "-latex", "--latex"],
+            Self::Elm => &["-elm", "--elm"],
+            Self::PureScript => &["-purs", "--purs", "-purescript", "--purescript"],
+            Self::Racket => &["-rkt", "--rkt", "-racket", "--racket"],
+            Self::Sml => &["-sml", "--sml"],
+            Self::SystemVerilog => &["-sv", "--sv", "-systemverilog", "--systemverilog"],
+            Self::Meson => &["-meson", "--meson"],
+            Self::Starlark => &["-bzl", "--bzl", "-bazel", "--bazel", "-starlark", "--starlark"],
+            Self::Justfile => &["-just", "--just", "-justfile", "--justfile"],
+            Self::Svelte => &["-svelte", "--svelte"],
+            Self::Vue => &["-vue", "--vue"],
+            Self::Astro => &["-astro", "--astro"],
+            Self::ObjectiveCpp => &["-objcpp", "--objcpp", "-objcxx", "--objcxx"],
+            Self::ActionScript => &["-as", "--as", "-actionscript", "--actionscript"],
+            Self::Apex => &["-apex", "--apex"],
+            Self::AutoHotkey => &["-ahk", "--ahk", "-autohotkey", "--autohotkey"],
         }
     }
 
@@ -560,7 +650,7 @@ impl LangId {
             b"-mojo" | b"--mojo" | b"-MOJO" | b"--MOJO" => {
                 Some(Self::Mojo)
             }
-            b"-v" | b"--v" | b"-V" | b"--V" | b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" | b"-sv" | b"--sv" | b"-SV" | b"--SV" => {
+            b"-v" | b"--v" | b"-V" | b"--V" | b"-verilog" | b"--verilog" | b"-VERILOG" | b"--VERILOG" => {
                 Some(Self::Verilog)
             }
             b"-cu" | b"--cu" | b"-CU" | b"--CU" | b"-cuda" | b"--cuda" | b"-CUDA" | b"--CUDA" => {
@@ -584,7 +674,7 @@ impl LangId {
             b"-tcl" | b"--tcl" | b"-TCL" | b"--TCL" => {
                 Some(Self::Tcl)
             }
-            b"-scm" | b"--scm" | b"-SCM" | b"--SCM" | b"-scheme" | b"--scheme" | b"-rkt" | b"--rkt" => {
+            b"-scm" | b"--scm" | b"-SCM" | b"--SCM" | b"-scheme" | b"--scheme" => {
                 Some(Self::Scheme)
             }
             b"-json" | b"--json-lang" => {
@@ -680,6 +770,21 @@ impl LangId {
             b"-cxxh" | b"--cxxh" | b"-CXXH" | b"--CXXH" | b"-cpp-header" | b"--cpp-header" | b"-CPP-HEADER" | b"--CPP-HEADER" => {
                 Some(Self::CppHeader)
             }
+            b"-elm" | b"--elm" | b"-ELM" | b"--ELM" => Some(Self::Elm),
+            b"-purs" | b"--purs" | b"-PURS" | b"--PURS" | b"-purescript" | b"--purescript" | b"-PURESCRIPT" | b"--PURESCRIPT" => Some(Self::PureScript),
+            b"-rkt" | b"--rkt" | b"-RKT" | b"--RKT" | b"-racket" | b"--racket" | b"-RACKET" | b"--RACKET" => Some(Self::Racket),
+            b"-sml" | b"--sml" | b"-SML" | b"--SML" => Some(Self::Sml),
+            b"-sv" | b"--sv" | b"-SV" | b"--SV" | b"-systemverilog" | b"--systemverilog" | b"-SYSTEMVERILOG" | b"--SYSTEMVERILOG" => Some(Self::SystemVerilog),
+            b"-meson" | b"--meson" | b"-MESON" | b"--MESON" => Some(Self::Meson),
+            b"-bzl" | b"--bzl" | b"-BZL" | b"--BZL" | b"-bazel" | b"--bazel" | b"-BAZEL" | b"--BAZEL" | b"-starlark" | b"--starlark" | b"-STARLARK" | b"--STARLARK" => Some(Self::Starlark),
+            b"-just" | b"--just" | b"-JUST" | b"--JUST" | b"-justfile" | b"--justfile" | b"-JUSTFILE" | b"--JUSTFILE" => Some(Self::Justfile),
+            b"-svelte" | b"--svelte" | b"-SVELTE" | b"--SVELTE" => Some(Self::Svelte),
+            b"-vue" | b"--vue" | b"-VUE" | b"--VUE" => Some(Self::Vue),
+            b"-astro" | b"--astro" | b"-ASTRO" | b"--ASTRO" => Some(Self::Astro),
+            b"-objcpp" | b"--objcpp" | b"-OBJCPP" | b"--OBJCPP" | b"-objcxx" | b"--objcxx" | b"-OBJCXX" | b"--OBJCXX" => Some(Self::ObjectiveCpp),
+            b"-as" | b"--as" | b"-AS" | b"--AS" | b"-actionscript" | b"--actionscript" | b"-ACTIONSCRIPT" | b"--ACTIONSCRIPT" => Some(Self::ActionScript),
+            b"-apex" | b"--apex" | b"-APEX" | b"--APEX" => Some(Self::Apex),
+            b"-ahk" | b"--ahk" | b"-AHK" | b"--AHK" | b"-autohotkey" | b"--autohotkey" | b"-AUTOHOTKEY" | b"--AUTOHOTKEY" => Some(Self::AutoHotkey),
             _ => None,
         }
     }
@@ -799,6 +904,21 @@ pub struct LangStats {
     pub llvm: ParseResult<{ llvm::KEYWORD_COUNT }>,
     pub wat: ParseResult<{ wat::KEYWORD_COUNT }>,
     pub tex: ParseResult<{ tex::KEYWORD_COUNT }>,
+    pub elm: ParseResult<{ elm::KEYWORD_COUNT }>,
+    pub purescript: ParseResult<{ purescript::KEYWORD_COUNT }>,
+    pub racket: ParseResult<{ racket::KEYWORD_COUNT }>,
+    pub sml: ParseResult<{ sml::KEYWORD_COUNT }>,
+    pub systemverilog: ParseResult<{ systemverilog::KEYWORD_COUNT }>,
+    pub meson: ParseResult<{ meson::KEYWORD_COUNT }>,
+    pub starlark: ParseResult<{ starlark::KEYWORD_COUNT }>,
+    pub justfile: ParseResult<{ just::KEYWORD_COUNT }>,
+    pub svelte: ParseResult<{ svelte::KEYWORD_COUNT }>,
+    pub vue: ParseResult<{ vue::KEYWORD_COUNT }>,
+    pub astro: ParseResult<{ astro::KEYWORD_COUNT }>,
+    pub objcpp: ParseResult<{ objcpp::KEYWORD_COUNT }>,
+    pub actionscript: ParseResult<{ actionscript::KEYWORD_COUNT }>,
+    pub apex: ParseResult<{ apex::KEYWORD_COUNT }>,
+    pub autohotkey: ParseResult<{ autohotkey::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -879,6 +999,21 @@ impl LangStats {
         self.llvm.add(&other.llvm);
         self.wat.add(&other.wat);
         self.tex.add(&other.tex);
+        self.elm.add(&other.elm);
+        self.purescript.add(&other.purescript);
+        self.racket.add(&other.racket);
+        self.sml.add(&other.sml);
+        self.systemverilog.add(&other.systemverilog);
+        self.meson.add(&other.meson);
+        self.starlark.add(&other.starlark);
+        self.justfile.add(&other.justfile);
+        self.svelte.add(&other.svelte);
+        self.vue.add(&other.vue);
+        self.astro.add(&other.astro);
+        self.objcpp.add(&other.objcpp);
+        self.actionscript.add(&other.actionscript);
+        self.apex.add(&other.apex);
+        self.autohotkey.add(&other.autohotkey);
     }
 
     #[inline(always)]
@@ -959,6 +1094,21 @@ impl LangStats {
             LangId::Llvm => self.llvm.lines_processed,
             LangId::Wat => self.wat.lines_processed,
             LangId::Tex => self.tex.lines_processed,
+            LangId::Elm => self.elm.lines_processed,
+            LangId::PureScript => self.purescript.lines_processed,
+            LangId::Racket => self.racket.lines_processed,
+            LangId::Sml => self.sml.lines_processed,
+            LangId::SystemVerilog => self.systemverilog.lines_processed,
+            LangId::Meson => self.meson.lines_processed,
+            LangId::Starlark => self.starlark.lines_processed,
+            LangId::Justfile => self.justfile.lines_processed,
+            LangId::Svelte => self.svelte.lines_processed,
+            LangId::Vue => self.vue.lines_processed,
+            LangId::Astro => self.astro.lines_processed,
+            LangId::ObjectiveCpp => self.objcpp.lines_processed,
+            LangId::ActionScript => self.actionscript.lines_processed,
+            LangId::Apex => self.apex.lines_processed,
+            LangId::AutoHotkey => self.autohotkey.lines_processed,
         }
     }
 
@@ -1040,6 +1190,21 @@ impl LangStats {
             LangId::Llvm => self.llvm.code_lines,
             LangId::Wat => self.wat.code_lines,
             LangId::Tex => self.tex.code_lines,
+            LangId::Elm => self.elm.code_lines,
+            LangId::PureScript => self.purescript.code_lines,
+            LangId::Racket => self.racket.code_lines,
+            LangId::Sml => self.sml.code_lines,
+            LangId::SystemVerilog => self.systemverilog.code_lines,
+            LangId::Meson => self.meson.code_lines,
+            LangId::Starlark => self.starlark.code_lines,
+            LangId::Justfile => self.justfile.code_lines,
+            LangId::Svelte => self.svelte.code_lines,
+            LangId::Vue => self.vue.code_lines,
+            LangId::Astro => self.astro.code_lines,
+            LangId::ObjectiveCpp => self.objcpp.code_lines,
+            LangId::ActionScript => self.actionscript.code_lines,
+            LangId::Apex => self.apex.code_lines,
+            LangId::AutoHotkey => self.autohotkey.code_lines,
         }
     }
 
@@ -1121,6 +1286,21 @@ impl LangStats {
             LangId::Llvm => self.llvm.comment_lines,
             LangId::Wat => self.wat.comment_lines,
             LangId::Tex => self.tex.comment_lines,
+            LangId::Elm => self.elm.comment_lines,
+            LangId::PureScript => self.purescript.comment_lines,
+            LangId::Racket => self.racket.comment_lines,
+            LangId::Sml => self.sml.comment_lines,
+            LangId::SystemVerilog => self.systemverilog.comment_lines,
+            LangId::Meson => self.meson.comment_lines,
+            LangId::Starlark => self.starlark.comment_lines,
+            LangId::Justfile => self.justfile.comment_lines,
+            LangId::Svelte => self.svelte.comment_lines,
+            LangId::Vue => self.vue.comment_lines,
+            LangId::Astro => self.astro.comment_lines,
+            LangId::ObjectiveCpp => self.objcpp.comment_lines,
+            LangId::ActionScript => self.actionscript.comment_lines,
+            LangId::Apex => self.apex.comment_lines,
+            LangId::AutoHotkey => self.autohotkey.comment_lines,
         }
     }
 
@@ -1202,6 +1382,21 @@ impl LangStats {
             LangId::Llvm => self.llvm.blank_lines,
             LangId::Wat => self.wat.blank_lines,
             LangId::Tex => self.tex.blank_lines,
+            LangId::Elm => self.elm.blank_lines,
+            LangId::PureScript => self.purescript.blank_lines,
+            LangId::Racket => self.racket.blank_lines,
+            LangId::Sml => self.sml.blank_lines,
+            LangId::SystemVerilog => self.systemverilog.blank_lines,
+            LangId::Meson => self.meson.blank_lines,
+            LangId::Starlark => self.starlark.blank_lines,
+            LangId::Justfile => self.justfile.blank_lines,
+            LangId::Svelte => self.svelte.blank_lines,
+            LangId::Vue => self.vue.blank_lines,
+            LangId::Astro => self.astro.blank_lines,
+            LangId::ObjectiveCpp => self.objcpp.blank_lines,
+            LangId::ActionScript => self.actionscript.blank_lines,
+            LangId::Apex => self.apex.blank_lines,
+            LangId::AutoHotkey => self.autohotkey.blank_lines,
         }
     }
 
@@ -1283,6 +1478,21 @@ impl LangStats {
             LangId::Llvm => self.llvm.total_keywords,
             LangId::Wat => self.wat.total_keywords,
             LangId::Tex => self.tex.total_keywords,
+            LangId::Elm => self.elm.total_keywords,
+            LangId::PureScript => self.purescript.total_keywords,
+            LangId::Racket => self.racket.total_keywords,
+            LangId::Sml => self.sml.total_keywords,
+            LangId::SystemVerilog => self.systemverilog.total_keywords,
+            LangId::Meson => self.meson.total_keywords,
+            LangId::Starlark => self.starlark.total_keywords,
+            LangId::Justfile => self.justfile.total_keywords,
+            LangId::Svelte => self.svelte.total_keywords,
+            LangId::Vue => self.vue.total_keywords,
+            LangId::Astro => self.astro.total_keywords,
+            LangId::ObjectiveCpp => self.objcpp.total_keywords,
+            LangId::ActionScript => self.actionscript.total_keywords,
+            LangId::Apex => self.apex.total_keywords,
+            LangId::AutoHotkey => self.autohotkey.total_keywords,
         }
     }
 
@@ -1364,6 +1574,21 @@ impl LangStats {
             LangId::Llvm => &llvm::KEYWORD_NAMES,
             LangId::Wat => &wat::KEYWORD_NAMES,
             LangId::Tex => &tex::KEYWORD_NAMES,
+            LangId::Elm => &elm::KEYWORD_NAMES,
+            LangId::PureScript => &purescript::KEYWORD_NAMES,
+            LangId::Racket => &racket::KEYWORD_NAMES,
+            LangId::Sml => &sml::KEYWORD_NAMES,
+            LangId::SystemVerilog => &systemverilog::KEYWORD_NAMES,
+            LangId::Meson => &meson::KEYWORD_NAMES,
+            LangId::Starlark => &starlark::KEYWORD_NAMES,
+            LangId::Justfile => &just::KEYWORD_NAMES,
+            LangId::Svelte => &svelte::KEYWORD_NAMES,
+            LangId::Vue => &vue::KEYWORD_NAMES,
+            LangId::Astro => &astro::KEYWORD_NAMES,
+            LangId::ObjectiveCpp => &objcpp::KEYWORD_NAMES,
+            LangId::ActionScript => &actionscript::KEYWORD_NAMES,
+            LangId::Apex => &apex::KEYWORD_NAMES,
+            LangId::AutoHotkey => &autohotkey::KEYWORD_NAMES,
         }
     }
 
@@ -1445,6 +1670,21 @@ impl LangStats {
             LangId::Llvm => &self.llvm.keyword_counts,
             LangId::Wat => &self.wat.keyword_counts,
             LangId::Tex => &self.tex.keyword_counts,
+            LangId::Elm => &self.elm.keyword_counts,
+            LangId::PureScript => &self.purescript.keyword_counts,
+            LangId::Racket => &self.racket.keyword_counts,
+            LangId::Sml => &self.sml.keyword_counts,
+            LangId::SystemVerilog => &self.systemverilog.keyword_counts,
+            LangId::Meson => &self.meson.keyword_counts,
+            LangId::Starlark => &self.starlark.keyword_counts,
+            LangId::Justfile => &self.justfile.keyword_counts,
+            LangId::Svelte => &self.svelte.keyword_counts,
+            LangId::Vue => &self.vue.keyword_counts,
+            LangId::Astro => &self.astro.keyword_counts,
+            LangId::ObjectiveCpp => &self.objcpp.keyword_counts,
+            LangId::ActionScript => &self.actionscript.keyword_counts,
+            LangId::Apex => &self.apex.keyword_counts,
+            LangId::AutoHotkey => &self.autohotkey.keyword_counts,
         }
     }
 
@@ -1526,6 +1766,21 @@ impl LangStats {
             LangId::Llvm => &llvm::KEYWORD_LENS,
             LangId::Wat => &wat::KEYWORD_LENS,
             LangId::Tex => &tex::KEYWORD_LENS,
+            LangId::Elm => &elm::KEYWORD_LENS,
+            LangId::PureScript => &purescript::KEYWORD_LENS,
+            LangId::Racket => &racket::KEYWORD_LENS,
+            LangId::Sml => &sml::KEYWORD_LENS,
+            LangId::SystemVerilog => &systemverilog::KEYWORD_LENS,
+            LangId::Meson => &meson::KEYWORD_LENS,
+            LangId::Starlark => &starlark::KEYWORD_LENS,
+            LangId::Justfile => &just::KEYWORD_LENS,
+            LangId::Svelte => &svelte::KEYWORD_LENS,
+            LangId::Vue => &vue::KEYWORD_LENS,
+            LangId::Astro => &astro::KEYWORD_LENS,
+            LangId::ObjectiveCpp => &objcpp::KEYWORD_LENS,
+            LangId::ActionScript => &actionscript::KEYWORD_LENS,
+            LangId::Apex => &apex::KEYWORD_LENS,
+            LangId::AutoHotkey => &autohotkey::KEYWORD_LENS,
         }
     }
 
@@ -1607,6 +1862,21 @@ impl LangStats {
             LangId::Llvm => (llvm::KW_MIN_LEN, llvm::KW_MAX_LEN),
             LangId::Wat => (wat::KW_MIN_LEN, wat::KW_MAX_LEN),
             LangId::Tex => (tex::KW_MIN_LEN, tex::KW_MAX_LEN),
+            LangId::Elm => (elm::KW_MIN_LEN, elm::KW_MAX_LEN),
+            LangId::PureScript => (purescript::KW_MIN_LEN, purescript::KW_MAX_LEN),
+            LangId::Racket => (racket::KW_MIN_LEN, racket::KW_MAX_LEN),
+            LangId::Sml => (sml::KW_MIN_LEN, sml::KW_MAX_LEN),
+            LangId::SystemVerilog => (systemverilog::KW_MIN_LEN, systemverilog::KW_MAX_LEN),
+            LangId::Meson => (meson::KW_MIN_LEN, meson::KW_MAX_LEN),
+            LangId::Starlark => (starlark::KW_MIN_LEN, starlark::KW_MAX_LEN),
+            LangId::Justfile => (just::KW_MIN_LEN, just::KW_MAX_LEN),
+            LangId::Svelte => (svelte::KW_MIN_LEN, svelte::KW_MAX_LEN),
+            LangId::Vue => (vue::KW_MIN_LEN, vue::KW_MAX_LEN),
+            LangId::Astro => (astro::KW_MIN_LEN, astro::KW_MAX_LEN),
+            LangId::ObjectiveCpp => (objcpp::KW_MIN_LEN, objcpp::KW_MAX_LEN),
+            LangId::ActionScript => (actionscript::KW_MIN_LEN, actionscript::KW_MAX_LEN),
+            LangId::Apex => (apex::KW_MIN_LEN, apex::KW_MAX_LEN),
+            LangId::AutoHotkey => (autohotkey::KW_MIN_LEN, autohotkey::KW_MAX_LEN),
         }
     }
 
@@ -1688,6 +1958,21 @@ impl LangStats {
             LangId::Llvm => (&llvm::TOKEN_KIND, &llvm::TOKEN_LUT_LO),
             LangId::Wat => (&wat::TOKEN_KIND, &wat::TOKEN_LUT_LO),
             LangId::Tex => (&tex::TOKEN_KIND, &tex::TOKEN_LUT_LO),
+            LangId::Elm => (&elm::TOKEN_KIND, &elm::TOKEN_LUT_LO),
+            LangId::PureScript => (&purescript::TOKEN_KIND, &purescript::TOKEN_LUT_LO),
+            LangId::Racket => (&racket::TOKEN_KIND, &racket::TOKEN_LUT_LO),
+            LangId::Sml => (&sml::TOKEN_KIND, &sml::TOKEN_LUT_LO),
+            LangId::SystemVerilog => (&systemverilog::TOKEN_KIND, &systemverilog::TOKEN_LUT_LO),
+            LangId::Meson => (&meson::TOKEN_KIND, &meson::TOKEN_LUT_LO),
+            LangId::Starlark => (&starlark::TOKEN_KIND, &starlark::TOKEN_LUT_LO),
+            LangId::Justfile => (&just::TOKEN_KIND, &just::TOKEN_LUT_LO),
+            LangId::Svelte => (&svelte::TOKEN_KIND, &svelte::TOKEN_LUT_LO),
+            LangId::Vue => (&vue::TOKEN_KIND, &vue::TOKEN_LUT_LO),
+            LangId::Astro => (&astro::TOKEN_KIND, &astro::TOKEN_LUT_LO),
+            LangId::ObjectiveCpp => (&objcpp::TOKEN_KIND, &objcpp::TOKEN_LUT_LO),
+            LangId::ActionScript => (&actionscript::TOKEN_KIND, &actionscript::TOKEN_LUT_LO),
+            LangId::Apex => (&apex::TOKEN_KIND, &apex::TOKEN_LUT_LO),
+            LangId::AutoHotkey => (&autohotkey::TOKEN_KIND, &autohotkey::TOKEN_LUT_LO),
         }
     }
 }
@@ -1707,6 +1992,15 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
     }
     if (enabled_mask & LANG_CMAKE_MASK) != 0 && (name == b"CMakeLists.txt" || name == b"cmakelists.txt") {
         return Some(LangId::CMake);
+    }
+    if (enabled_mask & LANG_MESON_MASK) != 0 && (name == b"meson.build" || name == b"meson_options.txt") {
+        return Some(LangId::Meson);
+    }
+    if (enabled_mask & LANG_STARLARK_MASK) != 0 && (name == b"BUILD" || name == b"BUILD.bazel" || name == b"WORKSPACE" || name == b"WORKSPACE.bazel") {
+        return Some(LangId::Starlark);
+    }
+    if (enabled_mask & LANG_JUSTFILE_MASK) != 0 && (name == b"justfile" || name == b"Justfile" || name == b".justfile") {
+        return Some(LangId::Justfile);
     }
     let len = name.len();
     if len < 3 {
@@ -1780,16 +2074,18 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"ex" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
             b"jl" if (enabled_mask & LANG_JULIA_MASK) != 0 => return Some(LangId::Julia),
             b"fs" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
-            b"sv" | b"vh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b"vh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b"sv" if (enabled_mask & LANG_SYSTEMVERILOG_MASK) != 0 => return Some(LangId::SystemVerilog),
             b"cu" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
             b"ss" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
             b"mk" if (enabled_mask & LANG_MAKEFILE_MASK) != 0 => return Some(LangId::Makefile),
-            b"mm" if (enabled_mask & LANG_OBJECTIVEC_MASK) != 0 => return Some(LangId::ObjectiveC),
+            b"mm" if (enabled_mask & LANG_OBJECTIVECPP_MASK) != 0 => return Some(LangId::ObjectiveCpp),
             b"ha" if (enabled_mask & LANG_HARE_MASK) != 0 => return Some(LangId::Hare),
             b"cl" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
             b"pp" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
             b"tf" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
             b"ll" if (enabled_mask & LANG_LLVM_MASK) != 0 => return Some(LangId::Llvm),
+            b"as" if (enabled_mask & LANG_ACTIONSCRIPT_MASK) != 0 => return Some(LangId::ActionScript),
             _ => {}
         }
         return None;
@@ -1840,14 +2136,15 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             }
             b"sol" if (enabled_mask & LANG_SOLIDITY_MASK) != 0 => return Some(LangId::Solidity),
             b"fsi" | b"fsx" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
-            b"svh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
+            b"svh" if (enabled_mask & LANG_SYSTEMVERILOG_MASK) != 0 => return Some(LangId::SystemVerilog),
             b"cuh" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
             b"adb" | b"ads" if (enabled_mask & LANG_ADA_MASK) != 0 => return Some(LangId::Ada),
             b"gvy" if (enabled_mask & LANG_GROOVY_MASK) != 0 => return Some(LangId::Groovy),
             b"clj" | b"edn" if (enabled_mask & LANG_CLOJURE_MASK) != 0 => return Some(LangId::Clojure),
             b"asm" if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
             b"tcl" if (enabled_mask & LANG_TCL_MASK) != 0 => return Some(LangId::Tcl),
-            b"scm" | b"rkt" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
+            b"scm" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
+            b"rkt" if (enabled_mask & LANG_RACKET_MASK) != 0 => return Some(LangId::Racket),
             b"yml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
             b"vsh" if (enabled_mask & LANG_V_MASK) != 0 => return Some(LangId::V),
             b"lsp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
@@ -1863,7 +2160,20 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"nix" if (enabled_mask & LANG_NIX_MASK) != 0 => return Some(LangId::Nix),
             b"hcl" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
             b"wat" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
-            b"tex" | b"sty" | b"cls" if (enabled_mask & LANG_TEX_MASK) != 0 => return Some(LangId::Tex),
+            b"tex" | b"sty" if (enabled_mask & LANG_TEX_MASK) != 0 => return Some(LangId::Tex),
+            b"cls" => {
+                if (enabled_mask & LANG_TEX_MASK) != 0 {
+                    return Some(LangId::Tex);
+                }
+                if (enabled_mask & LANG_APEX_MASK) != 0 {
+                    return Some(LangId::Apex);
+                }
+            }
+            b"elm" if (enabled_mask & LANG_ELM_MASK) != 0 => return Some(LangId::Elm),
+            b"sml" | b"sig" if (enabled_mask & LANG_SML_MASK) != 0 => return Some(LangId::Sml),
+            b"bzl" if (enabled_mask & LANG_STARLARK_MASK) != 0 => return Some(LangId::Starlark),
+            b"vue" if (enabled_mask & LANG_VUE_MASK) != 0 => return Some(LangId::Vue),
+            b"ahk" if (enabled_mask & LANG_AUTOHOTKEY_MASK) != 0 => return Some(LangId::AutoHotkey),
             _ => {}
         }
         return None;
@@ -1901,6 +2211,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"scss" | b"sass" if (enabled_mask & LANG_SASS_MASK) != 0 => return Some(LangId::Sass),
             b"wast" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
             b"vhdl" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
+            b"purs" if (enabled_mask & LANG_PURESCRIPT_MASK) != 0 => return Some(LangId::PureScript),
             _ => {}
         }
         return None;
@@ -1931,6 +2242,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         if &ext == b"xhtml" && (enabled_mask & LANG_HTML_MASK) != 0 {
             return Some(LangId::Html);
         }
+        if &ext == b"astro" && (enabled_mask & LANG_ASTRO_MASK) != 0 {
+            return Some(LangId::Astro);
+        }
         if &ext == b"proto" && (enabled_mask & LANG_PROTOBUF_MASK) != 0 {
             return Some(LangId::Protobuf);
         }
@@ -1956,6 +2270,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         if &ext == b"gradle" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
             return Some(LangId::Groovy);
         }
+        if &ext == b"svelte" && (enabled_mask & LANG_SVELTE_MASK) != 0 {
+            return Some(LangId::Svelte);
+        }
         if &ext == b"tfvars" && (enabled_mask & LANG_HCL_MASK) != 0 {
             return Some(LangId::Hcl);
         }
@@ -1975,6 +2292,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         ];
         if &ext == b"graphql" && (enabled_mask & LANG_GRAPHQL_MASK) != 0 {
             return Some(LangId::Graphql);
+        }
+        if &ext == b"trigger" && (enabled_mask & LANG_APEX_MASK) != 0 {
+            return Some(LangId::Apex);
         }
     }
     if len >= 7 && name[len - 6] == b'.' {
@@ -2875,6 +3195,21 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Llvm => llvm::parse_into(content, &mut stats.llvm),
         LangId::Wat => wat::parse_into(content, &mut stats.wat),
         LangId::Tex => tex::parse_into(content, &mut stats.tex),
+        LangId::Elm => elm::parse_into(content, &mut stats.elm),
+        LangId::PureScript => purescript::parse_into(content, &mut stats.purescript),
+        LangId::Racket => racket::parse_into(content, &mut stats.racket),
+        LangId::Sml => sml::parse_into(content, &mut stats.sml),
+        LangId::SystemVerilog => systemverilog::parse_into(content, &mut stats.systemverilog),
+        LangId::Meson => meson::parse_into(content, &mut stats.meson),
+        LangId::Starlark => starlark::parse_into(content, &mut stats.starlark),
+        LangId::Justfile => just::parse_into(content, &mut stats.justfile),
+        LangId::Svelte => svelte::parse_into(content, &mut stats.svelte),
+        LangId::Vue => vue::parse_into(content, &mut stats.vue),
+        LangId::Astro => astro::parse_into(content, &mut stats.astro),
+        LangId::ObjectiveCpp => objcpp::parse_into(content, &mut stats.objcpp),
+        LangId::ActionScript => actionscript::parse_into(content, &mut stats.actionscript),
+        LangId::Apex => apex::parse_into(content, &mut stats.apex),
+        LangId::AutoHotkey => autohotkey::parse_into(content, &mut stats.autohotkey),
     }
 }
 
@@ -3068,11 +3403,16 @@ mod tests {
                 | LangId::PowerShell
                 | LangId::Graphql
                 | LangId::Nix
-                | LangId::Hcl => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl => "--",
-                LangId::OCaml => "(*",
+                | LangId::Hcl
+                | LangId::Meson
+                | LangId::Starlark
+                | LangId::Justfile => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript => "--",
+                LangId::OCaml | LangId::Sml => "(*",
                 LangId::Fortran => "!",
                 LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
+                LangId::Racket | LangId::AutoHotkey => ";",
+                LangId::Svelte | LangId::Vue | LangId::Astro => "<!--",
                 LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp | LangId::Llvm => ";",
                 LangId::Wat => ";;",
                 LangId::Cobol => "*>",
@@ -3135,6 +3475,13 @@ mod tests {
                     | LangId::Llvm
                     | LangId::Wat
                     | LangId::Tex
+                    | LangId::Elm
+                    | LangId::PureScript
+                    | LangId::Racket
+                    | LangId::Sml
+                    | LangId::Meson
+                    | LangId::Starlark
+                    | LangId::Justfile
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
@@ -3441,7 +3788,7 @@ mod tests {
         );
         assert_eq!(
             detect_language(b"foo.sv", LANG_ALL_MASK),
-            Some(LangId::Verilog)
+            Some(LangId::SystemVerilog)
         );
         assert_eq!(
             detect_language(b"foo.vh", LANG_ALL_MASK),
@@ -3449,7 +3796,7 @@ mod tests {
         );
         assert_eq!(
             detect_language(b"foo.svh", LANG_ALL_MASK),
-            Some(LangId::Verilog)
+            Some(LangId::SystemVerilog)
         );
         assert_eq!(
             detect_language(b"foo.cu", LANG_ALL_MASK),
@@ -3525,7 +3872,7 @@ mod tests {
         );
         assert_eq!(
             detect_language(b"foo.rkt", LANG_ALL_MASK),
-            Some(LangId::Scheme)
+            Some(LangId::Racket)
         );
         assert_eq!(
             detect_language(b"foo.json", LANG_ALL_MASK),
@@ -3605,7 +3952,7 @@ mod tests {
         );
         assert_eq!(
             detect_language(b"foo.mm", LANG_ALL_MASK),
-            Some(LangId::ObjectiveC)
+            Some(LangId::ObjectiveCpp)
         );
 
         assert_eq!(detect_language(b"foo.c", LANG_C_MASK), Some(LangId::C));
@@ -3854,8 +4201,10 @@ mod tests {
             };
 
             let block_open = match lang {
-                LangId::Haskell => "{-",
-                LangId::OCaml | LangId::FSharp | LangId::Pascal => "(*",
+                LangId::Haskell | LangId::Elm | LangId::PureScript => "{-",
+                LangId::OCaml | LangId::FSharp | LangId::Pascal | LangId::Sml => "(*",
+                LangId::Racket => "#|",
+                LangId::Svelte | LangId::Vue | LangId::Astro => "<!--",
                 LangId::Lua => "--[[",
                 LangId::Scheme | LangId::CommonLisp => "#|",
                 LangId::Wat => "(;",
@@ -3886,12 +4235,17 @@ mod tests {
                 | LangId::Cobol
                 | LangId::Vhdl
                 | LangId::Llvm
-                | LangId::Tex => "",
+                | LangId::Tex
+                | LangId::Meson
+                | LangId::Starlark
+                | LangId::Justfile => "",
                 _ => "/*",
             };
             let block_close = match lang {
-                LangId::Haskell => "-}",
-                LangId::OCaml | LangId::FSharp | LangId::Pascal => "*)",
+                LangId::Haskell | LangId::Elm | LangId::PureScript => "-}",
+                LangId::OCaml | LangId::FSharp | LangId::Pascal | LangId::Sml => "*)",
+                LangId::Racket => "|#",
+                LangId::Svelte | LangId::Vue | LangId::Astro => "-->",
                 LangId::Lua => "]]",
                 LangId::Scheme | LangId::CommonLisp => "|#",
                 LangId::Wat => ";)",
@@ -3922,7 +4276,10 @@ mod tests {
                 | LangId::Cobol
                 | LangId::Vhdl
                 | LangId::Llvm
-                | LangId::Tex => "",
+                | LangId::Tex
+                | LangId::Meson
+                | LangId::Starlark
+                | LangId::Justfile => "",
                 _ => "*/",
             };
 
