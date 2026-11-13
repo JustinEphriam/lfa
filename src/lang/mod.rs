@@ -27,6 +27,7 @@ pub mod graphql;
 pub mod groovy;
 pub mod hare;
 pub mod haskell;
+pub mod hcl;
 pub mod hlsl;
 pub mod html;
 pub mod java;
@@ -34,11 +35,13 @@ pub mod javascript;
 pub mod json;
 pub mod julia;
 pub mod kotlin;
+pub mod llvm;
 pub mod lua;
 pub mod makefile;
 pub mod matlab;
 pub mod mojo;
 pub mod nim;
+pub mod nix;
 pub mod objc;
 pub mod ocaml;
 pub mod odin;
@@ -51,17 +54,20 @@ pub mod python;
 pub mod r;
 pub mod ruby;
 pub mod rust;
+pub mod sass;
 pub mod scala;
 pub mod scheme;
 pub mod solidity;
 pub mod sql;
 pub mod swift;
 pub mod tcl;
+pub mod tex;
 pub mod toml;
 pub mod typescript;
 pub mod v;
 pub mod verilog;
 pub mod vhdl;
+pub mod wat;
 pub mod wgsl;
 pub mod xml;
 pub mod yaml;
@@ -139,9 +145,15 @@ pub enum LangId {
     Vhdl = 66,
     CHeader = 67,
     CppHeader = 68,
+    Sass = 69,
+    Nix = 70,
+    Hcl = 71,
+    Llvm = 72,
+    Wat = 73,
+    Tex = 74,
 }
 
-pub const LANG_COUNT: usize = 69;
+pub const LANG_COUNT: usize = 75;
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -211,6 +223,12 @@ pub const LANG_COBOL_MASK: u128 = 1 << (LangId::Cobol as u128);
 pub const LANG_VHDL_MASK: u128 = 1 << (LangId::Vhdl as u128);
 pub const LANG_CHEADER_MASK: u128 = 1 << (LangId::CHeader as u128);
 pub const LANG_CPPHEADER_MASK: u128 = 1 << (LangId::CppHeader as u128);
+pub const LANG_SASS_MASK: u128 = 1 << (LangId::Sass as u128);
+pub const LANG_NIX_MASK: u128 = 1 << (LangId::Nix as u128);
+pub const LANG_HCL_MASK: u128 = 1 << (LangId::Hcl as u128);
+pub const LANG_LLVM_MASK: u128 = 1 << (LangId::Llvm as u128);
+pub const LANG_WAT_MASK: u128 = 1 << (LangId::Wat as u128);
+pub const LANG_TEX_MASK: u128 = 1 << (LangId::Tex as u128);
 pub const LANG_ALL_MASK: u128 = if LANG_COUNT == 128 {
     !0u128
 } else {
@@ -287,6 +305,12 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Vhdl,
     LangId::CHeader,
     LangId::CppHeader,
+    LangId::Sass,
+    LangId::Nix,
+    LangId::Hcl,
+    LangId::Llvm,
+    LangId::Wat,
+    LangId::Tex,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -372,6 +396,12 @@ impl LangId {
             Self::Vhdl => "VHDL",
             Self::CHeader => "C Header",
             Self::CppHeader => "C++ Header",
+            Self::Sass => "Sass",
+            Self::Nix => "Nix",
+            Self::Hcl => "HCL",
+            Self::Llvm => "LLVM",
+            Self::Wat => "WebAssembly",
+            Self::Tex => "TeX",
         }
     }
 
@@ -445,13 +475,19 @@ impl LangId {
             Self::Hare => &["-ha", "--ha", "-hare", "--hare"],
             Self::Html => &["-html", "--html", "-htm", "--htm"],
             Self::Xml => &["-xml", "--xml"],
-            Self::Css => &["-css", "--css", "-scss", "--scss", "-sass", "--sass", "-less", "--less"],
+            Self::Css => &["-css", "--css", "-less", "--less"],
             Self::Graphql => &["-graphql", "--graphql", "-gql", "--gql"],
             Self::Protobuf => &["-proto", "--proto", "-protobuf", "--protobuf"],
             Self::Cobol => &["-cobol", "--cobol", "-cbl", "--cbl"],
             Self::Vhdl => &["-vhdl", "--vhdl", "-vhd", "--vhd"],
             Self::CHeader => &["-ch", "--ch", "-c-header", "--c-header"],
             Self::CppHeader => &["-cxxh", "--cxxh", "-cpp-header", "--cpp-header"],
+            Self::Sass => &["-sass", "--sass", "-scss", "--scss"],
+            Self::Nix => &["-nix", "--nix"],
+            Self::Hcl => &["-hcl", "--hcl", "-tf", "--tf", "-terraform", "--terraform"],
+            Self::Llvm => &["-llvm", "--llvm", "-ll", "--ll"],
+            Self::Wat => &["-wat", "--wat", "-wast", "--wast", "-wasm-text", "--wasm-text"],
+            Self::Tex => &["-tex", "--tex", "-latex", "--latex"],
         }
     }
 
@@ -605,8 +641,26 @@ impl LangId {
             b"-xml" | b"--xml" | b"-XML" | b"--XML" => {
                 Some(Self::Xml)
             }
-            b"-css" | b"--css" | b"-CSS" | b"--CSS" | b"-scss" | b"--scss" | b"-SCSS" | b"--SCSS" | b"-sass" | b"--sass" | b"-SASS" | b"--SASS" | b"-less" | b"--less" | b"-LESS" | b"--LESS" => {
+            b"-css" | b"--css" | b"-CSS" | b"--CSS" | b"-less" | b"--less" | b"-LESS" | b"--LESS" => {
                 Some(Self::Css)
+            }
+            b"-sass" | b"--sass" | b"-SASS" | b"--SASS" | b"-scss" | b"--scss" | b"-SCSS" | b"--SCSS" => {
+                Some(Self::Sass)
+            }
+            b"-nix" | b"--nix" | b"-NIX" | b"--NIX" => {
+                Some(Self::Nix)
+            }
+            b"-hcl" | b"--hcl" | b"-HCL" | b"--HCL" | b"-tf" | b"--tf" | b"-TF" | b"--TF" | b"-terraform" | b"--terraform" | b"-TERRAFORM" | b"--TERRAFORM" => {
+                Some(Self::Hcl)
+            }
+            b"-llvm" | b"--llvm" | b"-LLVM" | b"--LLVM" | b"-ll" | b"--ll" | b"-LL" | b"--LL" => {
+                Some(Self::Llvm)
+            }
+            b"-wat" | b"--wat" | b"-WAT" | b"--WAT" | b"-wast" | b"--wast" | b"-WAST" | b"--WAST" | b"-wasm-text" | b"--wasm-text" => {
+                Some(Self::Wat)
+            }
+            b"-tex" | b"--tex" | b"-TEX" | b"--TEX" | b"-latex" | b"--latex" | b"-LATEX" | b"--LATEX" => {
+                Some(Self::Tex)
             }
             b"-graphql" | b"--graphql" | b"-GRAPHQL" | b"--GRAPHQL" | b"-gql" | b"--gql" | b"-GQL" | b"--GQL" => {
                 Some(Self::Graphql)
@@ -739,6 +793,12 @@ pub struct LangStats {
     pub vhdl: ParseResult<{ vhdl::KEYWORD_COUNT }>,
     pub c_header: ParseResult<{ c::KEYWORD_COUNT }>,
     pub cpp_header: ParseResult<{ cpp::KEYWORD_COUNT }>,
+    pub sass: ParseResult<{ sass::KEYWORD_COUNT }>,
+    pub nix: ParseResult<{ nix::KEYWORD_COUNT }>,
+    pub hcl: ParseResult<{ hcl::KEYWORD_COUNT }>,
+    pub llvm: ParseResult<{ llvm::KEYWORD_COUNT }>,
+    pub wat: ParseResult<{ wat::KEYWORD_COUNT }>,
+    pub tex: ParseResult<{ tex::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -813,6 +873,12 @@ impl LangStats {
         self.vhdl.add(&other.vhdl);
         self.c_header.add(&other.c_header);
         self.cpp_header.add(&other.cpp_header);
+        self.sass.add(&other.sass);
+        self.nix.add(&other.nix);
+        self.hcl.add(&other.hcl);
+        self.llvm.add(&other.llvm);
+        self.wat.add(&other.wat);
+        self.tex.add(&other.tex);
     }
 
     #[inline(always)]
@@ -887,6 +953,12 @@ impl LangStats {
             LangId::Vhdl => self.vhdl.lines_processed,
             LangId::CHeader => self.c_header.lines_processed,
             LangId::CppHeader => self.cpp_header.lines_processed,
+            LangId::Sass => self.sass.lines_processed,
+            LangId::Nix => self.nix.lines_processed,
+            LangId::Hcl => self.hcl.lines_processed,
+            LangId::Llvm => self.llvm.lines_processed,
+            LangId::Wat => self.wat.lines_processed,
+            LangId::Tex => self.tex.lines_processed,
         }
     }
 
@@ -962,6 +1034,12 @@ impl LangStats {
             LangId::Vhdl => self.vhdl.code_lines,
             LangId::CHeader => self.c_header.code_lines,
             LangId::CppHeader => self.cpp_header.code_lines,
+            LangId::Sass => self.sass.code_lines,
+            LangId::Nix => self.nix.code_lines,
+            LangId::Hcl => self.hcl.code_lines,
+            LangId::Llvm => self.llvm.code_lines,
+            LangId::Wat => self.wat.code_lines,
+            LangId::Tex => self.tex.code_lines,
         }
     }
 
@@ -1037,6 +1115,12 @@ impl LangStats {
             LangId::Vhdl => self.vhdl.comment_lines,
             LangId::CHeader => self.c_header.comment_lines,
             LangId::CppHeader => self.cpp_header.comment_lines,
+            LangId::Sass => self.sass.comment_lines,
+            LangId::Nix => self.nix.comment_lines,
+            LangId::Hcl => self.hcl.comment_lines,
+            LangId::Llvm => self.llvm.comment_lines,
+            LangId::Wat => self.wat.comment_lines,
+            LangId::Tex => self.tex.comment_lines,
         }
     }
 
@@ -1112,6 +1196,12 @@ impl LangStats {
             LangId::Vhdl => self.vhdl.blank_lines,
             LangId::CHeader => self.c_header.blank_lines,
             LangId::CppHeader => self.cpp_header.blank_lines,
+            LangId::Sass => self.sass.blank_lines,
+            LangId::Nix => self.nix.blank_lines,
+            LangId::Hcl => self.hcl.blank_lines,
+            LangId::Llvm => self.llvm.blank_lines,
+            LangId::Wat => self.wat.blank_lines,
+            LangId::Tex => self.tex.blank_lines,
         }
     }
 
@@ -1187,6 +1277,12 @@ impl LangStats {
             LangId::Vhdl => self.vhdl.total_keywords,
             LangId::CHeader => self.c_header.total_keywords,
             LangId::CppHeader => self.cpp_header.total_keywords,
+            LangId::Sass => self.sass.total_keywords,
+            LangId::Nix => self.nix.total_keywords,
+            LangId::Hcl => self.hcl.total_keywords,
+            LangId::Llvm => self.llvm.total_keywords,
+            LangId::Wat => self.wat.total_keywords,
+            LangId::Tex => self.tex.total_keywords,
         }
     }
 
@@ -1262,6 +1358,12 @@ impl LangStats {
             LangId::Vhdl => &vhdl::KEYWORD_NAMES,
             LangId::CHeader => &c::KEYWORD_NAMES,
             LangId::CppHeader => &cpp::KEYWORD_NAMES,
+            LangId::Sass => &sass::KEYWORD_NAMES,
+            LangId::Nix => &nix::KEYWORD_NAMES,
+            LangId::Hcl => &hcl::KEYWORD_NAMES,
+            LangId::Llvm => &llvm::KEYWORD_NAMES,
+            LangId::Wat => &wat::KEYWORD_NAMES,
+            LangId::Tex => &tex::KEYWORD_NAMES,
         }
     }
 
@@ -1337,6 +1439,12 @@ impl LangStats {
             LangId::Vhdl => &self.vhdl.keyword_counts,
             LangId::CHeader => &self.c_header.keyword_counts,
             LangId::CppHeader => &self.cpp_header.keyword_counts,
+            LangId::Sass => &self.sass.keyword_counts,
+            LangId::Nix => &self.nix.keyword_counts,
+            LangId::Hcl => &self.hcl.keyword_counts,
+            LangId::Llvm => &self.llvm.keyword_counts,
+            LangId::Wat => &self.wat.keyword_counts,
+            LangId::Tex => &self.tex.keyword_counts,
         }
     }
 
@@ -1412,6 +1520,12 @@ impl LangStats {
             LangId::Vhdl => &vhdl::KEYWORD_LENS,
             LangId::CHeader => &c::KEYWORD_LENS,
             LangId::CppHeader => &cpp::KEYWORD_LENS,
+            LangId::Sass => &sass::KEYWORD_LENS,
+            LangId::Nix => &nix::KEYWORD_LENS,
+            LangId::Hcl => &hcl::KEYWORD_LENS,
+            LangId::Llvm => &llvm::KEYWORD_LENS,
+            LangId::Wat => &wat::KEYWORD_LENS,
+            LangId::Tex => &tex::KEYWORD_LENS,
         }
     }
 
@@ -1487,6 +1601,12 @@ impl LangStats {
             LangId::Vhdl => (vhdl::KW_MIN_LEN, vhdl::KW_MAX_LEN),
             LangId::CHeader => (c::KW_MIN_LEN, c::KW_MAX_LEN),
             LangId::CppHeader => (cpp::KW_MIN_LEN, cpp::KW_MAX_LEN),
+            LangId::Sass => (sass::KW_MIN_LEN, sass::KW_MAX_LEN),
+            LangId::Nix => (nix::KW_MIN_LEN, nix::KW_MAX_LEN),
+            LangId::Hcl => (hcl::KW_MIN_LEN, hcl::KW_MAX_LEN),
+            LangId::Llvm => (llvm::KW_MIN_LEN, llvm::KW_MAX_LEN),
+            LangId::Wat => (wat::KW_MIN_LEN, wat::KW_MAX_LEN),
+            LangId::Tex => (tex::KW_MIN_LEN, tex::KW_MAX_LEN),
         }
     }
 
@@ -1562,6 +1682,12 @@ impl LangStats {
             LangId::Vhdl => (&vhdl::TOKEN_KIND, &vhdl::TOKEN_LUT_LO),
             LangId::CHeader => (&c::TOKEN_KIND, &c::TOKEN_LUT_LO),
             LangId::CppHeader => (&cpp::TOKEN_KIND, &cpp::TOKEN_LUT_LO),
+            LangId::Sass => (&sass::TOKEN_KIND, &sass::TOKEN_LUT_LO),
+            LangId::Nix => (&nix::TOKEN_KIND, &nix::TOKEN_LUT_LO),
+            LangId::Hcl => (&hcl::TOKEN_KIND, &hcl::TOKEN_LUT_LO),
+            LangId::Llvm => (&llvm::TOKEN_KIND, &llvm::TOKEN_LUT_LO),
+            LangId::Wat => (&wat::TOKEN_KIND, &wat::TOKEN_LUT_LO),
+            LangId::Tex => (&tex::TOKEN_KIND, &tex::TOKEN_LUT_LO),
         }
     }
 }
@@ -1662,6 +1788,8 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"ha" if (enabled_mask & LANG_HARE_MASK) != 0 => return Some(LangId::Hare),
             b"cl" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
             b"pp" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
+            b"tf" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
+            b"ll" if (enabled_mask & LANG_LLVM_MASK) != 0 => return Some(LangId::Llvm),
             _ => {}
         }
         return None;
@@ -1732,6 +1860,10 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"gql" if (enabled_mask & LANG_GRAPHQL_MASK) != 0 => return Some(LangId::Graphql),
             b"cbl" | b"cob" | b"cpy" if (enabled_mask & LANG_COBOL_MASK) != 0 => return Some(LangId::Cobol),
             b"vhd" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
+            b"nix" if (enabled_mask & LANG_NIX_MASK) != 0 => return Some(LangId::Nix),
+            b"hcl" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
+            b"wat" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
+            b"tex" | b"sty" | b"cls" if (enabled_mask & LANG_TEX_MASK) != 0 => return Some(LangId::Tex),
             _ => {}
         }
         return None;
@@ -1765,7 +1897,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"psm1" | b"psd1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
             b"fish" if (enabled_mask & LANG_FISH_MASK) != 0 => return Some(LangId::Fish),
             b"html" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
-            b"scss" | b"sass" | b"less" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
+            b"less" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
+            b"scss" | b"sass" if (enabled_mask & LANG_SASS_MASK) != 0 => return Some(LangId::Sass),
+            b"wast" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
             b"vhdl" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
             _ => {}
         }
@@ -1821,6 +1955,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         if &ext == b"gradle" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
             return Some(LangId::Groovy);
+        }
+        if &ext == b"tfvars" && (enabled_mask & LANG_HCL_MASK) != 0 {
+            return Some(LangId::Hcl);
         }
     }
     if len >= 9 && name[len - 8] == b'.' {
@@ -2732,6 +2869,12 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Vhdl => vhdl::parse_into(content, &mut stats.vhdl),
         LangId::CHeader => c::parse_into(content, &mut stats.c_header),
         LangId::CppHeader => cpp::parse_into(content, &mut stats.cpp_header),
+        LangId::Sass => sass::parse_into(content, &mut stats.sass),
+        LangId::Nix => nix::parse_into(content, &mut stats.nix),
+        LangId::Hcl => hcl::parse_into(content, &mut stats.hcl),
+        LangId::Llvm => llvm::parse_into(content, &mut stats.llvm),
+        LangId::Wat => wat::parse_into(content, &mut stats.wat),
+        LangId::Tex => tex::parse_into(content, &mut stats.tex),
     }
 }
 
@@ -2919,14 +3062,19 @@ mod tests {
                 | LangId::Yaml
                 | LangId::Dockerfile
                 | LangId::Makefile
-                | LangId::CMake => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada => "--",
+                | LangId::CMake
+                | LangId::Fish
+                | LangId::Awk
+                | LangId::PowerShell
+                | LangId::Graphql
+                | LangId::Nix
+                | LangId::Hcl => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
-                LangId::Erlang | LangId::Matlab => "%",
-                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp => ";",
-                LangId::Fish | LangId::Awk | LangId::PowerShell | LangId::Graphql => "#",
-                LangId::Vhdl => "--",
+                LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp | LangId::Llvm => ";",
+                LangId::Wat => ";;",
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "//",
@@ -2984,6 +3132,9 @@ mod tests {
                     | LangId::Vhdl
                     | LangId::PowerShell
                     | LangId::Pascal
+                    | LangId::Llvm
+                    | LangId::Wat
+                    | LangId::Tex
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a /* x\ny".to_string());
@@ -2993,6 +3144,11 @@ mod tests {
                 samples.push("a\n#| x\ny |#".to_string());
                 samples.push("a #| x\ny".to_string());
                 samples.push("a\n#| x |# b".to_string());
+            }
+            if lang == LangId::Wat {
+                samples.push("a\n(; x\ny ;)".to_string());
+                samples.push("a (; x\ny".to_string());
+                samples.push("a\n(; x ;) b".to_string());
             }
             if lang == LangId::Haskell {
                 samples.push("a\n{- x\ny -}".to_string());
@@ -3532,9 +3688,19 @@ mod tests {
         assert_eq!(detect_language(b"foo.xml", LANG_ALL_MASK), Some(LangId::Xml));
         assert_eq!(detect_language(b"foo.svg", LANG_ALL_MASK), None);
         assert_eq!(detect_language(b"foo.css", LANG_ALL_MASK), Some(LangId::Css));
-        assert_eq!(detect_language(b"foo.scss", LANG_ALL_MASK), Some(LangId::Css));
-        assert_eq!(detect_language(b"foo.sass", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.scss", LANG_ALL_MASK), Some(LangId::Sass));
+        assert_eq!(detect_language(b"foo.sass", LANG_ALL_MASK), Some(LangId::Sass));
         assert_eq!(detect_language(b"foo.less", LANG_ALL_MASK), Some(LangId::Css));
+        assert_eq!(detect_language(b"foo.nix", LANG_ALL_MASK), Some(LangId::Nix));
+        assert_eq!(detect_language(b"foo.tf", LANG_ALL_MASK), Some(LangId::Hcl));
+        assert_eq!(detect_language(b"foo.tfvars", LANG_ALL_MASK), Some(LangId::Hcl));
+        assert_eq!(detect_language(b"foo.hcl", LANG_ALL_MASK), Some(LangId::Hcl));
+        assert_eq!(detect_language(b"foo.ll", LANG_ALL_MASK), Some(LangId::Llvm));
+        assert_eq!(detect_language(b"foo.wat", LANG_ALL_MASK), Some(LangId::Wat));
+        assert_eq!(detect_language(b"foo.wast", LANG_ALL_MASK), Some(LangId::Wat));
+        assert_eq!(detect_language(b"foo.tex", LANG_ALL_MASK), Some(LangId::Tex));
+        assert_eq!(detect_language(b"foo.sty", LANG_ALL_MASK), Some(LangId::Tex));
+        assert_eq!(detect_language(b"foo.cls", LANG_ALL_MASK), Some(LangId::Tex));
         assert_eq!(detect_language(b"foo.gql", LANG_ALL_MASK), Some(LangId::Graphql));
         assert_eq!(detect_language(b"foo.graphql", LANG_ALL_MASK), Some(LangId::Graphql));
         assert_eq!(detect_language(b"foo.proto", LANG_ALL_MASK), Some(LangId::Protobuf));
@@ -3672,12 +3838,15 @@ mod tests {
                 | LangId::Fish
                 | LangId::Awk
                 | LangId::PowerShell
-                | LangId::Graphql => "#",
+                | LangId::Graphql
+                | LangId::Nix
+                | LangId::Hcl => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl => "--",
                 LangId::OCaml => "(*",
                 LangId::Fortran => "!",
-                LangId::Erlang | LangId::Matlab => "%",
-                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp => ";",
+                LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
+                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp | LangId::Llvm => ";",
+                LangId::Wat => ";;",
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "",
@@ -3689,6 +3858,7 @@ mod tests {
                 LangId::OCaml | LangId::FSharp | LangId::Pascal => "(*",
                 LangId::Lua => "--[[",
                 LangId::Scheme | LangId::CommonLisp => "#|",
+                LangId::Wat => "(;",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::PowerShell => "<#",
                 LangId::Fortran
@@ -3714,7 +3884,9 @@ mod tests {
                 | LangId::Fish
                 | LangId::Awk
                 | LangId::Cobol
-                | LangId::Vhdl => "",
+                | LangId::Vhdl
+                | LangId::Llvm
+                | LangId::Tex => "",
                 _ => "/*",
             };
             let block_close = match lang {
@@ -3722,6 +3894,7 @@ mod tests {
                 LangId::OCaml | LangId::FSharp | LangId::Pascal => "*)",
                 LangId::Lua => "]]",
                 LangId::Scheme | LangId::CommonLisp => "|#",
+                LangId::Wat => ";)",
                 LangId::Html | LangId::Xml => "-->",
                 LangId::PowerShell => "#>",
                 LangId::Fortran
@@ -3747,7 +3920,9 @@ mod tests {
                 | LangId::Fish
                 | LangId::Awk
                 | LangId::Cobol
-                | LangId::Vhdl => "",
+                | LangId::Vhdl
+                | LangId::Llvm
+                | LangId::Tex => "",
                 _ => "*/",
             };
 
