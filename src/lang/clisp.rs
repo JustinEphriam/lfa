@@ -1,7 +1,7 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, make_token_lut_lo, skip_literal, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE, STATE_COMMENT, STATE_NONE, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
+    finish_line_comment, handle_quoted_literal, make_token_lut_lo, unified_parse_into, LangLexer,
+    ParseResult, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 24;
@@ -130,62 +130,33 @@ impl LangLexer<KEYWORD_COUNT> for CommonLispLexer {
     ) -> usize {
         let content_len = content.len();
         match kind {
-            TOK_SEMI => {
-                *line_state |= STATE_COMMENT;
-                if let Some(pos) = find_byte_avx2(&content[i + 1..], b'\n') {
-                    if (*line_state & STATE_CODE) != 0 {
-                        acc.code_lines += 1;
-                    } else {
-                        acc.comment_lines += 1;
-                    }
-                    acc.lines_processed += 1;
-                    *line_state = STATE_NONE;
-                    i + 1 + pos + 1
-                } else {
-                    content_len
-                }
-            }
+            TOK_SEMI => finish_line_comment(content, i + 1, line_state, acc),
             TOK_HASH => {
                 if i + 1 < content_len && content[i + 1] == b'|' {
-                    *line_state |= STATE_COMMENT;
                     let mut cur = i + 2;
                     let mut depth = 1usize;
                     while cur < content_len && depth > 0 {
-                        if cur + 1 < content_len && content[cur] == b'#' && content[cur + 1] == b'|' {
+                        if cur + 1 < content_len && content[cur] == b'#' && content[cur + 1] == b'|'
+                        {
                             depth += 1;
                             cur += 2;
-                        } else if cur + 1 < content_len && content[cur] == b'|' && content[cur + 1] == b'#' {
+                        } else if cur + 1 < content_len
+                            && content[cur] == b'|'
+                            && content[cur + 1] == b'#'
+                        {
                             depth -= 1;
                             cur += 2;
                         } else {
-                            if content[cur] == b'\n' {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                *line_state = STATE_COMMENT;
-                            }
                             cur += 1;
                         }
                     }
-                    cur
+                    finish_block_comment(content, i + 2, cur, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
                 }
             }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

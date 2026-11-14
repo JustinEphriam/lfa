@@ -1,12 +1,11 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_literal,
-    unified_parse_into, LangLexer, ParseResult, IDENT_CONT, STATE_CODE, STATE_COMMENT, TOK_CODE,
-    TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_quoted_literal,
+    handle_spliced_c_slash_comments, kw_match_2_to_16, make_token_lut_lo, unified_parse_into,
+    LangLexer, ParseResult, IDENT_CONT, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 #[cfg(test)]
-use super::{skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2};
+use super::{count_newlines_avx2, skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2};
 
 pub const KEYWORD_COUNT: usize = 59;
 const KW_SLOT_MASK: usize = 255;
@@ -187,90 +186,8 @@ impl LangLexer<KEYWORD_COUNT> for CLexer {
     ) -> usize {
         let content_len = content.len();
         match kind {
-            TOK_SLASH => {
-                if i + 1 < content_len {
-                    let next_b = content[i + 1];
-                    if next_b == b'/' {
-                        *line_state |= STATE_COMMENT;
-                        let mut j = i + 2;
-                        while j < content_len {
-                            let Some(pos) = find_byte_avx2(&content[j..], b'\n') else {
-                                j = content_len;
-                                break;
-                            };
-                            let nl_idx = j + pos;
-                            let mut check = nl_idx;
-                            if check > j && content[check - 1] == b'\r' {
-                                check -= 1;
-                            }
-                            let is_spliced = check > j && content[check - 1] == b'\\';
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else if (*line_state & STATE_COMMENT) != 0 {
-                                acc.comment_lines += 1;
-                            } else {
-                                acc.blank_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            if is_spliced {
-                                *line_state = STATE_COMMENT;
-                                j = nl_idx + 1;
-                            } else {
-                                *line_state = 0;
-                                j = nl_idx + 1;
-                                break;
-                            }
-                        }
-                        return j;
-                    } else if next_b == b'*' {
-                        *line_state |= STATE_COMMENT;
-                        if let Some(pos) = find_star_slash(&content[i + 2..]) {
-                            let star_slash_pos = i + 2 + pos;
-                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..star_slash_pos], b'\n') {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..star_slash_pos]);
-                                acc.comment_lines += inter_nls as i64;
-                                acc.lines_processed += inter_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return star_slash_pos + 2;
-                        } else {
-                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
-                                acc.comment_lines += rem_nls as i64;
-                                acc.lines_processed += rem_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return content_len;
-                        }
-                    }
-                }
-                *line_state |= STATE_CODE;
-                i + 1
-            }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_SLASH => handle_spliced_c_slash_comments(content, i, line_state, acc),
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => {
                 if i > 0 && i + 1 < content_len {
                     let prev = content[i - 1];
@@ -280,14 +197,7 @@ impl LangLexer<KEYWORD_COUNT> for CLexer {
                         return i + 1;
                     }
                 }
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'\'');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
+                handle_quoted_literal(content, i, b'\'', line_state, acc)
             }
             _ => {
                 *line_state |= STATE_CODE;

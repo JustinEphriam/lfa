@@ -1,8 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_ident_cont_avx2, skip_literal,
-    skip_nested_block_comment, unified_parse_into, LangLexer, ParseResult, IDENT_CONT,
-    STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    find_byte_avx2, handle_nested_c_slash_comments, handle_quoted_literal, kw_match_2_to_16,
+    make_token_lut_lo, skip_ident_cont_avx2, unified_parse_into, LangLexer, ParseResult,
+    IDENT_CONT, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 55;
@@ -252,69 +252,14 @@ impl LangLexer<KEYWORD_COUNT> for RustLexer {
     ) -> usize {
         let content_len = content.len();
         match kind {
-            TOK_SLASH => {
-                if i + 1 < content_len {
-                    let next_b = content[i + 1];
-                    if next_b == b'/' {
-                        *line_state |= STATE_COMMENT;
-                        let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') else {
-                            return content_len;
-                        };
-                        let nl_idx = i + 2 + pos;
-                        if (*line_state & STATE_CODE) != 0 {
-                            acc.code_lines += 1;
-                        } else if (*line_state & STATE_COMMENT) != 0 {
-                            acc.comment_lines += 1;
-                        } else {
-                            acc.blank_lines += 1;
-                        }
-                        acc.lines_processed += 1;
-                        *line_state = 0;
-                        return nl_idx + 1;
-                    } else if next_b == b'*' {
-                        *line_state |= STATE_COMMENT;
-                        let end_i = skip_nested_block_comment(content, i + 2);
-                        if let Some(first_nl) = find_byte_avx2(&content[i + 2..end_i], b'\n') {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            let first_nl_abs = i + 2 + first_nl;
-                            let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..end_i]);
-                            acc.comment_lines += inter_nls as i64;
-                            acc.lines_processed += inter_nls as i64;
-                            *line_state = STATE_COMMENT;
-                        }
-                        return end_i;
-                    }
-                }
-                *line_state |= STATE_CODE;
-                i + 1
-            }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_SLASH => handle_nested_c_slash_comments(content, i, line_state, acc),
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
                 if i + 1 < content_len {
                     let next_b = content[i + 1];
                     if next_b == b'\\' {
-                        let end_i = skip_literal(content, i + 1, b'\'');
-                        let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                        if nl > 0 {
-                            acc.code_lines += nl as i64;
-                            acc.lines_processed += nl as i64;
-                        }
-                        return end_i;
+                        return handle_quoted_literal(content, i, b'\'', line_state, acc);
                     }
                     if i + 2 < content_len && content[i + 2] == b'\'' {
                         return i + 3;

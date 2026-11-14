@@ -1,7 +1,7 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    make_token_lut_lo, skip_literal, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
+    handle_quoted_literal, make_token_lut_lo, unified_parse_into, LangLexer, ParseResult,
+    STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 41;
@@ -180,35 +180,14 @@ impl LangLexer<KEYWORD_COUNT> for SmlLexer {
         match kind {
             TOK_LPAREN => {
                 if i + 1 < content_len && content[i + 1] == b'*' {
-                    *line_state |= STATE_COMMENT;
                     let end_i = skip_sml_block_comment(content, i + 2);
-                    let nl = count_newlines_avx2(&content[i + 2..end_i]);
-                    if nl > 0 {
-                        if (*line_state & STATE_CODE) != 0 {
-                            acc.code_lines += 1;
-                            acc.comment_lines += (nl - 1) as i64;
-                        } else {
-                            acc.comment_lines += nl as i64;
-                        }
-                        acc.lines_processed += nl as i64;
-                        *line_state = STATE_COMMENT;
-                    }
-                    end_i
+                    finish_block_comment(content, i + 2, end_i, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
                 }
             }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

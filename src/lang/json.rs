@@ -1,7 +1,7 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    kw_match_2_to_16, make_token_lut_lo, skip_literal, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_quoted_literal,
+    kw_match_2_to_16, make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 3;
@@ -116,16 +116,7 @@ impl LangLexer<KEYWORD_COUNT> for JsonLexer {
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
         match kind {
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

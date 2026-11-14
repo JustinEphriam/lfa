@@ -1,8 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, find_star_slash, kw_match_2_to_16, make_token_lut_lo, skip_literal,
-    skip_triple_literal, unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT,
-    STATE_NONE, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
+    handle_spliced_c_slash_comments, handle_triple_or_quoted_literal, kw_match_2_to_16,
+    make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE, TOK_CODE, TOK_NL,
+    TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 50;
@@ -172,129 +172,11 @@ impl LangLexer<KEYWORD_COUNT> for GroovyLexer {
         line_state: &mut u8,
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
-        let content_len = content.len();
         match kind {
-            TOK_HASH => {
-                *line_state |= STATE_COMMENT;
-                if let Some(pos) = find_byte_avx2(&content[i + 1..], b'\n') {
-                    if (*line_state & STATE_CODE) != 0 {
-                        acc.code_lines += 1;
-                    } else {
-                        acc.comment_lines += 1;
-                    }
-                    acc.lines_processed += 1;
-                    *line_state = STATE_NONE;
-                    i + 1 + pos + 1
-                } else {
-                    content_len
-                }
-            }
-            TOK_SLASH => {
-                if i + 1 < content_len {
-                    let next_b = content[i + 1];
-                    if next_b == b'/' {
-                        *line_state |= STATE_COMMENT;
-                        let mut j = i + 2;
-                        while j < content_len {
-                            let Some(pos) = find_byte_avx2(&content[j..], b'\n') else {
-                                j = content_len;
-                                break;
-                            };
-                            let nl_idx = j + pos;
-                            let mut check = nl_idx;
-                            if check > j && content[check - 1] == b'\r' {
-                                check -= 1;
-                            }
-                            let is_spliced = check > j && content[check - 1] == b'\\';
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else if (*line_state & STATE_COMMENT) != 0 {
-                                acc.comment_lines += 1;
-                            } else {
-                                acc.blank_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            if is_spliced {
-                                *line_state = STATE_COMMENT;
-                                j = nl_idx + 1;
-                            } else {
-                                *line_state = STATE_NONE;
-                                j = nl_idx + 1;
-                                break;
-                            }
-                        }
-                        return j;
-                    } else if next_b == b'*' {
-                        *line_state |= STATE_COMMENT;
-                        if let Some(pos) = find_star_slash(&content[i + 2..]) {
-                            let star_slash_pos = i + 2 + pos;
-                            if let Some(first_nl) =
-                                find_byte_avx2(&content[i + 2..star_slash_pos], b'\n')
-                            {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let inter_nls = count_newlines_avx2(
-                                    &content[first_nl_abs + 1..star_slash_pos],
-                                );
-                                acc.comment_lines += inter_nls as i64;
-                                acc.lines_processed += inter_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return star_slash_pos + 2;
-                        } else {
-                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
-                                acc.comment_lines += rem_nls as i64;
-                                acc.lines_processed += rem_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return content_len;
-                        }
-                    }
-                }
-                *line_state |= STATE_CODE;
-                i + 1
-            }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = if i + 2 < content_len && content[i + 1] == b'"' && content[i + 2] == b'"' {
-                    skip_triple_literal(content, i + 3, b'"')
-                } else {
-                    skip_literal(content, i + 1, b'"')
-                };
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
-            TOK_APOSTROPHE => {
-                *line_state |= STATE_CODE;
-                let end_i = if i + 2 < content_len && content[i + 1] == b'\'' && content[i + 2] == b'\'' {
-                    skip_triple_literal(content, i + 3, b'\'')
-                } else {
-                    skip_literal(content, i + 1, b'\'')
-                };
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_HASH => finish_line_comment(content, i + 1, line_state, acc),
+            TOK_SLASH => handle_spliced_c_slash_comments(content, i, line_state, acc),
+            TOK_QUOTE => handle_triple_or_quoted_literal(content, i, b'"', line_state, acc),
+            TOK_APOSTROPHE => handle_triple_or_quoted_literal(content, i, b'\'', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

@@ -1,8 +1,7 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE,
-    TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
+    finish_line_comment, handle_quoted_literal, kw_match_2_to_16, make_token_lut_lo,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 34;
@@ -167,19 +166,7 @@ impl LangLexer<KEYWORD_COUNT> for HaskellLexer {
         match kind {
             TOK_MINUS => {
                 if i + 1 < content_len && content[i + 1] == b'-' {
-                    *line_state |= STATE_COMMENT;
-                    if let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') {
-                        if (*line_state & STATE_CODE) != 0 {
-                            acc.code_lines += 1;
-                        } else {
-                            acc.comment_lines += 1;
-                        }
-                        acc.lines_processed += 1;
-                        *line_state = 0;
-                        i + 2 + pos + 1
-                    } else {
-                        content_len
-                    }
+                    finish_line_comment(content, i + 2, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
@@ -187,72 +174,30 @@ impl LangLexer<KEYWORD_COUNT> for HaskellLexer {
             }
             TOK_LBRACE => {
                 if i + 1 < content_len && content[i + 1] == b'-' {
-                    *line_state |= STATE_COMMENT;
                     let mut cur = i + 2;
                     let mut depth = 1usize;
                     while cur + 1 < content_len {
                         if content[cur] == b'{' && content[cur + 1] == b'-' {
                             depth += 1;
                             cur += 2;
-                            continue;
-                        }
-                        if content[cur] == b'-' && content[cur + 1] == b'}' {
+                        } else if content[cur] == b'-' && content[cur + 1] == b'}' {
                             depth -= 1;
                             cur += 2;
                             if depth == 0 {
-                                return cur;
+                                return finish_block_comment(content, i + 2, cur, line_state, acc);
                             }
-                            continue;
+                        } else {
+                            cur += 1;
                         }
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
                     }
-                    while cur < content_len {
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    content_len
+                    finish_block_comment(content, i + 2, content_len, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
                 }
             }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
-            TOK_APOSTROPHE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'\'');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
+            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
             _ => i + 1,
         }
     }

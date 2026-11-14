@@ -3206,6 +3206,109 @@ pub fn handle_html_comment<const N: usize>(
 }
 
 #[inline(always)]
+pub fn finish_spliced_line_comment<const N: usize>(
+    content: &[u8],
+    body_start: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    let mut i = body_start;
+    *line_state |= STATE_COMMENT;
+    loop {
+        if let Some(pos) = find_byte_avx2(&content[i..], b'\n') {
+            let nl_idx = i + pos;
+            let mut prev = nl_idx;
+            if prev > i && content[prev - 1] == b'\r' {
+                prev -= 1;
+            }
+            if prev > i && content[prev - 1] == b'\\' {
+                if (*line_state & STATE_CODE) != 0 {
+                    acc.code_lines += 1;
+                } else {
+                    acc.comment_lines += 1;
+                }
+                acc.lines_processed += 1;
+                *line_state = STATE_COMMENT;
+                i = nl_idx + 1;
+                continue;
+            }
+            if (*line_state & STATE_CODE) != 0 {
+                acc.code_lines += 1;
+            } else {
+                acc.comment_lines += 1;
+            }
+            acc.lines_processed += 1;
+            *line_state = STATE_NONE;
+            return nl_idx + 1;
+        } else {
+            return content_len;
+        }
+    }
+}
+
+#[inline(always)]
+pub fn handle_spliced_c_slash_comments<const N: usize>(
+    content: &[u8],
+    i: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    if i + 1 < content_len {
+        let next = content[i + 1];
+        if next == b'/' {
+            return finish_spliced_line_comment(content, i + 2, line_state, acc);
+        } else if next == b'*' {
+            return handle_c_block_comment(content, i + 2, line_state, acc);
+        }
+    }
+    *line_state |= STATE_CODE;
+    i + 1
+}
+
+#[inline(always)]
+pub fn handle_c_slash_comments<const N: usize>(
+    content: &[u8],
+    i: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    if i + 1 < content_len {
+        let next = content[i + 1];
+        if next == b'/' {
+            return finish_line_comment(content, i + 2, line_state, acc);
+        } else if next == b'*' {
+            return handle_c_block_comment(content, i + 2, line_state, acc);
+        }
+    }
+    *line_state |= STATE_CODE;
+    i + 1
+}
+
+#[inline(always)]
+pub fn handle_nested_c_slash_comments<const N: usize>(
+    content: &[u8],
+    i: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    if i + 1 < content_len {
+        let next = content[i + 1];
+        if next == b'/' {
+            return finish_line_comment(content, i + 2, line_state, acc);
+        } else if next == b'*' {
+            let end_i = skip_nested_block_comment(content, i + 2);
+            return finish_block_comment(content, i + 2, end_i, line_state, acc);
+        }
+    }
+    *line_state |= STATE_CODE;
+    i + 1
+}
+
+#[inline(always)]
 pub fn handle_quoted_literal<const N: usize>(
     content: &[u8],
     i: usize,
