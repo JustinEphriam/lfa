@@ -3400,6 +3400,176 @@ pub fn handle_nested_2byte_comment<const N: usize>(
     }
 }
 
+pub fn skip_lisp_datum(content: &[u8], start_i: usize) -> usize {
+    let content_len = content.len();
+    let mut p = start_i;
+    let mut crossed_nl = false;
+    loop {
+        while p < content_len
+            && (content[p] == b' ' || content[p] == b'\t' || content[p] == b'\r')
+        {
+            p += 1;
+        }
+        if p >= content_len {
+            return p;
+        }
+        if content[p] == b'\n' {
+            if crossed_nl {
+                return p;
+            }
+            let mut q = p + 1;
+            while q < content_len
+                && (content[q] == b' ' || content[q] == b'\t' || content[q] == b'\r')
+            {
+                q += 1;
+            }
+            if q < content_len && content[q] != b'\n' && content[q] != b';' {
+                crossed_nl = true;
+                p = q;
+            } else {
+                return p;
+            }
+        }
+        let b = content[p];
+        if b == b'\'' || b == b'`' {
+            p += 1;
+            continue;
+        }
+        if b == b',' {
+            if p + 1 < content_len && content[p + 1] == b'@' {
+                p += 2;
+            } else {
+                p += 1;
+            }
+            continue;
+        }
+        if b == b'#' && p + 1 < content_len {
+            let next = content[p + 1];
+            if next == b'\'' || next == b'`' || next == b';' {
+                p += 2;
+                continue;
+            }
+            if next == b',' {
+                if p + 2 < content_len && content[p + 2] == b'@' {
+                    p += 3;
+                } else {
+                    p += 2;
+                }
+                continue;
+            }
+            if next == b'|' {
+                p = skip_nested_2byte_comment(content, p + 2, b'#', b'|', b'|', b'#');
+                continue;
+            }
+            if next == b'(' || next == b'[' || next == b'{' || next == b'"' {
+                p += 1;
+            }
+        }
+        break;
+    }
+    if p >= content_len || content[p] == b'\n' || content[p] == b';' {
+        return p;
+    }
+    match content[p] {
+        b'(' | b'[' | b'{' => {
+            let mut depth = 1usize;
+            p += 1;
+            while p < content_len && depth > 0 {
+                match content[p] {
+                    b'(' | b'[' | b'{' => {
+                        depth += 1;
+                        p += 1;
+                    }
+                    b')' | b']' | b'}' => {
+                        depth -= 1;
+                        p += 1;
+                    }
+                    b'"' => {
+                        p = skip_literal(content, p + 1, b'"');
+                    }
+                    b';' => {
+                        if let Some(pos) = find_byte_avx2(&content[p + 1..], b'\n') {
+                            p += 1 + pos;
+                        } else {
+                            return content_len;
+                        }
+                    }
+                    b'#' if p + 1 < content_len && content[p + 1] == b'|' => {
+                        p = skip_nested_2byte_comment(content, p + 2, b'#', b'|', b'|', b'#');
+                    }
+                    b'#' if p + 2 < content_len
+                        && content[p + 1] == b'\\'
+                        && content[p + 2] != b'\n' =>
+                    {
+                        p += 3;
+                    }
+                    b'|' => {
+                        p += 1;
+                        while p < content_len && content[p] != b'|' {
+                            if content[p] == b'\\' && p + 1 < content_len {
+                                p += 2;
+                            } else {
+                                p += 1;
+                            }
+                        }
+                        if p < content_len {
+                            p += 1;
+                        }
+                    }
+                    _ => {
+                        p += 1;
+                    }
+                }
+            }
+            p
+        }
+        b'"' => skip_literal(content, p + 1, b'"'),
+        b'|' => {
+            p += 1;
+            while p < content_len && content[p] != b'|' {
+                if content[p] == b'\\' && p + 1 < content_len {
+                    p += 2;
+                } else {
+                    p += 1;
+                }
+            }
+            if p < content_len {
+                p += 1;
+            }
+            p
+        }
+        _ => {
+            if content[p] == b'#'
+                && p + 2 < content_len
+                && content[p + 1] == b'\\'
+                && content[p + 2] != b'\n'
+            {
+                p += 3;
+            }
+            while p < content_len {
+                let b = content[p];
+                if b == b' '
+                    || b == b'\t'
+                    || b == b'\r'
+                    || b == b'\n'
+                    || b == b';'
+                    || b == b'('
+                    || b == b')'
+                    || b == b'['
+                    || b == b']'
+                    || b == b'{'
+                    || b == b'}'
+                    || b == b'"'
+                {
+                    break;
+                }
+                p += 1;
+            }
+            p
+        }
+    }
+}
+
 #[inline(always)]
 pub fn skip_nested_plus_slash_comment(content: &[u8], start_i: usize) -> usize {
     skip_nested_2byte_comment(content, start_i, b'/', b'+', b'+', b'/')
@@ -4131,17 +4301,25 @@ mod tests {
             }
             if lang == LangId::Racket {
                 samples.push("a\n#;   ".to_string());
+                samples.push("#;(define (f x)\n  (if x 1 2))\n(let ([y 3]) y)".to_string());
+                samples.push("#;\n(define x 1)".to_string());
+            }
+            if lang == LangId::Scheme {
+                samples.push("#;(define (f x)\n  (if x 1 2))\n(let ([y 3]) y)".to_string());
+                samples.push("#;\n(define x 1)".to_string());
             }
             if lang == LangId::Perl {
                 samples.push("a\n=pod\nx\ny".to_string());
                 samples.push("a\n__END__\nx\ny".to_string());
                 samples.push("my $x\n  =shift;\n# c".to_string());
                 samples.push("my $__END__ = 1;\n# c".to_string());
+                samples.push("__END__ = 1\n# c".to_string());
                 samples.push("=pod\n=cut\nx".to_string());
             }
             if lang == LangId::Ruby {
                 samples.push("a\n=begin\nx\n=end".to_string());
                 samples.push("a\n__END__\nx\ny".to_string());
+                samples.push("__END__ = 1\n# c".to_string());
             }
             for s in &samples {
                 let without = line_metrics(lang, s.as_bytes());
@@ -4187,9 +4365,32 @@ mod tests {
         );
         assert_eq!(line_metrics(LangId::Nix, b"''\n#\n"), [2, 2, 0, 0]);
         assert_eq!(line_metrics(LangId::Racket, b"a\n#;   \n"), [2, 1, 1, 0]);
+        for lang in [LangId::Racket, LangId::Scheme] {
+            assert_eq!(
+                line_metrics(lang, b"#;(define (f x)\n  (if x 1 2))\n(let ([y 3]) y)\n"),
+                [3, 1, 2, 0],
+                "{}",
+                lang.name()
+            );
+            assert_eq!(
+                line_metrics(lang, b"#;\n(define x 1)\n"),
+                [2, 0, 2, 0],
+                "{}",
+                lang.name()
+            );
+            let mut kw_stats = LangStats::default();
+            parse_into(
+                lang,
+                b"#;(define (f x) (if x 1 2))\n(let ([y 3]) y)\n",
+                &mut kw_stats,
+            );
+            assert_eq!(kw_stats.total_keywords(lang), 1, "{}", lang.name());
+        }
         assert_eq!(line_metrics(LangId::Perl, b"my $x\n  =shift;\n# c\n"), [3, 2, 1, 0]);
         assert_eq!(line_metrics(LangId::Perl, b"my $__END__ = 1;\n# c\n"), [2, 1, 1, 0]);
+        assert_eq!(line_metrics(LangId::Perl, b"__END__ = 1;\n# c\n"), [2, 1, 1, 0]);
         assert_eq!(line_metrics(LangId::Ruby, b"puts __END__\n# c\n"), [2, 1, 1, 0]);
+        assert_eq!(line_metrics(LangId::Ruby, b"__END__ = 1\n# c\n"), [2, 1, 1, 0]);
     }
 
     #[test]
@@ -5151,7 +5352,7 @@ mod tests {
                 assert_keyword_sum_and_metrics(lang, &stats, slice);
             }
 
-            let polyglot_special = b"SELECT 'a\\\nb' FROM t;\nlet x = {a = 1} | {b = 2}\n{|ocaml\nraw|}\n''\nnix\n#''\n#;   \r\n=pod\npod line\n=cut\n=begin\nruby line\n=end\n__END__\ntrailing\n";
+            let polyglot_special = b"SELECT 'a\\\nb' FROM t;\nlet x = {a = 1} | {b = 2}\n{|ocaml\nraw|}\n''\nnix\n#''\n#;   \r\n#;(define (f x)\n  (if x 1 2))\n#;\n(let ([y 3]) y)\n__END__ = 1\n=pod\npod line\n=cut\n=begin\nruby line\n=end\n__END__\ntrailing\n";
             for offset in 1..=polyglot_special.len() {
                 let slice = &polyglot_special[..offset];
                 let mut stats = LangStats::default();

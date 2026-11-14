@@ -163,16 +163,24 @@ impl LangLexer<KEYWORD_COUNT> for RubyLexer {
         let content_len = content.len();
         let cand = &content[start..end];
         if (start == 0 || content[start - 1] == b'\n') && cand == b"__END__" {
-            if let Some(pos) = find_byte_avx2(&content[end..], b'\n') {
-                let nl_abs = end + pos;
+            let mut p = end;
+            while p < content_len
+                && (content[p] == b' ' || content[p] == b'\t' || content[p] == b'\r')
+            {
+                p += 1;
+            }
+            if p == content_len {
+                return content_len;
+            }
+            if content[p] == b'\n' {
                 acc.code_lines += 1;
                 acc.lines_processed += 1;
-                let rem_nls = count_newlines_avx2(&content[nl_abs + 1..]);
+                let rem_nls = count_newlines_avx2(&content[p + 1..]);
                 acc.comment_lines += rem_nls as i64;
                 acc.lines_processed += rem_nls as i64;
                 *line_state = STATE_COMMENT;
+                return content_len;
             }
-            return content_len;
         }
 
         let is_method_or_symbol = if start > 0 {
