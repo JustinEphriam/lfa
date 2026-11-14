@@ -1994,6 +1994,58 @@ mod tests {
         assert_eq!(detect_doc_format(b"settings.jsonc"), Some(DocFormatId::Json5));
         assert_eq!(detect_doc_format(b"unknown.xyz"), None);
 
+        let parse_doc = |doc: DocFormatId, bytes: &[u8]| -> DocStats {
+            let mut st = DocStats::default();
+            parse_doc_into(doc, bytes, &mut st);
+            st
+        };
+
+        let md_trailing = parse_doc(DocFormatId::Markdown, b"<!-- comment --> trailing\n");
+        assert_eq!(md_trailing.lines, 1);
+        assert_eq!(md_trailing.content_lines, 1);
+        assert_eq!(md_trailing.comment_lines, 0);
+        assert_eq!(
+            md_trailing.lines,
+            md_trailing.content_lines + md_trailing.comment_lines + md_trailing.blank_lines
+        );
+
+        let md_multi_trailing = parse_doc(DocFormatId::Markdown, b"<!--\ncomment --> trailing\n");
+        assert_eq!(md_multi_trailing.lines, 2);
+        assert_eq!(md_multi_trailing.comment_lines, 1);
+        assert_eq!(md_multi_trailing.content_lines, 1);
+        assert_eq!(
+            md_multi_trailing.lines,
+            md_multi_trailing.content_lines
+                + md_multi_trailing.comment_lines
+                + md_multi_trailing.blank_lines
+        );
+
+        let json5_trailing = parse_doc(DocFormatId::Json5, b"/* comment */ true\n");
+        assert_eq!(json5_trailing.lines, 1);
+        assert_eq!(json5_trailing.content_lines, 1);
+        assert_eq!(json5_trailing.comment_lines, 0);
+        assert_eq!(
+            json5_trailing.lines,
+            json5_trailing.content_lines
+                + json5_trailing.comment_lines
+                + json5_trailing.blank_lines
+        );
+
+        let json5_multi_trailing = parse_doc(DocFormatId::Json5, b"/*\ncomment */ true\n");
+        assert_eq!(json5_multi_trailing.lines, 2);
+        assert_eq!(json5_multi_trailing.comment_lines, 1);
+        assert_eq!(json5_multi_trailing.content_lines, 1);
+        assert_eq!(
+            json5_multi_trailing.lines,
+            json5_multi_trailing.content_lines
+                + json5_multi_trailing.comment_lines
+                + json5_multi_trailing.blank_lines
+        );
+
+        let rich_doc = "<!-- c -->\n<!-- c --> trailing\n<!--\nmulti\n--> tail\n// c\n/* c */\n/* c */ trailing\n/*\nmulti\n*/ tail\n# ini\n; ini2\n.. rst\n\nkey=val";
+        let rich_doc_nl = format!("{rich_doc}\n");
+        let rich_doc_crlf = rich_doc.replace('\n', "\r\n");
+        let rich_bytes = rich_doc.as_bytes();
         for doc in ALL_DOC_FORMATS {
             let mut st = DocStats::default();
             parse_doc_into(doc, b"", &mut st);
@@ -2011,6 +2063,22 @@ line 2
             assert_eq!(st_content.lines, 3);
             assert_eq!(st_content.blank_lines, 1);
             assert_eq!(st_content.lines, st_content.content_lines + st_content.comment_lines + st_content.blank_lines);
+
+            let base_st = parse_doc(doc, rich_bytes);
+            assert_eq!(base_st, parse_doc(doc, rich_doc_nl.as_bytes()), "{doc:?}");
+            assert_eq!(base_st, parse_doc(doc, rich_doc_crlf.as_bytes()), "{doc:?}");
+            for offset in 0..=rich_bytes.len() {
+                let slice = &rich_bytes[..offset];
+                let trunc_st = parse_doc(doc, slice);
+                let expected_lines = slice.iter().filter(|&&b| b == b'\n').count() as i64
+                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
+                assert_eq!(trunc_st.lines, expected_lines, "{doc:?} at offset {offset}");
+                assert_eq!(
+                    trunc_st.lines,
+                    trunc_st.content_lines + trunc_st.comment_lines + trunc_st.blank_lines,
+                    "{doc:?} at offset {offset}"
+                );
+            }
         }
 
         let mut md_st = DocStats::default();

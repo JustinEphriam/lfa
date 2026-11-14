@@ -3503,7 +3503,13 @@ pub fn finish_block_comment<const N: usize>(
         acc.lines_processed += nl as i64;
         *line_state = STATE_COMMENT;
     }
-    end_i
+    let mut next_i = end_i;
+    while next_i < content.len()
+        && (content[next_i] == b' ' || content[next_i] == b'\t' || content[next_i] == b'\r')
+    {
+        next_i += 1;
+    }
+    next_i
 }
 
 #[inline(always)]
@@ -4023,6 +4029,7 @@ mod tests {
                     | LangId::CommonLisp
                     | LangId::Fish
                     | LangId::Awk
+                    | LangId::Hare
                     | LangId::Html
                     | LangId::Xml
                     | LangId::Graphql
@@ -4042,8 +4049,10 @@ mod tests {
                     | LangId::Justfile
             ) {
                 samples.push("a\n/* x\ny */".to_string());
+                samples.push("a\n/* x\ny */   ".to_string());
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
+                assert_eq!(line_metrics(lang, b"a\n/* x\ny */   "), [3, 1, 2, 0], "{}", lang.name());
             }
             if lang == LangId::Scheme || lang == LangId::CommonLisp || lang == LangId::Racket {
                 samples.push("a\n#| x\ny |#".to_string());
@@ -4122,6 +4131,21 @@ mod tests {
                     without[0],
                     without[1] + without[2] + without[3],
                     "{} sample {:?}",
+                    lang.name(),
+                    s
+                );
+                let s_crlf = s.replace('\n', "\r\n");
+                assert_eq!(
+                    line_metrics(lang, s_crlf.as_bytes()),
+                    without,
+                    "{} crlf sample {:?}",
+                    lang.name(),
+                    s
+                );
+                assert_eq!(
+                    line_metrics(lang, format!("{s_crlf}\r\n").as_bytes()),
+                    without,
+                    "{} crlf+eol sample {:?}",
                     lang.name(),
                     s
                 );
@@ -4646,6 +4670,91 @@ mod tests {
         assert_eq!(detect_language(b"foo.vhdl", LANG_ALL_MASK), Some(LangId::Vhdl));
     }
 
+    fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
+        let lines = stats.lines(lang);
+        let code = stats.code_lines(lang);
+        let comm = stats.comment_lines(lang);
+        let blnk = stats.blank_lines(lang);
+        let expected_lines = count_newlines_avx2(slice) as i64
+            + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
+        assert_eq!(
+            lines,
+            code + comm + blnk,
+            "lang {:?} len {}: lines={lines}, code={code}, comm={comm}, blnk={blnk}",
+            lang,
+            slice.len()
+        );
+        assert_eq!(
+            lines,
+            expected_lines,
+            "lang {:?} len {}: lines={lines} != expected={expected_lines}",
+            lang,
+            slice.len()
+        );
+        let kw_sum: i64 = stats.keyword_counts(lang).iter().copied().sum();
+        assert_eq!(stats.total_keywords(lang), kw_sum, "lang {:?} kw sum", lang);
+    }
+
+    #[test]
+    fn test_avx2_scalar_parity_0_to_100() {
+        for total_len in 0..=100usize {
+            let empty_buf = vec![b'a'; total_len];
+            assert_eq!(
+                count_newlines_avx2(&empty_buf),
+                empty_buf.iter().filter(|&&b| b == b'\n').count()
+            );
+            assert_eq!(find_byte_avx2(&empty_buf, b'!'), None);
+            assert_eq!(find_star_slash(&empty_buf), None);
+            assert_eq!(skip_ident_cont_avx2(&empty_buf, 0), total_len);
+            assert_eq!(skip_js_ident_cont_avx2(&empty_buf, 0), total_len);
+
+            let mut alt_nl = vec![b'x'; total_len];
+            for idx in (0..total_len).step_by(3) {
+                alt_nl[idx] = b'\n';
+            }
+            assert_eq!(
+                count_newlines_avx2(&alt_nl),
+                alt_nl.iter().filter(|&&b| b == b'\n').count()
+            );
+
+            for pos in 0..total_len {
+                let mut byte_buf = vec![b'.'; total_len];
+                byte_buf[pos] = b'!';
+                assert_eq!(
+                    find_byte_avx2(&byte_buf, b'!'),
+                    byte_buf.iter().position(|&b| b == b'!')
+                );
+
+                let mut id_buf = vec![b'a'; total_len];
+                id_buf[pos] = b'-';
+                let scalar_id = id_buf
+                    .iter()
+                    .position(|&b| IDENT_CONT[b as usize] == 0)
+                    .unwrap_or(total_len);
+                assert_eq!(skip_ident_cont_avx2(&id_buf, 0), scalar_id);
+
+                id_buf[pos] = b'$';
+                let scalar_js_no_stop = id_buf
+                    .iter()
+                    .position(|&b| JS_IDENT_CONT[b as usize] == 0)
+                    .unwrap_or(total_len);
+                assert_eq!(skip_js_ident_cont_avx2(&id_buf, 0), scalar_js_no_stop);
+            }
+
+            if total_len >= 2 {
+                for pos in 0..total_len - 1 {
+                    let mut ss_buf = vec![b'.'; total_len];
+                    ss_buf[pos] = b'*';
+                    ss_buf[pos + 1] = b'/';
+                    assert_eq!(
+                        find_star_slash(&ss_buf),
+                        ss_buf.windows(2).position(|w| w == b"*/")
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn test_all_languages_compile_time_and_simd_invariants() {
         for b in 0..=255u8 {
@@ -4682,6 +4791,37 @@ mod tests {
             assert_eq!(min_len, actual_min);
             assert_eq!(max_len, actual_max);
 
+            for total_len in 0..=100usize {
+                let filler = vec![b' '; total_len];
+                let scalar_end = (0..total_len)
+                    .find(|&idx| token_kind[filler[idx] as usize] > TOK_CODE || filler[idx] == b'\n')
+                    .unwrap_or(total_len);
+                assert_eq!(
+                    skip_non_tokens_with_lut_avx2(&filler, 0, token_kind, token_lut_lo),
+                    scalar_end,
+                    "lang {:?} filler len {}",
+                    lang,
+                    total_len
+                );
+                if total_len > 0 {
+                    for hit in [0, total_len / 2, total_len - 1] {
+                        let mut buf = vec![b' '; total_len];
+                        buf[hit] = b'\n';
+                        let scalar_hit = (0..total_len)
+                            .find(|&idx| token_kind[buf[idx] as usize] > TOK_CODE || buf[idx] == b'\n')
+                            .unwrap_or(total_len);
+                        assert_eq!(
+                            skip_non_tokens_with_lut_avx2(&buf, 0, token_kind, token_lut_lo),
+                            scalar_hit,
+                            "lang {:?} len {} hit {}",
+                            lang,
+                            total_len,
+                            hit
+                        );
+                    }
+                }
+            }
+
             for b in 0..=255u8 {
                 for pos in [0, 1, 15, 16, 19, 31, 32, 33] {
                     let mut block = [b' '; 64];
@@ -4711,6 +4851,7 @@ mod tests {
 
                 let mut stats = LangStats::default();
                 parse_into(lang, &avx_src, &mut stats);
+                assert_keyword_sum_and_metrics(lang, &stats, &avx_src);
                 assert_eq!(stats.total_keywords(lang), 1, "lang {:?} kw {}", lang, kw);
                 assert_eq!(
                     stats.keyword_counts(lang)[i],
@@ -4729,6 +4870,7 @@ mod tests {
 
                 let mut stats2 = LangStats::default();
                 parse_into(lang, &prefixed, &mut stats2);
+                assert_keyword_sum_and_metrics(lang, &stats2, &prefixed);
                 assert_eq!(stats2.total_keywords(lang), 0, "lang {:?} kw {}", lang, kw);
             }
         }
@@ -4748,10 +4890,10 @@ mod tests {
             for ws in [b"   ".as_slice(), b"\t\t".as_slice(), b"\n".as_slice(), b"  \n  \n\t\n".as_slice(), b"\r\n\r\n".as_slice()] {
                 let mut ws_stats = LangStats::default();
                 parse_into(lang, ws, &mut ws_stats);
+                assert_keyword_sum_and_metrics(lang, &ws_stats, ws);
                 assert_eq!(ws_stats.code_lines(lang), 0, "lang {:?}", lang);
                 assert_eq!(ws_stats.comment_lines(lang), 0, "lang {:?}", lang);
                 assert_eq!(ws_stats.total_keywords(lang), 0, "lang {:?}", lang);
-                assert_eq!(ws_stats.lines(lang), ws_stats.blank_lines(lang), "lang {:?}", lang);
             }
 
             let cmt: &str = match lang {
@@ -4909,30 +5051,23 @@ mod tests {
             };
 
             let sample_bytes = sample.as_bytes();
+            let mut lf_stats = LangStats::default();
+            parse_into(lang, sample_bytes, &mut lf_stats);
+            let sample_crlf = sample.replace('\n', "\r\n");
+            let mut crlf_stats = LangStats::default();
+            parse_into(lang, sample_crlf.as_bytes(), &mut crlf_stats);
+            assert_eq!(lf_stats.lines(lang), crlf_stats.lines(lang), "crlf lines {:?}", lang);
+            assert_eq!(lf_stats.code_lines(lang), crlf_stats.code_lines(lang), "crlf code {:?}", lang);
+            assert_eq!(lf_stats.comment_lines(lang), crlf_stats.comment_lines(lang), "crlf comm {:?}", lang);
+            assert_eq!(lf_stats.blank_lines(lang), crlf_stats.blank_lines(lang), "crlf blnk {:?}", lang);
+            assert_eq!(lf_stats.total_keywords(lang), crlf_stats.total_keywords(lang), "crlf kw_total {:?}", lang);
+            assert_eq!(lf_stats.keyword_counts(lang), crlf_stats.keyword_counts(lang), "crlf kw_counts {:?}", lang);
+
             for offset in 0..=sample_bytes.len() {
                 let slice = &sample_bytes[..offset];
                 let mut stats = LangStats::default();
                 parse_into(lang, slice, &mut stats);
-                let lines = stats.lines(lang);
-                let code = stats.code_lines(lang);
-                let comm = stats.comment_lines(lang);
-                let blnk = stats.blank_lines(lang);
-                let expected_lines = count_newlines_avx2(slice) as i64
-                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
-                assert_eq!(
-                    lines,
-                    code + comm + blnk,
-                    "lang {:?} at offset {offset}/{}: lines={lines}, code={code}, comm={comm}, blnk={blnk}",
-                    lang,
-                    sample_bytes.len()
-                );
-                assert_eq!(
-                    lines,
-                    expected_lines,
-                    "lang {:?} at offset {offset}/{}: lines={lines} != expected={expected_lines}",
-                    lang,
-                    sample_bytes.len()
-                );
+                assert_keyword_sum_and_metrics(lang, &stats, slice);
             }
 
             let multiline_quotes = b"\"line1\nline2\"\n'line3\nline4'\n`line5\nline6`\n";
@@ -4940,24 +5075,7 @@ mod tests {
                 let slice = &multiline_quotes[..offset];
                 let mut stats = LangStats::default();
                 parse_into(lang, slice, &mut stats);
-                let lines = stats.lines(lang);
-                let code = stats.code_lines(lang);
-                let comm = stats.comment_lines(lang);
-                let blnk = stats.blank_lines(lang);
-                let expected_lines = count_newlines_avx2(slice) as i64
-                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
-                assert_eq!(
-                    lines,
-                    code + comm + blnk,
-                    "lang {:?} quote slice offset {offset}: sum mismatch",
-                    lang
-                );
-                assert_eq!(
-                    lines,
-                    expected_lines,
-                    "lang {:?} quote slice offset {offset}: lines={lines} != expected={expected_lines}",
-                    lang
-                );
+                assert_keyword_sum_and_metrics(lang, &stats, slice);
             }
 
             let nested_and_special = b"/* a /* b\nc */ d */\n{- a {- b\nc -} d -}\n(* a (* b\nc *) d *)\n#| a #| b\nc |# d |#\n/+ a /+ b\nc +/ d +/\n#[ a #[ b\nc ]# d ]#\n#= a #= b\nc =# d =#\n\"\"\"triple\nquote\"\"\"\n`tmpl ${a + `${b\nc}`} end`\n";
@@ -4965,24 +5083,7 @@ mod tests {
                 let slice = &nested_and_special[..offset];
                 let mut stats = LangStats::default();
                 parse_into(lang, slice, &mut stats);
-                let lines = stats.lines(lang);
-                let code = stats.code_lines(lang);
-                let comm = stats.comment_lines(lang);
-                let blnk = stats.blank_lines(lang);
-                let expected_lines = count_newlines_avx2(slice) as i64
-                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
-                assert_eq!(
-                    lines,
-                    code + comm + blnk,
-                    "lang {:?} nested slice offset {offset}: sum mismatch",
-                    lang
-                );
-                assert_eq!(
-                    lines,
-                    expected_lines,
-                    "lang {:?} nested slice offset {offset}: lines={lines} != expected={expected_lines}",
-                    lang
-                );
+                assert_keyword_sum_and_metrics(lang, &stats, slice);
             }
         }
     }

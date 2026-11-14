@@ -201,6 +201,36 @@ pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
     None
 }
 
+fn count_block_comment_doc_line(
+    trimmed: &[u8],
+    open: &[u8],
+    close: &[u8],
+    in_block: &mut bool,
+    stats: &mut DocStats,
+) {
+    let search_start = if *in_block {
+        0
+    } else if trimmed.starts_with(open) {
+        open.len()
+    } else {
+        stats.content_lines += 1;
+        return;
+    };
+    let tail = &trimmed[search_start..];
+    if let Some(close_pos) = tail.windows(close.len()).position(|w| w == close) {
+        let after = &tail[close_pos + close.len()..];
+        if after.iter().any(|&b| b != b' ' && b != b'\t') {
+            stats.content_lines += 1;
+        } else {
+            stats.comment_lines += 1;
+        }
+        *in_block = false;
+    } else {
+        stats.comment_lines += 1;
+        *in_block = true;
+    }
+}
+
 pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
     if content.is_empty() {
         return;
@@ -236,32 +266,7 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
 
         match doc {
             DocFormatId::Markdown | DocFormatId::Svg => {
-                if in_block {
-                    stats.comment_lines += 1;
-                    if let Some(close_pos) = trimmed.windows(3).position(|w| w == b"-->") {
-                        if close_pos + 3 < trimmed.len() {
-                            let after = &trimmed[close_pos + 3..];
-                            if after.iter().any(|&b| b != b' ' && b != b'\t') {
-                                stats.content_lines += 1;
-                            }
-                        }
-                        in_block = false;
-                    }
-                } else if trimmed.starts_with(b"<!--") {
-                    stats.comment_lines += 1;
-                    if let Some(close_pos) = trimmed.windows(3).position(|w| w == b"-->") {
-                        if close_pos + 3 < trimmed.len() {
-                            let after = &trimmed[close_pos + 3..];
-                            if after.iter().any(|&b| b != b' ' && b != b'\t') {
-                                stats.content_lines += 1;
-                            }
-                        }
-                    } else {
-                        in_block = true;
-                    }
-                } else {
-                    stats.content_lines += 1;
-                }
+                count_block_comment_doc_line(trimmed, b"<!--", b"-->", &mut in_block, stats);
             }
             DocFormatId::PlainText | DocFormatId::Csv => {
                 stats.content_lines += 1;
@@ -284,33 +289,10 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
                 stats.content_lines += 1;
             }
             DocFormatId::Json5 => {
-                if in_block {
+                if !in_block && trimmed.starts_with(b"//") {
                     stats.comment_lines += 1;
-                    if let Some(close_pos) = trimmed.windows(2).position(|w| w == b"*/") {
-                        if close_pos + 2 < trimmed.len() {
-                            let after = &trimmed[close_pos + 2..];
-                            if after.iter().any(|&b| b != b' ' && b != b'\t') {
-                                stats.content_lines += 1;
-                            }
-                        }
-                        in_block = false;
-                    }
-                } else if trimmed.starts_with(b"//") {
-                    stats.comment_lines += 1;
-                } else if trimmed.starts_with(b"/*") {
-                    stats.comment_lines += 1;
-                    if let Some(close_pos) = trimmed.windows(2).position(|w| w == b"*/") {
-                        if close_pos + 2 < trimmed.len() {
-                            let after = &trimmed[close_pos + 2..];
-                            if after.iter().any(|&b| b != b' ' && b != b'\t') {
-                                stats.content_lines += 1;
-                            }
-                        }
-                    } else {
-                        in_block = true;
-                    }
                 } else {
-                    stats.content_lines += 1;
+                    count_block_comment_doc_line(trimmed, b"/*", b"*/", &mut in_block, stats);
                 }
             }
         }
