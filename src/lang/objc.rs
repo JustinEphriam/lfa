@@ -130,18 +130,6 @@ impl LangLexer<KEYWORD_COUNT> for ObjectiveCLexer {
 }
 
 #[inline(always)]
-fn starts_with_objc_pp(trimmed: &[u8], directive: &[u8]) -> bool {
-    if !trimmed.starts_with(directive) {
-        return false;
-    }
-    if trimmed.len() == directive.len() {
-        return true;
-    }
-    let next = trimmed[directive.len()];
-    !(next.is_ascii_alphanumeric() || next == b'_')
-}
-
-#[inline(always)]
 fn contains_token_word(haystack: &[u8], token: &[u8]) -> bool {
     let mut i = 0;
     while i + token.len() <= haystack.len() {
@@ -158,9 +146,17 @@ fn contains_token_word(haystack: &[u8], token: &[u8]) -> bool {
     false
 }
 
+#[inline(always)]
+fn scan_ident(bytes: &[u8], start: usize) -> usize {
+    let mut end = start;
+    while end < bytes.len() && (bytes[end].is_ascii_alphanumeric() || bytes[end] == b'_') {
+        end += 1;
+    }
+    end
+}
+
 pub fn is_objc_file(content: &[u8]) -> bool {
-    let scan = &content[..content.len().min(4096)];
-    for raw_line in scan.split(|&b| b == b'\n') {
+    for raw_line in content.split(|&b| b == b'\n') {
         let mut line = raw_line;
         if line.ends_with(b"\r") {
             line = &line[..line.len() - 1];
@@ -173,28 +169,44 @@ pub fn is_objc_file(content: &[u8]) -> bool {
         if trimmed.is_empty() || trimmed[0] == b'%' {
             continue;
         }
-        if trimmed.starts_with(b"//")
+        if trimmed[0] == b'}'
+            || trimmed.starts_with(b"//")
             || trimmed.starts_with(b"/*")
             || trimmed.starts_with(b"- (")
             || trimmed.starts_with(b"+ (")
             || trimmed.starts_with(b"-(")
             || trimmed.starts_with(b"+(")
-            || starts_with_objc_pp(trimmed, b"#import")
-            || starts_with_objc_pp(trimmed, b"#include")
-            || starts_with_objc_pp(trimmed, b"#pragma")
-            || starts_with_objc_pp(trimmed, b"#ifdef")
-            || starts_with_objc_pp(trimmed, b"#ifndef")
-            || starts_with_objc_pp(trimmed, b"#define")
         {
             return true;
         }
-        if trimmed[0] == b'@' {
-            let mut end = 1;
-            while end < trimmed.len()
-                && (trimmed[end].is_ascii_alphabetic() || trimmed[end] == b'_')
-            {
-                end += 1;
+        if trimmed[0] == b'#' {
+            let mut p = 1;
+            while p < trimmed.len() && (trimmed[p] == b' ' || trimmed[p] == b'\t') {
+                p += 1;
             }
+            let end = scan_ident(trimmed, p);
+            if matches!(
+                &trimmed[p..end],
+                b"import"
+                    | b"include"
+                    | b"define"
+                    | b"undef"
+                    | b"ifdef"
+                    | b"ifndef"
+                    | b"if"
+                    | b"elif"
+                    | b"else"
+                    | b"endif"
+                    | b"pragma"
+                    | b"error"
+                    | b"warning"
+                    | b"line"
+            ) {
+                return true;
+            }
+        }
+        if trimmed[0] == b'@' {
+            let end = scan_ident(trimmed, 1);
             if matches!(
                 &trimmed[1..end],
                 b"interface"
@@ -230,6 +242,48 @@ pub fn is_objc_file(content: &[u8]) -> bool {
                     | b"false"
             ) {
                 return true;
+            }
+        }
+        if trimmed[0].is_ascii_alphabetic() || trimmed[0] == b'_' {
+            let end = scan_ident(trimmed, 0);
+            if end < trimmed.len()
+                && matches!(trimmed[end], b' ' | b'\t' | b'*')
+                && matches!(
+                    &trimmed[..end],
+                    b"void"
+                        | b"int"
+                        | b"typedef"
+                        | b"static"
+                        | b"extern"
+                        | b"struct"
+                        | b"union"
+                        | b"enum"
+                        | b"unsigned"
+                        | b"signed"
+                        | b"const"
+                        | b"volatile"
+                        | b"register"
+                        | b"auto"
+                        | b"goto"
+                        | b"bool"
+                        | b"BOOL"
+                        | b"id"
+                        | b"Class"
+                        | b"SEL"
+                        | b"IMP"
+                        | b"instancetype"
+                )
+            {
+                let mut q = end;
+                while q < trimmed.len() && (trimmed[q] == b' ' || trimmed[q] == b'\t') {
+                    q += 1;
+                }
+                if q < trimmed.len()
+                    && (trimmed[q].is_ascii_alphabetic()
+                        || matches!(trimmed[q], b'_' | b'*' | b'(' | b'{'))
+                {
+                    return true;
+                }
             }
         }
         if trimmed.windows(2).any(|w| w == b"@\"")
@@ -289,5 +343,15 @@ pub mod tests {
             b"% MATLAB comment\nfunction y = f(x)\n  y = x + 1;\nend\n"
         ));
         assert!(!is_objc_file(b"f = @(x) x.^2;\nA = [1, 2; 3, 4];\n"));
+        assert!(!is_objc_file(b"c = {1, 2};\nfunction y = f(x)\n  y = x;\nend\n"));
+
+        let mut padded = vec![b'\n'; 5100];
+        padded.extend_from_slice(b"@implementation Foo\n@end\n");
+        assert!(is_objc_file(&padded));
+
+        assert!(is_objc_file(b"int main(void) {\n    return 0;\n}\n"));
+        assert!(is_objc_file(b"static void helper(int x) {}\n"));
+        assert!(is_objc_file(b"typedef struct { int a; } Foo;\n"));
+        assert!(is_objc_file(b"#if DEBUG\n}\n#endif\n"));
     }
 }
