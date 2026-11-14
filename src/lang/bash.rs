@@ -1,7 +1,7 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
     handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add, make_token_kind,
-    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult,
+    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 21;
@@ -129,7 +129,10 @@ impl LangLexer<KEYWORD_COUNT> for BashLexer {
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
             TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

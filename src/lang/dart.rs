@@ -181,7 +181,10 @@ impl LangLexer<KEYWORD_COUNT> for DartLexer {
             }
             TOK_QUOTE => handle_triple_or_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => handle_triple_or_quoted_literal(content, i, b'\'', line_state, acc),
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

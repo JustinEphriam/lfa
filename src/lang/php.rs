@@ -2,7 +2,7 @@ use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
     handle_c_slash_comments, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
     make_token_kind, make_token_lut_lo, match_keyword_caseless_with, unified_parse_into, LangLexer,
-    ParseResult,
+    ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 69;
@@ -189,7 +189,10 @@ impl LangLexer<KEYWORD_COUNT> for PhpLexer {
             TOK_QUOTE | TOK_APOSTROPHE | TOK_BACKTICK => {
                 handle_quoted_literal(content, i, content[i], line_state, acc)
             }
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

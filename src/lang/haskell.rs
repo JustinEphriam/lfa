@@ -124,7 +124,10 @@ impl LangLexer<KEYWORD_COUNT> for HaskellLexer {
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => handle_char_or_lifetime(content, i, line_state),
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

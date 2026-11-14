@@ -1,4 +1,6 @@
 pub mod doc;
+#[cfg(test)]
+pub mod oracle;
 pub mod ada;
 pub mod assembly;
 pub mod awk;

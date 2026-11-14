@@ -232,7 +232,10 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }
