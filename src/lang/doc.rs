@@ -377,7 +377,11 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
             trimmed_start += 1;
         }
         if trimmed_start == line.len() {
-            stats.blank_lines += 1;
+            if in_block {
+                stats.comment_lines += 1;
+            } else {
+                stats.blank_lines += 1;
+            }
             continue;
         }
         let trimmed = &line[trimmed_start..];

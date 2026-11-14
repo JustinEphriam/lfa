@@ -129,6 +129,121 @@ impl LangLexer<KEYWORD_COUNT> for ObjectiveCLexer {
     }
 }
 
+#[inline(always)]
+fn starts_with_objc_pp(trimmed: &[u8], directive: &[u8]) -> bool {
+    if !trimmed.starts_with(directive) {
+        return false;
+    }
+    if trimmed.len() == directive.len() {
+        return true;
+    }
+    let next = trimmed[directive.len()];
+    !(next.is_ascii_alphanumeric() || next == b'_')
+}
+
+#[inline(always)]
+fn contains_token_word(haystack: &[u8], token: &[u8]) -> bool {
+    let mut i = 0;
+    while i + token.len() <= haystack.len() {
+        if &haystack[i..i + token.len()] == token {
+            let next_ok = i + token.len() == haystack.len()
+                || !(haystack[i + token.len()].is_ascii_alphanumeric()
+                    || haystack[i + token.len()] == b'_');
+            if next_ok {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    false
+}
+
+pub fn is_objc_file(content: &[u8]) -> bool {
+    let scan = &content[..content.len().min(4096)];
+    for raw_line in scan.split(|&b| b == b'\n') {
+        let mut line = raw_line;
+        if line.ends_with(b"\r") {
+            line = &line[..line.len() - 1];
+        }
+        let mut s = 0;
+        while s < line.len() && (line[s] == b' ' || line[s] == b'\t') {
+            s += 1;
+        }
+        let trimmed = &line[s..];
+        if trimmed.is_empty() || trimmed[0] == b'%' {
+            continue;
+        }
+        if trimmed.starts_with(b"//")
+            || trimmed.starts_with(b"/*")
+            || trimmed.starts_with(b"- (")
+            || trimmed.starts_with(b"+ (")
+            || trimmed.starts_with(b"-(")
+            || trimmed.starts_with(b"+(")
+            || starts_with_objc_pp(trimmed, b"#import")
+            || starts_with_objc_pp(trimmed, b"#include")
+            || starts_with_objc_pp(trimmed, b"#pragma")
+            || starts_with_objc_pp(trimmed, b"#ifdef")
+            || starts_with_objc_pp(trimmed, b"#ifndef")
+            || starts_with_objc_pp(trimmed, b"#define")
+        {
+            return true;
+        }
+        if trimmed[0] == b'@' {
+            let mut end = 1;
+            while end < trimmed.len()
+                && (trimmed[end].is_ascii_alphabetic() || trimmed[end] == b'_')
+            {
+                end += 1;
+            }
+            if matches!(
+                &trimmed[1..end],
+                b"interface"
+                    | b"implementation"
+                    | b"protocol"
+                    | b"end"
+                    | b"class"
+                    | b"property"
+                    | b"synthesize"
+                    | b"dynamic"
+                    | b"autoreleasepool"
+                    | b"synchronized"
+                    | b"try"
+                    | b"catch"
+                    | b"finally"
+                    | b"throw"
+                    | b"selector"
+                    | b"encode"
+                    | b"compatibility_alias"
+                    | b"defs"
+                    | b"optional"
+                    | b"required"
+                    | b"public"
+                    | b"package"
+                    | b"protected"
+                    | b"private"
+                    | b"return"
+                    | b"YES"
+                    | b"NO"
+                    | b"yes"
+                    | b"no"
+                    | b"true"
+                    | b"false"
+            ) {
+                return true;
+            }
+        }
+        if trimmed.windows(2).any(|w| w == b"@\"")
+            || trimmed.windows(10).any(|w| w == b"@selector(" || w == b"@protocol(")
+            || trimmed.windows(8).any(|w| w == b"@encode(")
+            || contains_token_word(trimmed, b"@YES")
+            || contains_token_word(trimmed, b"@NO")
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn parse_into(content: &[u8], res: &mut ParseResult<KEYWORD_COUNT>) {
     unified_parse_into::<KEYWORD_COUNT, ObjectiveCLexer>(content, res);
 }
@@ -160,5 +275,19 @@ pub mod tests {
         assert_eq!(res.comment_lines, 2);
         assert_eq!(res.blank_lines, 0);
         assert!(res.total_keywords >= 2);
+    }
+
+    #[test]
+    fn test_is_objc_file_disambiguation() {
+        assert!(is_objc_file(b"@class Foo;\n@return @YES;\n"));
+        assert!(is_objc_file(b"#import <Foundation/Foundation.h>\n"));
+        assert!(is_objc_file(b"@interface Foo : NSObject\n@end\n"));
+        assert!(is_objc_file(b"@implementation Foo\n- (void)bar {}\n@end\n"));
+        assert!(is_objc_file(b"// C comment in ObjC\nx = @\"hello\";\n"));
+
+        assert!(!is_objc_file(
+            b"% MATLAB comment\nfunction y = f(x)\n  y = x + 1;\nend\n"
+        ));
+        assert!(!is_objc_file(b"f = @(x) x.^2;\nA = [1, 2; 3, 4];\n"));
     }
 }

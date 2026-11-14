@@ -10,7 +10,7 @@ use lang::doc::{
 use lang::doc::DocStats;
 use lang::{
     detect_language, detect_shebang, parse_into, LangId, LangStats, ALL_LANGS, LANG_ALL_MASK,
-    LANG_COUNT,
+    LANG_COUNT, LANG_OBJECTIVEC_MASK,
 };
 use rustix::buffer::spare_capacity;
 use rustix::fd::{AsFd, OwnedFd};
@@ -382,6 +382,7 @@ fn process_single_path<Fd: AsFd>(
     dirfd: Fd,
     path: &CStr,
     target: FileTarget,
+    enabled_mask: u128,
     res: &mut WorkerResult,
     fb: &mut Vec<u8>,
 ) {
@@ -399,16 +400,24 @@ fn process_single_path<Fd: AsFd>(
             }
         }
     } else {
-        let lang = ALL_LANGS[target.lang_id() as usize];
-        let idx = lang as usize;
-        res.files_found[idx] += 1;
+        let mut lang = ALL_LANGS[target.lang_id() as usize];
         if read_file_into(dirfd, path, fb) {
+            if lang == LangId::Matlab
+                && (enabled_mask & LANG_OBJECTIVEC_MASK) != 0
+                && lang::objc::is_objc_file(fb)
+            {
+                lang = LangId::ObjectiveC;
+            }
+            let idx = lang as usize;
+            res.files_found[idx] += 1;
             res.files_processed[idx] += 1;
             parse_into(lang, fb, &mut res.lang_stats);
             if fb.capacity() > 524_288 {
                 fb.clear();
                 fb.shrink_to(131_072);
             }
+        } else {
+            res.files_found[lang as usize] += 1;
         }
     }
 }
@@ -439,12 +448,12 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                 if let Some(dirfd) = b.dirfd.take() {
                     for i in 0..b.count {
                         let name = b.get_rel_name_cstr(i);
-                        process_single_path(&dirfd, name, b.targets[i], &mut res, &mut fb);
+                        process_single_path(&dirfd, name, b.targets[i], enabled_mask, &mut res, &mut fb);
                     }
                 } else {
                     for i in 0..b.count {
                         let path = b.get_path_cstr(i);
-                        process_single_path(CWD, path, b.targets[i], &mut res, &mut fb);
+                        process_single_path(CWD, path, b.targets[i], enabled_mask, &mut res, &mut fb);
                     }
                 }
                 prev_finished_batch = Some(b);
@@ -546,7 +555,7 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                 let lb = local_batch.as_mut().unwrap();
                                 if !lb.append(dir_bytes, name, target, &mut too_long) {
                                     if too_long {
-                                        process_single_path(&fd, name_cstr, target, &mut res, &mut fb);
+                                        process_single_path(&fd, name_cstr, target, enabled_mask, &mut res, &mut fb);
                                     } else {
                                         if batch_started_empty && let Ok(dup_fd) = dup(&fd) {
                                             lb.dirfd = Some(dup_fd);
@@ -1745,7 +1754,7 @@ fn main() {
             }
         }
 
-        let Some(lang) = lang_opt else {
+        let Some(mut lang) = lang_opt else {
             eprintln!(
                 "Error: {} is not a supported source file",
                 target_os.to_string_lossy()
@@ -1753,12 +1762,20 @@ fn main() {
             process::exit(1);
         };
         num_workers = 1;
-        let idx = lang as usize;
-        totals.files_found[idx] = 1;
         let mut fb = Vec::with_capacity(131072);
         if read_file_into(CWD, target_cstr, &mut fb) {
+            if lang == LangId::Matlab
+                && (enabled_mask & LANG_OBJECTIVEC_MASK) != 0
+                && lang::objc::is_objc_file(&fb)
+            {
+                lang = LangId::ObjectiveC;
+            }
+            let idx = lang as usize;
+            totals.files_found[idx] = 1;
             totals.files_processed[idx] = 1;
             parse_into(lang, &fb, &mut totals.lang_stats);
+        } else {
+            totals.files_found[lang as usize] = 1;
         }
     }
 
@@ -2661,6 +2678,32 @@ key=val
         assert_eq!(res.lang_stats.lines(LangId::Bash), 3);
         assert_eq!(res.files_processed[LangId::Python as usize], 1);
         assert_eq!(res.lang_stats.lines(LangId::Python), 3);
+
+        let _ = fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_dot_m_disambiguation_in_scheduler() {
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let tmp_dir = format!("/tmp/lfa_m_disambig_{unique_id}");
+        fs::create_dir_all(&tmp_dir).unwrap();
+
+        let objc_path = format!("{tmp_dir}/cls.m");
+        let matlab_path = format!("{tmp_dir}/math.m");
+        fs::write(&objc_path, b"@class Foo;\n@return @YES;\n").unwrap();
+        fs::write(&matlab_path, b"function y = sq(x)\ny = x * x;\nend\n").unwrap();
+
+        let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, false);
+        let res = unified_worker_proc(&sched);
+
+        assert_eq!(res.files_processed[LangId::ObjectiveC as usize], 1);
+        assert_eq!(res.lang_stats.lines(LangId::ObjectiveC), 2);
+        assert_eq!(res.lang_stats.total_keywords(LangId::ObjectiveC), 3);
+        assert_eq!(res.files_processed[LangId::Matlab as usize], 1);
+        assert_eq!(res.lang_stats.lines(LangId::Matlab), 3);
 
         let _ = fs::remove_dir_all(&tmp_dir);
     }

@@ -5853,7 +5853,21 @@ mod tests {
             assert_eq!(ds.content_lines, 1);
             assert_eq!(ds.comment_lines, 2);
             assert_eq!(ds.blank_lines, 0);
+
+            let mut ds = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, b"<!--\n\n   \n-->\n", &mut ds);
+            assert_eq!(ds.lines, 4);
+            assert_eq!(ds.comment_lines, 4);
+            assert_eq!(ds.blank_lines, 0);
+            assert_eq!(ds.content_lines, 0);
         }
+
+        let mut ds = doc::DocStats::default();
+        doc::parse_doc_into(doc::DocFormatId::Json5, b"/*\n\n   \n*/\n", &mut ds);
+        assert_eq!(ds.lines, 4);
+        assert_eq!(ds.comment_lines, 4);
+        assert_eq!(ds.blank_lines, 0);
+        assert_eq!(ds.content_lines, 0);
 
         let mut ds = doc::DocStats::default();
         doc::parse_doc_into(doc::DocFormatId::Json5, b"/* a */ /* b */\n", &mut ds);
