@@ -1,8 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal,
-    skip_triple_literal, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
-    STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    finish_block_comment, finish_line_comment, kw_match_2_to_16, make_token_lut_lo, skip_literal,
+    skip_nested_block_comment, skip_triple_literal, unified_parse_into, LangLexer, ParseResult,
+    STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 52;
@@ -188,61 +188,10 @@ impl LangLexer<KEYWORD_COUNT> for ScalaLexer {
         match kind {
             TOK_SLASH => {
                 if i + 1 < content_len && content[i + 1] == b'/' {
-                    *line_state |= STATE_COMMENT;
-                    if let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') {
-                        if (*line_state & STATE_CODE) != 0 {
-                            acc.code_lines += 1;
-                        } else {
-                            acc.comment_lines += 1;
-                        }
-                        acc.lines_processed += 1;
-                        *line_state = 0;
-                        i + 2 + pos + 1
-                    } else {
-                        content_len
-                    }
+                    finish_line_comment(content, i + 2, line_state, acc)
                 } else if i + 1 < content_len && content[i + 1] == b'*' {
-                    *line_state |= STATE_COMMENT;
-                    let mut cur = i + 2;
-                    let mut depth = 1usize;
-                    while cur + 1 < content_len {
-                        if content[cur] == b'/' && content[cur + 1] == b'*' {
-                            depth += 1;
-                            cur += 2;
-                            continue;
-                        }
-                        if content[cur] == b'*' && content[cur + 1] == b'/' {
-                            depth -= 1;
-                            cur += 2;
-                            if depth == 0 {
-                                return cur;
-                            }
-                            continue;
-                        }
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    while cur < content_len {
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    content_len
+                    let end_i = skip_nested_block_comment(content, i + 2);
+                    finish_block_comment(content, i + 2, end_i, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1

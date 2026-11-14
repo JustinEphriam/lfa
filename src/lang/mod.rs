@@ -3118,6 +3118,135 @@ pub fn skip_triple_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
 }
 
 #[inline(always)]
+pub fn skip_html_comment(content: &[u8], start_i: usize) -> usize {
+    assert!(start_i <= content.len());
+    let content_len = content.len();
+    let mut i = start_i;
+    while i + 2 < content_len {
+        let Some(pos) = find_byte_avx2(&content[i + 2..], b'>') else {
+            return content_len;
+        };
+        let gt_idx = i + 2 + pos;
+        if content[gt_idx - 2] == b'-' && content[gt_idx - 1] == b'-' {
+            return gt_idx + 1;
+        }
+        i = gt_idx - 1;
+    }
+    content_len
+}
+
+#[inline(always)]
+pub fn finish_line_comment<const N: usize>(
+    content: &[u8],
+    body_start: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    *line_state |= STATE_COMMENT;
+    if let Some(pos) = find_byte_avx2(&content[body_start..], b'\n') {
+        if (*line_state & STATE_CODE) != 0 {
+            acc.code_lines += 1;
+        } else {
+            acc.comment_lines += 1;
+        }
+        acc.lines_processed += 1;
+        *line_state = STATE_NONE;
+        body_start + pos + 1
+    } else {
+        content.len()
+    }
+}
+
+#[inline(always)]
+pub fn finish_block_comment<const N: usize>(
+    content: &[u8],
+    body_start: usize,
+    end_i: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    *line_state |= STATE_COMMENT;
+    let nl = count_newlines_avx2(&content[body_start..end_i]);
+    if nl > 0 {
+        if (*line_state & STATE_CODE) != 0 {
+            acc.code_lines += 1;
+            acc.comment_lines += (nl - 1) as i64;
+        } else {
+            acc.comment_lines += nl as i64;
+        }
+        acc.lines_processed += nl as i64;
+        *line_state = STATE_COMMENT;
+    }
+    end_i
+}
+
+#[inline(always)]
+pub fn handle_c_block_comment<const N: usize>(
+    content: &[u8],
+    body_start: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let end_i = match find_star_slash(&content[body_start..]) {
+        Some(pos) => body_start + pos + 2,
+        None => content.len(),
+    };
+    finish_block_comment(content, body_start, end_i, line_state, acc)
+}
+
+#[inline(always)]
+pub fn handle_html_comment<const N: usize>(
+    content: &[u8],
+    body_start: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let end_i = skip_html_comment(content, body_start);
+    finish_block_comment(content, body_start, end_i, line_state, acc)
+}
+
+#[inline(always)]
+pub fn handle_quoted_literal<const N: usize>(
+    content: &[u8],
+    i: usize,
+    quote: u8,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    *line_state |= STATE_CODE;
+    let end_i = skip_literal(content, i + 1, quote);
+    let nl = count_newlines_avx2(&content[i + 1..end_i]);
+    if nl > 0 {
+        acc.code_lines += nl as i64;
+        acc.lines_processed += nl as i64;
+    }
+    end_i
+}
+
+#[inline(always)]
+pub fn handle_triple_or_quoted_literal<const N: usize>(
+    content: &[u8],
+    i: usize,
+    quote: u8,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    *line_state |= STATE_CODE;
+    let content_len = content.len();
+    let end_i = if i + 2 < content_len && content[i + 1] == quote && content[i + 2] == quote {
+        skip_triple_literal(content, i + 3, quote)
+    } else {
+        skip_literal(content, i + 1, quote)
+    };
+    let nl = count_newlines_avx2(&content[i + 1..end_i]);
+    if nl > 0 {
+        acc.code_lines += nl as i64;
+        acc.lines_processed += nl as i64;
+    }
+    end_i
+}
+
+#[inline(always)]
 pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
     match lang {
         LangId::C => c::parse_into(content, &mut stats.c),
@@ -3617,6 +3746,11 @@ mod tests {
             s[offset + 10] = b'"';
             assert_eq!(skip_literal(&s, 0, b'"'), offset + 11);
         }
+
+        assert_eq!(skip_html_comment(b"-->rest", 0), 3);
+        assert_eq!(skip_html_comment(b"-> not end -->rest", 0), 14);
+        assert_eq!(skip_html_comment(b"--->rest", 0), 4);
+        assert_eq!(skip_html_comment(b"unclosed --", 0), 11);
     }
 
     #[test]

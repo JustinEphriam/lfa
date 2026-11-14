@@ -1,8 +1,8 @@
 use super::{
-    find_byte_avx2, find_star_slash, count_newlines_avx2,
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len,
-    kw_match_2_to_16, make_token_lut_lo, skip_literal, unified_parse_into,
-    LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
+    handle_c_block_comment, handle_html_comment, handle_quoted_literal, kw_match_2_to_16,
+    make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE, TOK_CODE, TOK_NL,
+    TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 12;
@@ -139,52 +139,9 @@ impl LangLexer<KEYWORD_COUNT> for SvelteLexer {
                 if i + 1 < content_len {
                     let next = content[i + 1];
                     if next == b'/' {
-                        *line_state |= STATE_COMMENT;
-                        if let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = 0;
-                            return i + 2 + pos + 1;
-                        }
-                        return content_len;
+                        return finish_line_comment(content, i + 2, line_state, acc);
                     } else if next == b'*' {
-                        *line_state |= STATE_COMMENT;
-                        if let Some(pos) = find_star_slash(&content[i + 2..]) {
-                            let star_slash_pos = i + 2 + pos;
-                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..star_slash_pos], b'\n') {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let inter_nls = count_newlines_avx2(&content[first_nl_abs + 1..star_slash_pos]);
-                                acc.comment_lines += inter_nls as i64;
-                                acc.lines_processed += inter_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return star_slash_pos + 2;
-                        } else {
-                            if let Some(first_nl) = find_byte_avx2(&content[i + 2..], b'\n') {
-                                if (*line_state & STATE_CODE) != 0 {
-                                    acc.code_lines += 1;
-                                } else {
-                                    acc.comment_lines += 1;
-                                }
-                                acc.lines_processed += 1;
-                                let first_nl_abs = i + 2 + first_nl;
-                                let rem_nls = count_newlines_avx2(&content[first_nl_abs + 1..]);
-                                acc.comment_lines += rem_nls as i64;
-                                acc.lines_processed += rem_nls as i64;
-                                *line_state = STATE_COMMENT;
-                            }
-                            return content_len;
-                        }
+                        return handle_c_block_comment(content, i + 2, line_state, acc);
                     }
                 }
                 *line_state |= STATE_CODE;
@@ -196,62 +153,14 @@ impl LangLexer<KEYWORD_COUNT> for SvelteLexer {
                     && content[i + 2] == b'-'
                     && content[i + 3] == b'-'
                 {
-                    *line_state |= STATE_COMMENT;
-                    let mut cur = i + 4;
-                    while cur < content_len {
-                        if cur + 2 < content_len
-                            && content[cur] == b'-'
-                            && content[cur + 1] == b'-'
-                            && content[cur + 2] == b'>'
-                        {
-                            return cur + 3;
-                        }
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    return content_len;
+                    return handle_html_comment(content, i + 4, line_state, acc);
                 }
                 *line_state |= STATE_CODE;
                 i + 1
             }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
-            TOK_APOSTROPHE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'\'');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
-            TOK_BACKTICK => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'`');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
+            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
+            TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

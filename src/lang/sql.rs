@@ -1,7 +1,7 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, make_token_lut_lo, skip_literal, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
+    handle_c_block_comment, handle_quoted_literal, make_token_lut_lo, unified_parse_into,
+    LangLexer, ParseResult, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 100;
@@ -270,19 +270,7 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
         match kind {
             TOK_MINUS => {
                 if i + 1 < content_len && content[i + 1] == b'-' {
-                    *line_state |= STATE_COMMENT;
-                    if let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') {
-                        if (*line_state & STATE_CODE) != 0 {
-                            acc.code_lines += 1;
-                        } else {
-                            acc.comment_lines += 1;
-                        }
-                        acc.lines_processed += 1;
-                        *line_state = 0;
-                        i + 2 + pos + 1
-                    } else {
-                        content_len
-                    }
+                    finish_line_comment(content, i + 2, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
@@ -290,56 +278,13 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
             }
             TOK_SLASH => {
                 if i + 1 < content_len && content[i + 1] == b'*' {
-                    *line_state |= STATE_COMMENT;
-                    let mut cur = i + 2;
-                    while cur + 1 < content_len {
-                        if content[cur] == b'*' && content[cur + 1] == b'/' {
-                            return cur + 2;
-                        }
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    while cur < content_len {
-                        if content[cur] == b'\n' {
-                            if (*line_state & STATE_CODE) != 0 {
-                                acc.code_lines += 1;
-                            } else {
-                                acc.comment_lines += 1;
-                            }
-                            acc.lines_processed += 1;
-                            *line_state = STATE_COMMENT;
-                        }
-                        cur += 1;
-                    }
-                    content_len
+                    handle_c_block_comment(content, i + 2, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
                     i + 1
                 }
             }
-            TOK_HASH => {
-                *line_state |= STATE_COMMENT;
-                if let Some(pos) = find_byte_avx2(&content[i + 1..], b'\n') {
-                    if (*line_state & STATE_CODE) != 0 {
-                        acc.code_lines += 1;
-                    } else {
-                        acc.comment_lines += 1;
-                    }
-                    acc.lines_processed += 1;
-                    *line_state = 0;
-                    i + 1 + pos + 1
-                } else {
-                    content_len
-                }
-            }
+            TOK_HASH => finish_line_comment(content, i + 1, line_state, acc),
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
                 let mut cur = i + 1;
@@ -363,26 +308,8 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
                 }
                 content_len
             }
-            TOK_QUOTE => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
-            TOK_BACKTICK => {
-                *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'`');
-                let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                if nl > 0 {
-                    acc.code_lines += nl as i64;
-                    acc.lines_processed += nl as i64;
-                }
-                end_i
-            }
+            TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
+            TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),
             _ => i + 1,
         }
     }
