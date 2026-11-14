@@ -1,12 +1,11 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_quoted_literal, kw_match_2_to_16, make_token_kind, make_token_lut_lo,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    handle_quoted_literal, kw_hash_fl_add, make_kw_table_fl_add, make_token_kind,
+    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 4;
 const KW_SLOT_MASK: usize = 7;
-const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "false",
@@ -19,34 +18,12 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAME
 pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
 pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 
-const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
-const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
-const _: () = assert!(KW_MIN_LEN >= 2 && KW_MAX_LEN <= 16);
-
 #[inline(always)]
 const fn kw_hash(first: u8, last: u8, len: usize) -> usize {
-    let val = (first as usize)
-        .wrapping_mul(914)
-        .wrapping_add((last as usize).wrapping_mul(559))
-        .wrapping_add(len.wrapping_mul(90));
-    val & KW_SLOT_MASK
+    kw_hash_fl_add(first, last, len, [914, 559, 90], 0, KW_SLOT_MASK)
 }
 
-const KW_TABLE: [u8; 8] = {
-    let mut table = [KW_EMPTY; 8];
-    let mut i = 0;
-    while i < KEYWORD_COUNT {
-        let name = KEYWORD_NAMES[i].as_bytes();
-        let len = KEYWORD_LENS[i] as usize;
-        assert!(name.len() == len);
-        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
-        let h = kw_hash(name[0], name[len - 1], len);
-        assert!(table[h] == KW_EMPTY);
-        table[h] = i as u8;
-        i += 1;
-    }
-    table
-};
+const KW_TABLE: [u8; 8] = make_kw_table_fl_add(&KEYWORD_NAMES, [914, 559, 90], 0);
 
 const TOK_IDENT: u8 = 3;
 const TOK_HASH: u8 = 4;
@@ -64,11 +41,6 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-const fn len_matches(n: usize, idx: usize) -> bool {
-    n == KEYWORD_LENS[idx] as usize
-}
-
 pub struct TomlLexer;
 
 impl LangLexer<KEYWORD_COUNT> for TomlLexer {
@@ -79,20 +51,15 @@ impl LangLexer<KEYWORD_COUNT> for TomlLexer {
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
-        let n = cand.len();
-        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-            let h = kw_hash(cand[0], cand[n - 1], n);
-            let slot = KW_TABLE[h];
-            if slot != KW_EMPTY {
-                let idx = slot as usize;
-                if len_matches(n, idx)
-                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
-                {
-                    return Some(idx);
-                }
-            }
-        }
-        None
+        match_keyword_with(
+            cand,
+            KW_MIN_LEN,
+            KW_MAX_LEN,
+            &KW_TABLE,
+            &KEYWORD_LENS,
+            &KEYWORD_NAMES,
+            |c| kw_hash(c[0], c[c.len() - 1], c.len()),
+        )
     }
 
     #[inline(always)]

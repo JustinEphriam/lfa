@@ -1,12 +1,12 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_c_block_comment, handle_html_comment, handle_quoted_literal, kw_match_2_to_16,
-    make_token_kind, make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    handle_c_block_comment, handle_html_comment, handle_quoted_literal, make_token_kind,
+    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult, KW_EMPTY,
+    STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 34;
 const KW_SLOT_MASK: usize = 63;
-const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "component",
@@ -49,10 +49,6 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAME
 pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
 pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 
-const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
-const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
-const _: () = assert!(KW_MIN_LEN >= 2 && KW_MAX_LEN <= 16);
-
 const TOK_IDENT: u8 = 3;
 const TOK_SLASH: u8 = 4;
 const TOK_LT: u8 = 5;
@@ -82,8 +78,6 @@ const KW_TABLE: [u8; 64] = {
     while i < KEYWORD_COUNT {
         let name = KEYWORD_NAMES[i].as_bytes();
         let len = KEYWORD_LENS[i] as usize;
-        assert!(name.len() == len);
-        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
         let h = kw_hash(name, len);
         assert!(table[h] == KW_EMPTY);
         table[h] = i as u8;
@@ -105,11 +99,6 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-const fn len_matches(n: usize, idx: usize) -> bool {
-    n == KEYWORD_LENS[idx] as usize
-}
-
 pub struct VueLexer;
 
 impl LangLexer<KEYWORD_COUNT> for VueLexer {
@@ -120,18 +109,15 @@ impl LangLexer<KEYWORD_COUNT> for VueLexer {
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
-        let n = cand.len();
-        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-            let h = kw_hash(cand, n);
-            let slot = KW_TABLE[h];
-            if slot != KW_EMPTY {
-                let idx = slot as usize;
-                if len_matches(n, idx) && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes()) {
-                    return Some(idx);
-                }
-            }
-        }
-        None
+        match_keyword_with(
+            cand,
+            KW_MIN_LEN,
+            KW_MAX_LEN,
+            &KW_TABLE,
+            &KEYWORD_LENS,
+            &KEYWORD_NAMES,
+            |c| kw_hash(c, c.len()),
+        )
     }
 
     #[inline(always)]

@@ -2764,6 +2764,224 @@ pub const fn compute_kw_max_len<const N: usize>(names: &[&str; N]) -> usize {
     max
 }
 
+pub const KW_EMPTY: u8 = 255;
+
+#[inline(always)]
+pub const fn kw_hash_fml_add(
+    first: u8,
+    mid: u8,
+    last: u8,
+    len: usize,
+    coeffs: [usize; 4],
+    shift: u32,
+    mask: usize,
+) -> usize {
+    let val = (first as usize)
+        .wrapping_mul(coeffs[0])
+        .wrapping_add((mid as usize).wrapping_mul(coeffs[1]))
+        .wrapping_add((last as usize).wrapping_mul(coeffs[2]))
+        .wrapping_add(len.wrapping_mul(coeffs[3]));
+    if shift == 0 {
+        val & mask
+    } else {
+        (val ^ (val >> shift)) & mask
+    }
+}
+
+pub const fn make_kw_table_fml_add<const N: usize, const M: usize>(
+    names: &[&str; N],
+    coeffs: [usize; 4],
+    shift: u32,
+) -> [u8; M] {
+    assert!(N > 0 && N < 255);
+    assert!(M.is_power_of_two());
+    let mask = M - 1;
+    let mut table = [KW_EMPTY; M];
+    let mut i = 0;
+    while i < N {
+        let name = names[i].as_bytes();
+        let len = name.len();
+        assert!(len >= 2 && len <= 16);
+        let h = kw_hash_fml_add(name[0], name[len / 2], name[len - 1], len, coeffs, shift, mask);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+}
+
+#[inline(always)]
+pub const fn kw_hash_fml_xor(
+    first: u8,
+    mid: u8,
+    last: u8,
+    len: usize,
+    coeffs: [usize; 4],
+    shift: u32,
+    mask: usize,
+) -> usize {
+    let val = (first as usize).wrapping_mul(coeffs[0])
+        ^ (mid as usize).wrapping_mul(coeffs[1])
+        ^ (last as usize).wrapping_mul(coeffs[2])
+        ^ len.wrapping_mul(coeffs[3]);
+    if shift == 0 {
+        val & mask
+    } else {
+        (val ^ (val >> shift)) & mask
+    }
+}
+
+pub const fn make_kw_table_fml_xor<const N: usize, const M: usize>(
+    names: &[&str; N],
+    coeffs: [usize; 4],
+    shift: u32,
+) -> [u8; M] {
+    assert!(N > 0 && N < 255);
+    assert!(M.is_power_of_two());
+    let mask = M - 1;
+    let mut table = [KW_EMPTY; M];
+    let mut i = 0;
+    while i < N {
+        let name = names[i].as_bytes();
+        let len = name.len();
+        assert!(len >= 2 && len <= 16);
+        let h = kw_hash_fml_xor(name[0], name[len / 2], name[len - 1], len, coeffs, shift, mask);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+}
+
+#[inline(always)]
+pub const fn kw_hash_fl_add(
+    first: u8,
+    last: u8,
+    len: usize,
+    coeffs: [usize; 3],
+    shift: u32,
+    mask: usize,
+) -> usize {
+    let val = (first as usize)
+        .wrapping_mul(coeffs[0])
+        .wrapping_add((last as usize).wrapping_mul(coeffs[1]))
+        .wrapping_add(len.wrapping_mul(coeffs[2]));
+    if shift == 0 {
+        val & mask
+    } else {
+        (val ^ (val >> shift)) & mask
+    }
+}
+
+pub const fn make_kw_table_fl_add<const N: usize, const M: usize>(
+    names: &[&str; N],
+    coeffs: [usize; 3],
+    shift: u32,
+) -> [u8; M] {
+    assert!(N > 0 && N < 255);
+    assert!(M.is_power_of_two());
+    let mask = M - 1;
+    let mut table = [KW_EMPTY; M];
+    let mut i = 0;
+    while i < N {
+        let name = names[i].as_bytes();
+        let len = name.len();
+        assert!(len >= 2 && len <= 16);
+        let h = kw_hash_fl_add(name[0], name[len - 1], len, coeffs, shift, mask);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+}
+
+#[inline(always)]
+pub const fn kw_hash_fsl_add(
+    first: u8,
+    second: u8,
+    last: u8,
+    len: usize,
+    coeffs: [usize; 4],
+    shift: u32,
+    mask: usize,
+) -> usize {
+    let val = (first as usize)
+        .wrapping_mul(coeffs[0])
+        .wrapping_add((second as usize).wrapping_mul(coeffs[1]))
+        .wrapping_add((last as usize).wrapping_mul(coeffs[2]))
+        .wrapping_add(len.wrapping_mul(coeffs[3]));
+    if shift == 0 {
+        val & mask
+    } else {
+        (val ^ (val >> shift)) & mask
+    }
+}
+
+pub const fn make_kw_table_fsl_add<const N: usize, const M: usize>(
+    names: &[&str; N],
+    coeffs: [usize; 4],
+    shift: u32,
+) -> [u8; M] {
+    assert!(N > 0 && N < 255);
+    assert!(M.is_power_of_two());
+    let mask = M - 1;
+    let mut table = [KW_EMPTY; M];
+    let mut i = 0;
+    while i < N {
+        let name = names[i].as_bytes();
+        let len = name.len();
+        assert!(len >= 2 && len <= 16);
+        let h = kw_hash_fsl_add(name[0], name[1], name[len - 1], len, coeffs, shift, mask);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+}
+
+#[inline(always)]
+pub const fn kw_hash_b01ml_add(
+    cand: &[u8],
+    coeffs: [usize; 5],
+    shift: u32,
+    mask: usize,
+) -> usize {
+    let len = cand.len();
+    let val = (cand[0] as usize)
+        .wrapping_mul(coeffs[0])
+        .wrapping_add((cand[1] as usize).wrapping_mul(coeffs[1]))
+        .wrapping_add((cand[len / 2] as usize).wrapping_mul(coeffs[2]))
+        .wrapping_add((cand[len - 1] as usize).wrapping_mul(coeffs[3]))
+        .wrapping_add(len.wrapping_mul(coeffs[4]));
+    if shift == 0 {
+        val & mask
+    } else {
+        (val ^ (val >> shift)) & mask
+    }
+}
+
+pub const fn make_kw_table_b01ml_add<const N: usize, const M: usize>(
+    names: &[&str; N],
+    coeffs: [usize; 5],
+    shift: u32,
+) -> [u8; M] {
+    assert!(N > 0 && N < 255);
+    assert!(M.is_power_of_two());
+    let mask = M - 1;
+    let mut table = [KW_EMPTY; M];
+    let mut i = 0;
+    while i < N {
+        let name = names[i].as_bytes();
+        let len = name.len();
+        assert!(len >= 2 && len <= 16);
+        let h = kw_hash_b01ml_add(name, coeffs, shift, mask);
+        assert!(table[h] == KW_EMPTY);
+        table[h] = i as u8;
+        i += 1;
+    }
+    table
+}
+
 pub const AVX2_ASCII_LUT_HI: [i8; 32] = [
     1, 2, 4, 8, 16, 32, 64, -128, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 4, 8, 16, 32, 64, -128, 0, 0, 0,
     0, 0, 0, 0, 0,
@@ -2995,6 +3213,86 @@ pub fn kw_match_2_to_16(cand: &[u8], kw: &[u8]) -> bool {
         let b1 = u16::from_ne_bytes(kw[..2].try_into().unwrap());
         a1 == b1 && cand[n - 1] == kw[n - 1]
     }
+}
+
+#[inline(always)]
+pub fn verify_keyword_slot<const N: usize>(
+    cand: &[u8],
+    slot: usize,
+    kw_min_len: usize,
+    kw_max_len: usize,
+    lens: &[u8; N],
+    names: &[&str; N],
+) -> Option<usize> {
+    let n = cand.len();
+    if slot < N
+        && n.wrapping_sub(kw_min_len) <= kw_max_len - kw_min_len
+        && lens[slot] as usize == n
+        && kw_match_2_to_16(cand, names[slot].as_bytes())
+    {
+        Some(slot)
+    } else {
+        None
+    }
+}
+
+#[inline(always)]
+pub fn verify_keyword_slot_caseless<const N: usize>(
+    cand: &[u8],
+    slot: usize,
+    kw_min_len: usize,
+    kw_max_len: usize,
+    lens: &[u8; N],
+    names: &[&str; N],
+) -> Option<usize> {
+    let n = cand.len();
+    if slot < N
+        && n.wrapping_sub(kw_min_len) <= kw_max_len - kw_min_len
+        && lens[slot] as usize == n
+        && cand.eq_ignore_ascii_case(names[slot].as_bytes())
+    {
+        Some(slot)
+    } else {
+        None
+    }
+}
+
+#[inline(always)]
+pub fn match_keyword_with<const N: usize, const M: usize, F: FnOnce(&[u8]) -> usize>(
+    cand: &[u8],
+    kw_min_len: usize,
+    kw_max_len: usize,
+    table: &[u8; M],
+    lens: &[u8; N],
+    names: &[&str; N],
+    hash: F,
+) -> Option<usize> {
+    let n = cand.len();
+    if n.wrapping_sub(kw_min_len) <= kw_max_len - kw_min_len {
+        debug_assert!(M.is_power_of_two());
+        let slot = table[hash(cand) & (M - 1)] as usize;
+        return verify_keyword_slot(cand, slot, kw_min_len, kw_max_len, lens, names);
+    }
+    None
+}
+
+#[inline(always)]
+pub fn match_keyword_caseless_with<const N: usize, const M: usize, F: FnOnce(&[u8]) -> usize>(
+    cand: &[u8],
+    kw_min_len: usize,
+    kw_max_len: usize,
+    table: &[u8; M],
+    lens: &[u8; N],
+    names: &[&str; N],
+    hash: F,
+) -> Option<usize> {
+    let n = cand.len();
+    if n.wrapping_sub(kw_min_len) <= kw_max_len - kw_min_len {
+        debug_assert!(M.is_power_of_two());
+        let slot = table[hash(cand) & (M - 1)] as usize;
+        return verify_keyword_slot_caseless(cand, slot, kw_min_len, kw_max_len, lens, names);
+    }
+    None
 }
 
 #[inline(always)]

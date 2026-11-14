@@ -1,12 +1,11 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_quoted_literal, kw_match_2_to_16, make_token_kind, make_token_lut_lo,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    handle_quoted_literal, make_token_kind, make_token_lut_lo, match_keyword_with,
+    unified_parse_into, LangLexer, ParseResult, KW_EMPTY, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 29;
 const KW_SLOT_MASK: usize = 63;
-const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "and", "argparse", "begin", "break", "builtin", "case", "command",
@@ -18,10 +17,6 @@ pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
 pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAMES);
 pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
 pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
-
-const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
-const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
-const _: () = assert!(KW_MIN_LEN >= 2 && KW_MAX_LEN <= 16);
 
 #[inline(always)]
 const fn kw_hash(first: u8, second: u8, last: u8, len: usize) -> usize {
@@ -64,11 +59,6 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-const fn len_matches(n: usize, idx: usize) -> bool {
-    n == KEYWORD_LENS[idx] as usize
-}
-
 pub struct FishLexer;
 
 impl LangLexer<KEYWORD_COUNT> for FishLexer {
@@ -79,19 +69,15 @@ impl LangLexer<KEYWORD_COUNT> for FishLexer {
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
-        let n = cand.len();
-        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-            let second = if n > 1 { cand[1] } else { cand[0] };
-            let h = kw_hash(cand[0], second, cand[n - 1], n);
-            let slot = KW_TABLE[h];
-            if slot != KW_EMPTY {
-                let idx = slot as usize;
-                if len_matches(n, idx) && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes()) {
-                    return Some(idx);
-                }
-            }
-        }
-        None
+        match_keyword_with(
+            cand,
+            KW_MIN_LEN,
+            KW_MAX_LEN,
+            &KW_TABLE,
+            &KEYWORD_LENS,
+            &KEYWORD_NAMES,
+            |c| kw_hash(c[0], c[1], c[c.len() - 1], c.len()),
+        )
     }
 
     #[inline(always)]

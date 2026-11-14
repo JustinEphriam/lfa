@@ -1,7 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, finish_line_comment, handle_quoted_literal, kw_match_2_to_16, make_token_kind,
-    make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT,
+    find_byte_avx2, finish_line_comment, handle_quoted_literal, kw_hash_fsl_add,
+    make_kw_table_fsl_add, make_token_kind, make_token_lut_lo, match_keyword_with,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT,
 };
 
 #[cfg(test)]
@@ -9,7 +10,6 @@ use super::TOK_CODE;
 
 pub const KEYWORD_COUNT: usize = 73;
 const KW_SLOT_MASK: usize = 255;
-const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "if",
@@ -91,41 +91,26 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAME
 pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
 pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 
-const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
-const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
-
 const TOK_IDENT: u8 = 3;
 const TOK_HASH: u8 = 4;
 const TOK_QUOTE: u8 = 5;
 const TOK_APOSTROPHE: u8 = 6;
 const TOK_BACKTICK: u8 = 7;
 
-
 #[inline(always)]
 const fn kw_hash(first: u8, second: u8, last: u8, len: usize) -> usize {
-    let v = (first as usize)
-        .wrapping_mul(873)
-        .wrapping_add((second as usize).wrapping_mul(3146))
-        .wrapping_add((last as usize).wrapping_mul(2425))
-        .wrapping_add(len.wrapping_mul(3063));
-    (v ^ (v >> 4)) & KW_SLOT_MASK
+    kw_hash_fsl_add(
+        first,
+        second,
+        last,
+        len,
+        [873, 3146, 2425, 3063],
+        4,
+        KW_SLOT_MASK,
+    )
 }
 
-const KW_TABLE: [u8; 256] = {
-    let mut table = [KW_EMPTY; 256];
-    let mut i = 0;
-    while i < KEYWORD_COUNT {
-        let name = KEYWORD_NAMES[i].as_bytes();
-        let len = KEYWORD_LENS[i] as usize;
-        assert!(name.len() == len);
-        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
-        let h = kw_hash(name[0], name[1], name[len - 1], len);
-        assert!(table[h] == KW_EMPTY);
-        table[h] = i as u8;
-        i += 1;
-    }
-    table
-};
+const KW_TABLE: [u8; 256] = make_kw_table_fsl_add(&KEYWORD_NAMES, [873, 3146, 2425, 3063], 4);
 
 pub const TOKEN_KIND: [u8; 256] = make_token_kind(
     TOK_IDENT,
@@ -236,20 +221,17 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
             return end;
         }
 
-        let n = end - start;
-        if n.wrapping_sub(KW_MIN_LEN) <= KW_MAX_LEN - KW_MIN_LEN {
-            let h = kw_hash(cand[0], cand[1], cand[n - 1], n);
-            let id = KW_TABLE[h];
-            if id != KW_EMPTY {
-                let idx = id as usize;
-                debug_assert!(idx < KEYWORD_COUNT);
-                if KEYWORD_LENS[idx] as usize == n
-                    && kw_match_2_to_16(cand, KEYWORD_NAMES[idx].as_bytes())
-                {
-                    acc.keyword_counts[idx] += 1;
-                    acc.total_keywords += 1;
-                }
-            }
+        if let Some(idx) = match_keyword_with(
+            cand,
+            KW_MIN_LEN,
+            KW_MAX_LEN,
+            &KW_TABLE,
+            &KEYWORD_LENS,
+            &KEYWORD_NAMES,
+            |c| kw_hash(c[0], c[1], c[c.len() - 1], c.len()),
+        ) {
+            acc.keyword_counts[idx] += 1;
+            acc.total_keywords += 1;
         }
         end
     }

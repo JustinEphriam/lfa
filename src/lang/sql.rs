@@ -1,12 +1,12 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_c_block_comment, handle_quoted_literal, make_token_kind, make_token_lut_lo,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    handle_c_block_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
+    make_token_kind, make_token_lut_lo, match_keyword_caseless_with, unified_parse_into, LangLexer,
+    ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 100;
 const KW_SLOT_MASK: usize = 511;
-const KW_EMPTY: u8 = 255;
 
 pub const KEYWORD_NAMES: [&str; KEYWORD_COUNT] = [
     "all",
@@ -115,9 +115,6 @@ pub const KEYWORD_LENS: [u8; KEYWORD_COUNT] = compute_keyword_lens(&KEYWORD_NAME
 pub const KW_MIN_LEN: usize = compute_kw_min_len(&KEYWORD_NAMES);
 pub const KW_MAX_LEN: usize = compute_kw_max_len(&KEYWORD_NAMES);
 
-const _: () = assert!(KEYWORD_NAMES.len() == KEYWORD_COUNT);
-const _: () = assert!(KEYWORD_LENS.len() == KEYWORD_COUNT);
-
 const TOK_IDENT: u8 = 3;
 const TOK_MINUS: u8 = 4;
 const TOK_SLASH: u8 = 5;
@@ -128,44 +125,10 @@ const TOK_HASH: u8 = 9;
 
 #[inline(always)]
 const fn kw_hash(first: u8, mid: u8, last: u8, len: usize) -> usize {
-    let v = (first as usize)
-        .wrapping_mul(1)
-        .wrapping_add((mid as usize).wrapping_mul(61))
-        .wrapping_add((last as usize).wrapping_mul(63))
-        .wrapping_add(len.wrapping_mul(99));
-    (v ^ (v >> 1)) & KW_SLOT_MASK
+    kw_hash_fml_add(first, mid, last, len, [1, 61, 63, 99], 1, KW_SLOT_MASK)
 }
 
-const KW_TABLE: [u8; 512] = {
-    let mut table = [KW_EMPTY; 512];
-    let mut i = 0;
-    while i < KEYWORD_COUNT {
-        let name = KEYWORD_NAMES[i].as_bytes();
-        let len = KEYWORD_LENS[i] as usize;
-        assert!(name.len() == len);
-        assert!(len >= KW_MIN_LEN && len <= KW_MAX_LEN);
-        let h = kw_hash(name[0], name[len / 2], name[len - 1], len);
-        assert!(table[h] == KW_EMPTY);
-        table[h] = i as u8;
-        i += 1;
-    }
-    table
-};
-
-#[inline(always)]
-fn kw_match_case_insensitive(cand: &[u8], target: &[u8]) -> bool {
-    if cand.len() != target.len() {
-        return false;
-    }
-    for i in 0..cand.len() {
-        let b = cand[i];
-        let lower = if b.is_ascii_uppercase() { b + 32 } else { b };
-        if lower != target[i] {
-            return false;
-        }
-    }
-    true
-}
+const KW_TABLE: [u8; 512] = make_kw_table_fml_add(&KEYWORD_NAMES, [1, 61, 63, 99], 1);
 
 pub const TOKEN_KIND: [u8; 256] = make_token_kind(
     TOK_IDENT,
@@ -194,52 +157,25 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
     const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
     const HAS_DOLLAR_IDENT: bool = false;
     const SUPPORTS_TEMPLATES: bool = false;
-    const HAS_SPECIAL_IDENT: bool = true;
-    const HAS_LINE_START_HOOK: bool = false;
 
     #[inline(always)]
-    fn match_keyword(_cand: &[u8]) -> Option<usize> {
-        None
-    }
-
-    #[inline(always)]
-    fn handle_ident(
-        content: &[u8],
-        start: usize,
-        end: usize,
-        _line_state: &mut u8,
-        acc: &mut ParseResult<KEYWORD_COUNT>,
-    ) -> usize {
-        let cand = &content[start..end];
-        let cand_len = cand.len();
-        if (KW_MIN_LEN..=KW_MAX_LEN).contains(&cand_len) {
-            let first = if cand[0].is_ascii_uppercase() {
-                cand[0] + 32
-            } else {
-                cand[0]
-            };
-            let mid_b = cand[cand_len / 2];
-            let mid = if mid_b.is_ascii_uppercase() {
-                mid_b + 32
-            } else {
-                mid_b
-            };
-            let last_b = cand[cand_len - 1];
-            let last = if last_b.is_ascii_uppercase() {
-                last_b + 32
-            } else {
-                last_b
-            };
-
-            let h = kw_hash(first, mid, last, cand_len);
-            let idx = KW_TABLE[h] as usize;
-            if idx < KEYWORD_COUNT && kw_match_case_insensitive(cand, KEYWORD_NAMES[idx].as_bytes()) {
-                acc.keyword_counts[idx] += 1;
-                acc.total_keywords += 1;
-            }
-        }
-
-        end
+    fn match_keyword(cand: &[u8]) -> Option<usize> {
+        match_keyword_caseless_with(
+            cand,
+            KW_MIN_LEN,
+            KW_MAX_LEN,
+            &KW_TABLE,
+            &KEYWORD_LENS,
+            &KEYWORD_NAMES,
+            |c| {
+                kw_hash(
+                    c[0].to_ascii_lowercase(),
+                    c[c.len() / 2].to_ascii_lowercase(),
+                    c[c.len() - 1].to_ascii_lowercase(),
+                    c.len(),
+                )
+            },
+        )
     }
 
     #[inline(always)]
