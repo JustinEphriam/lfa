@@ -1,5 +1,5 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
     find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal, unified_parse_into,
     LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
 };
@@ -173,13 +173,28 @@ impl LangLexer<KEYWORD_COUNT> for MesonLexer {
             }
             TOK_QUOTE => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'"')
+                let end_i = skip_literal(content, i + 1, b'"');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'\'')
+                let end_i = skip_literal(content, i + 1, b'\'');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

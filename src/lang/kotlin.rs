@@ -268,9 +268,18 @@ impl LangLexer<KEYWORD_COUNT> for KotlinLexer {
             }
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'\'')
+                let end_i = skip_literal(content, i + 1, b'\'');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

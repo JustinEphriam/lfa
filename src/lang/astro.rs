@@ -146,11 +146,17 @@ impl LangLexer<KEYWORD_COUNT> for AstroLexer {
                     let next = content[i + 1];
                     if next == b'/' {
                         *line_state |= STATE_COMMENT;
-                        let mut cur = i + 2;
-                        while cur < content_len && content[cur] != b'\n' {
-                            cur += 1;
+                        if let Some(pos) = find_byte_avx2(&content[i + 2..], b'\n') {
+                            if (*line_state & STATE_CODE) != 0 {
+                                acc.code_lines += 1;
+                            } else {
+                                acc.comment_lines += 1;
+                            }
+                            acc.lines_processed += 1;
+                            *line_state = 0;
+                            return i + 2 + pos + 1;
                         }
-                        return cur;
+                        return content_len;
                     } else if next == b'*' {
                         *line_state |= STATE_COMMENT;
                         if let Some(pos) = find_star_slash(&content[i + 2..]) {
@@ -224,17 +230,38 @@ impl LangLexer<KEYWORD_COUNT> for AstroLexer {
             }
             TOK_QUOTE => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'"')
+                let end_i = skip_literal(content, i + 1, b'"');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'\'')
+                let end_i = skip_literal(content, i + 1, b'\'');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
             TOK_BACKTICK => {
                 *line_state |= STATE_CODE;
-                skip_literal(content, i + 1, b'`')
+                let end_i = skip_literal(content, i + 1, b'`');
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                end_i
             }
-            _ => i + 1,
+            _ => {
+                *line_state |= STATE_CODE;
+                i + 1
+            }
         }
     }
 }

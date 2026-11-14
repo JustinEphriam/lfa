@@ -4187,12 +4187,27 @@ mod tests {
                 | LangId::PowerShell
                 | LangId::Graphql
                 | LangId::Nix
-                | LangId::Hcl => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl => "--",
-                LangId::OCaml => "(*",
+                | LangId::Hcl
+                | LangId::Meson
+                | LangId::Starlark
+                | LangId::Justfile => "#",
+                LangId::Lua
+                | LangId::Sql
+                | LangId::Haskell
+                | LangId::Ada
+                | LangId::Vhdl
+                | LangId::Elm
+                | LangId::PureScript => "--",
+                LangId::OCaml | LangId::Sml => "(*",
                 LangId::Fortran => "!",
                 LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
-                LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp | LangId::Llvm => ";",
+                LangId::Clojure
+                | LangId::Scheme
+                | LangId::Assembly
+                | LangId::CommonLisp
+                | LangId::Llvm
+                | LangId::Racket
+                | LangId::AutoHotkey => ";",
                 LangId::Wat => ";;",
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
@@ -4320,6 +4335,31 @@ mod tests {
                     "lang {:?} at offset {offset}/{}: lines={lines}, code={code}, comm={comm}, blnk={blnk}",
                     lang,
                     sample_bytes.len()
+                );
+            }
+
+            let multiline_quotes = b"\"line1\nline2\"\n'line3\nline4'\n`line5\nline6`\n";
+            for offset in 1..=multiline_quotes.len() {
+                let slice = &multiline_quotes[..offset];
+                let mut stats = LangStats::default();
+                parse_into(lang, slice, &mut stats);
+                let lines = stats.lines(lang);
+                let code = stats.code_lines(lang);
+                let comm = stats.comment_lines(lang);
+                let blnk = stats.blank_lines(lang);
+                let expected_lines = count_newlines_avx2(slice) as i64
+                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
+                assert_eq!(
+                    lines,
+                    code + comm + blnk,
+                    "lang {:?} quote slice offset {offset}: sum mismatch",
+                    lang
+                );
+                assert_eq!(
+                    lines,
+                    expected_lines,
+                    "lang {:?} quote slice offset {offset}: lines={lines} != expected={expected_lines}",
+                    lang
                 );
             }
         }
