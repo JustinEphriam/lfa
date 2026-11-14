@@ -2769,6 +2769,34 @@ pub const AVX2_ASCII_LUT_HI: [i8; 32] = [
     0, 0, 0, 0, 0,
 ];
 
+pub const fn make_token_kind(tok_ident: u8, specials: &[(u8, u8)]) -> [u8; 256] {
+    let mut table = [TOK_CODE; 256];
+    table[b' ' as usize] = TOK_WS;
+    table[b'\t' as usize] = TOK_WS;
+    table[b'\r' as usize] = TOK_WS;
+    table[0x0b_usize] = TOK_WS;
+    table[0x0c_usize] = TOK_WS;
+    table[b'\n' as usize] = TOK_NL;
+    let mut c = b'a';
+    while c <= b'z' {
+        table[c as usize] = tok_ident;
+        c += 1;
+    }
+    let mut c = b'A';
+    while c <= b'Z' {
+        table[c as usize] = tok_ident;
+        c += 1;
+    }
+    table[b'_' as usize] = tok_ident;
+    let mut i = 0;
+    while i < specials.len() {
+        let (byte, kind) = specials[i];
+        table[byte as usize] = kind;
+        i += 1;
+    }
+    table
+}
+
 pub const fn make_token_lut_lo(token_kind: &[u8; 256]) -> [i8; 32] {
     let mut lo16 = [0u8; 16];
     let mut b = 0usize;

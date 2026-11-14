@@ -1,11 +1,11 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_quoted_literal,
-    handle_spliced_c_slash_comments, kw_match_2_to_16, make_token_lut_lo, unified_parse_into,
-    LangLexer, ParseResult, IDENT_CONT, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
+    handle_spliced_c_slash_comments, kw_match_2_to_16, make_token_kind, make_token_lut_lo,
+    unified_parse_into, LangLexer, ParseResult, IDENT_CONT, STATE_CODE,
 };
 
 #[cfg(test)]
-use super::{count_newlines_avx2, skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2};
+use super::{count_newlines_avx2, skip_ident_cont_avx2, skip_non_tokens_with_lut_avx2, TOK_CODE};
 
 pub const KEYWORD_COUNT: usize = 59;
 const KW_SLOT_MASK: usize = 255;
@@ -110,30 +110,14 @@ const KW_TABLE: [u8; 256] = {
     table
 };
 
-pub const TOKEN_KIND: [u8; 256] = {
-    let mut table = [TOK_CODE; 256];
-    table[b' ' as usize] = TOK_WS;
-    table[b'\t' as usize] = TOK_WS;
-    table[b'\r' as usize] = TOK_WS;
-    table[0x0b_usize] = TOK_WS;
-    table[0x0c_usize] = TOK_WS;
-    table[b'\n' as usize] = TOK_NL;
-    let mut c = b'a';
-    while c <= b'z' {
-        table[c as usize] = TOK_IDENT;
-        c += 1;
-    }
-    let mut c = b'A';
-    while c <= b'Z' {
-        table[c as usize] = TOK_IDENT;
-        c += 1;
-    }
-    table[b'_' as usize] = TOK_IDENT;
-    table[b'/' as usize] = TOK_SLASH;
-    table[b'"' as usize] = TOK_QUOTE;
-    table[b'\'' as usize] = TOK_APOSTROPHE;
-    table
-};
+pub const TOKEN_KIND: [u8; 256] = make_token_kind(
+    TOK_IDENT,
+    &[
+        (b'/', TOK_SLASH),
+        (b'"', TOK_QUOTE),
+        (b'\'', TOK_APOSTROPHE),
+    ],
+);
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 

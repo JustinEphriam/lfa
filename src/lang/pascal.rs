@@ -1,7 +1,7 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, find_byte_avx2,
-    finish_block_comment, finish_line_comment, handle_quoted_literal, make_token_lut_lo,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE, TOK_CODE, TOK_NL, TOK_WS,
+    finish_block_comment, finish_line_comment, handle_quoted_literal, make_token_kind,
+    make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 65;
@@ -57,32 +57,15 @@ const TOK_LBRACE: u8 = 5;
 const TOK_LPAREN: u8 = 6;
 const TOK_SQUOTE: u8 = 7;
 
-pub const TOKEN_KIND: [u8; 256] = {
-    let mut t = [TOK_CODE; 256];
-    t[b' ' as usize] = TOK_WS;
-    t[b'\t' as usize] = TOK_WS;
-    t[b'\r' as usize] = TOK_WS;
-    t[0x0b_usize] = TOK_WS;
-    t[0x0c_usize] = TOK_WS;
-    t[b'\n' as usize] = TOK_NL;
-
-    let mut c = b'a';
-    while c <= b'z' {
-        t[c as usize] = TOK_IDENT;
-        c += 1;
-    }
-    let mut c = b'A';
-    while c <= b'Z' {
-        t[c as usize] = TOK_IDENT;
-        c += 1;
-    }
-    t[b'_' as usize] = TOK_IDENT;
-    t[b'/' as usize] = TOK_SLASH;
-    t[b'{' as usize] = TOK_LBRACE;
-    t[b'(' as usize] = TOK_LPAREN;
-    t[b'\'' as usize] = TOK_SQUOTE;
-    t
-};
+pub const TOKEN_KIND: [u8; 256] = make_token_kind(
+    TOK_IDENT,
+    &[
+        (b'/', TOK_SLASH),
+        (b'{', TOK_LBRACE),
+        (b'(', TOK_LPAREN),
+        (b'\'', TOK_SQUOTE),
+    ],
+);
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
