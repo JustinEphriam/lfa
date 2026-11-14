@@ -4119,8 +4119,28 @@ mod tests {
                 samples.push("a --[[ x\ny".to_string());
                 samples.push("a\n--[[ x ]] b".to_string());
             }
+            if lang == LangId::Sql {
+                samples.push("SELECT 'a\\\nb'".to_string());
+                samples.push("'\\".to_string());
+            }
+            if lang == LangId::OCaml {
+                samples.push("let x = {a = 1} | {b = 2}\n(* c *)".to_string());
+            }
+            if lang == LangId::Nix {
+                samples.push("''\n#".to_string());
+            }
+            if lang == LangId::Racket {
+                samples.push("a\n#;   ".to_string());
+            }
             if lang == LangId::Perl {
                 samples.push("a\n=pod\nx\ny".to_string());
+                samples.push("a\n__END__\nx\ny".to_string());
+                samples.push("my $x\n  =shift;\n# c".to_string());
+                samples.push("my $__END__ = 1;\n# c".to_string());
+                samples.push("=pod\n=cut\nx".to_string());
+            }
+            if lang == LangId::Ruby {
+                samples.push("a\n=begin\nx\n=end".to_string());
                 samples.push("a\n__END__\nx\ny".to_string());
             }
             for s in &samples {
@@ -4160,6 +4180,16 @@ mod tests {
                 );
             }
         }
+        assert_eq!(line_metrics(LangId::Sql, b"SELECT 'a\\\nb';\n"), [2, 2, 0, 0]);
+        assert_eq!(
+            line_metrics(LangId::OCaml, b"let x = {a = 1} | {b = 2}\n(* c *)\n"),
+            [2, 1, 1, 0]
+        );
+        assert_eq!(line_metrics(LangId::Nix, b"''\n#\n"), [2, 2, 0, 0]);
+        assert_eq!(line_metrics(LangId::Racket, b"a\n#;   \n"), [2, 1, 1, 0]);
+        assert_eq!(line_metrics(LangId::Perl, b"my $x\n  =shift;\n# c\n"), [3, 2, 1, 0]);
+        assert_eq!(line_metrics(LangId::Perl, b"my $__END__ = 1;\n# c\n"), [2, 1, 1, 0]);
+        assert_eq!(line_metrics(LangId::Ruby, b"puts __END__\n# c\n"), [2, 1, 1, 0]);
     }
 
     #[test]
@@ -4693,6 +4723,41 @@ mod tests {
         );
         let kw_sum: i64 = stats.keyword_counts(lang).iter().copied().sum();
         assert_eq!(stats.total_keywords(lang), kw_sum, "lang {:?} kw sum", lang);
+        if slice.last().is_some_and(|&b| b != b'\n') {
+            let mut with_nl = Vec::with_capacity(slice.len() + 1);
+            with_nl.extend_from_slice(slice);
+            with_nl.push(b'\n');
+            let mut stats_nl = LangStats::default();
+            parse_into(lang, &with_nl, &mut stats_nl);
+            assert_eq!(
+                lines,
+                stats_nl.lines(lang),
+                "lang {:?} +nl lines {:?}",
+                lang,
+                String::from_utf8_lossy(slice)
+            );
+            assert_eq!(
+                code,
+                stats_nl.code_lines(lang),
+                "lang {:?} +nl code {:?}",
+                lang,
+                String::from_utf8_lossy(slice)
+            );
+            assert_eq!(
+                comm,
+                stats_nl.comment_lines(lang),
+                "lang {:?} +nl comm {:?}",
+                lang,
+                String::from_utf8_lossy(slice)
+            );
+            assert_eq!(
+                blnk,
+                stats_nl.blank_lines(lang),
+                "lang {:?} +nl blnk {:?}",
+                lang,
+                String::from_utf8_lossy(slice)
+            );
+        }
     }
 
     #[test]
@@ -5081,6 +5146,14 @@ mod tests {
             let nested_and_special = b"/* a /* b\nc */ d */\n{- a {- b\nc -} d -}\n(* a (* b\nc *) d *)\n#| a #| b\nc |# d |#\n/+ a /+ b\nc +/ d +/\n#[ a #[ b\nc ]# d ]#\n#= a #= b\nc =# d =#\n\"\"\"triple\nquote\"\"\"\n`tmpl ${a + `${b\nc}`} end`\n";
             for offset in 1..=nested_and_special.len() {
                 let slice = &nested_and_special[..offset];
+                let mut stats = LangStats::default();
+                parse_into(lang, slice, &mut stats);
+                assert_keyword_sum_and_metrics(lang, &stats, slice);
+            }
+
+            let polyglot_special = b"SELECT 'a\\\nb' FROM t;\nlet x = {a = 1} | {b = 2}\n{|ocaml\nraw|}\n''\nnix\n#''\n#;   \r\n=pod\npod line\n=cut\n=begin\nruby line\n=end\n__END__\ntrailing\n";
+            for offset in 1..=polyglot_special.len() {
+                let slice = &polyglot_special[..offset];
                 let mut stats = LangStats::default();
                 parse_into(lang, slice, &mut stats);
                 assert_keyword_sum_and_metrics(lang, &stats, slice);

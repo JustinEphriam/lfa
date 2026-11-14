@@ -108,7 +108,10 @@ impl LangLexer<KEYWORD_COUNT> for RubyLexer {
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
         let content_len = content.len();
-        if i + 5 < content_len && &content[i..i + 6] == b"=begin" {
+        if (i == 0 || content[i - 1] == b'\n')
+            && i + 5 < content_len
+            && &content[i..i + 6] == b"=begin"
+        {
             let next_byte = if i + 6 < content_len {
                 content[i + 6]
             } else {
@@ -159,7 +162,7 @@ impl LangLexer<KEYWORD_COUNT> for RubyLexer {
     ) -> usize {
         let content_len = content.len();
         let cand = &content[start..end];
-        if cand == b"__END__" {
+        if (start == 0 || content[start - 1] == b'\n') && cand == b"__END__" {
             if let Some(pos) = find_byte_avx2(&content[end..], b'\n') {
                 let nl_abs = end + pos;
                 acc.code_lines += 1;

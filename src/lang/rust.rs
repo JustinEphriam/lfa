@@ -218,7 +218,7 @@ impl LangLexer<KEYWORD_COUNT> for RustLexer {
                     if next_b == b'\\' {
                         return handle_quoted_literal(content, i, b'\'', line_state, acc);
                     }
-                    if i + 2 < content_len && content[i + 2] == b'\'' {
+                    if next_b != b'\n' && i + 2 < content_len && content[i + 2] == b'\'' {
                         return i + 3;
                     }
                     if IDENT_CONT[next_b as usize] != 0 {

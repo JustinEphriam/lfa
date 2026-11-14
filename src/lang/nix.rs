@@ -96,14 +96,16 @@ impl LangLexer<KEYWORD_COUNT> for NixLexer {
                 *line_state |= STATE_CODE;
                 if i + 1 < content_len && content[i + 1] == b'\'' {
                     let mut curr = i + 2;
+                    let mut closed = false;
                     while curr + 1 < content_len {
                         if content[curr] == b'\'' && content[curr + 1] == b'\'' {
                             curr += 2;
+                            closed = true;
                             break;
                         }
                         curr += 1;
                     }
-                    if curr >= content_len {
+                    if !closed {
                         curr = content_len;
                     }
                     let nl = count_newlines_avx2(&content[i + 2..curr]);

@@ -1,7 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_nested_2byte_comment,
-    handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add, make_token_kind,
-    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    handle_nested_2byte_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
+    make_token_kind, make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer,
+    ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 56;
@@ -136,30 +137,40 @@ impl LangLexer<KEYWORD_COUNT> for OCamlLexer {
                 handle_nested_2byte_comment(content, i, *b"(*", *b"*)", line_state, acc)
             }
             TOK_LBRACE => {
-                if i + 1 < content_len && (content[i + 1] == b'|' || content[i + 1].is_ascii_lowercase()) {
+                if i + 1 < content_len
+                    && (content[i + 1] == b'|'
+                        || content[i + 1].is_ascii_lowercase()
+                        || content[i + 1] == b'_')
+                {
                     let mut bar = i + 1;
-                    while bar < content_len && content[bar] != b'|' && content[bar] != b'\n' && bar - i < 32 {
+                    while bar < content_len
+                        && (content[bar].is_ascii_lowercase() || content[bar] == b'_')
+                        && bar - i < 32
+                    {
                         bar += 1;
                     }
                     if bar < content_len && content[bar] == b'|' {
                         *line_state |= STATE_CODE;
                         let delim = &content[i + 1..bar];
                         let mut cur = bar + 1;
+                        let mut end_i = content_len;
                         while cur < content_len {
                             if content[cur] == b'|'
                                 && cur + 1 + delim.len() < content_len
                                 && &content[cur + 1..cur + 1 + delim.len()] == delim
                                 && content[cur + 1 + delim.len()] == b'}'
                             {
-                                return cur + 2 + delim.len();
-                            }
-                            if content[cur] == b'\n' {
-                                acc.code_lines += 1;
-                                acc.lines_processed += 1;
+                                end_i = cur + 2 + delim.len();
+                                break;
                             }
                             cur += 1;
                         }
-                        return content_len;
+                        let nl = count_newlines_avx2(&content[bar + 1..end_i]);
+                        if nl > 0 {
+                            acc.code_lines += nl as i64;
+                            acc.lines_processed += nl as i64;
+                        }
+                        return end_i;
                     }
                 }
                 *line_state |= STATE_CODE;

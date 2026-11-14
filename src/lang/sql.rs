@@ -1,8 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_c_block_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
-    make_token_kind, make_token_lut_lo, match_keyword_caseless_with, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
+    finish_line_comment, handle_c_block_comment, handle_quoted_literal, kw_hash_fml_add,
+    make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_caseless_with,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 100;
@@ -214,19 +214,21 @@ impl LangLexer<KEYWORD_COUNT> for SqlLexer {
                             cur += 2;
                             continue;
                         }
-                        return cur + 1;
+                        cur += 1;
+                        break;
                     }
                     if content[cur] == b'\\' && cur + 1 < content_len {
                         cur += 2;
                         continue;
                     }
-                    if content[cur] == b'\n' {
-                        acc.code_lines += 1;
-                        acc.lines_processed += 1;
-                    }
                     cur += 1;
                 }
-                content_len
+                let nl = count_newlines_avx2(&content[i + 1..cur]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
+                }
+                cur
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),

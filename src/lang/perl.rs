@@ -153,7 +153,8 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
         let content_len = content.len();
-        if content[i] == b'='
+        if (i == 0 || content[i - 1] == b'\n')
+            && content[i] == b'='
             && i + 1 < content_len
             && ((content[i + 1] >= b'a' && content[i + 1] <= b'z')
                 || (content[i + 1] >= b'A' && content[i + 1] <= b'Z'))
@@ -169,13 +170,20 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
                 acc.lines_processed += 1;
                 pod_i = nl_abs + 1;
                 if pod_i + 3 < content_len && &content[pod_i..pod_i + 4] == b"=cut" {
-                    if let Some(cut_pos) = find_byte_avx2(&content[pod_i..], b'\n') {
-                        acc.comment_lines += 1;
-                        acc.lines_processed += 1;
-                        return pod_i + cut_pos + 1;
+                    let term = if pod_i + 4 < content_len {
+                        content[pod_i + 4]
                     } else {
-                        *line_state = STATE_COMMENT;
-                        return content_len;
+                        b'\n'
+                    };
+                    if term == b' ' || term == b'\t' || term == b'\r' || term == b'\n' {
+                        if let Some(cut_pos) = find_byte_avx2(&content[pod_i..], b'\n') {
+                            acc.comment_lines += 1;
+                            acc.lines_processed += 1;
+                            return pod_i + cut_pos + 1;
+                        } else {
+                            *line_state = STATE_COMMENT;
+                            return content_len;
+                        }
                     }
                 }
             }
@@ -194,7 +202,9 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
     ) -> usize {
         let content_len = content.len();
         let cand = &content[start..end];
-        if cand == b"__DATA__" || cand == b"__END__" {
+        if (start == 0 || content[start - 1] == b'\n')
+            && (cand == b"__DATA__" || cand == b"__END__")
+        {
             if let Some(pos) = find_byte_avx2(&content[end..], b'\n') {
                 let nl_abs = end + pos;
                 acc.code_lines += 1;
