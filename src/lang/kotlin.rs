@@ -1,8 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
     find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal,
-    skip_nested_block_comment, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
-    STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    skip_nested_block_comment, skip_triple_literal, unified_parse_into, LangLexer, ParseResult,
+    STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 74;
@@ -190,7 +190,7 @@ impl LangLexer<KEYWORD_COUNT> for KotlinLexer {
     fn handle_special(
         kind: u8,
         content: &[u8],
-        mut i: usize,
+        i: usize,
         line_state: &mut u8,
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
@@ -235,36 +235,17 @@ impl LangLexer<KEYWORD_COUNT> for KotlinLexer {
             }
             TOK_QUOTE => {
                 *line_state |= STATE_CODE;
-                if i + 2 < content_len && content[i + 1] == b'"' && content[i + 2] == b'"' {
-                    i += 3;
-                    while i + 2 < content_len {
-                        if content[i] == b'"' && content[i + 1] == b'"' && content[i + 2] == b'"' {
-                            i += 3;
-                            break;
-                        }
-                        if content[i] == b'\n' {
-                            acc.code_lines += 1;
-                            acc.lines_processed += 1;
-                            *line_state = STATE_CODE;
-                        }
-                        i += 1;
-                    }
-                    if i + 2 >= content_len && i < content_len {
-                        let nl = count_newlines_avx2(&content[i..]);
-                        acc.code_lines += nl as i64;
-                        acc.lines_processed += nl as i64;
-                        i = content_len;
-                    }
-                    i
+                let end_i = if i + 2 < content_len && content[i + 1] == b'"' && content[i + 2] == b'"' {
+                    skip_triple_literal(content, i + 3, b'"')
                 } else {
-                    let end_i = skip_literal(content, i + 1, b'"');
-                    let nl = count_newlines_avx2(&content[i + 1..end_i]);
-                    if nl > 0 {
-                        acc.code_lines += nl as i64;
-                        acc.lines_processed += nl as i64;
-                    }
-                    end_i
+                    skip_literal(content, i + 1, b'"')
+                };
+                let nl = count_newlines_avx2(&content[i + 1..end_i]);
+                if nl > 0 {
+                    acc.code_lines += nl as i64;
+                    acc.lines_processed += nl as i64;
                 }
+                end_i
             }
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
@@ -319,5 +300,11 @@ mod tests {
         assert_eq!(acc.code_lines, 8);
         assert_eq!(acc.lines_processed, 10);
         assert_eq!(acc.total_keywords, 4);
+        let eof_triple = b"val x = \"\"\"hello\"\"\"\n\n";
+        let mut acc2 = ParseResult::<KEYWORD_COUNT>::default();
+        parse_into(eof_triple, &mut acc2);
+        assert_eq!(acc2.code_lines, 1);
+        assert_eq!(acc2.blank_lines, 1);
+        assert_eq!(acc2.lines_processed, 2);
     }
 }

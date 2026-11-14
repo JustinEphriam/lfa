@@ -1,7 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal, unified_parse_into,
-    LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL, TOK_WS,
+    find_byte_avx2, kw_match_2_to_16, make_token_lut_lo, skip_literal, skip_triple_literal,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT, TOK_CODE, TOK_NL,
+    TOK_WS,
 };
 
 pub const KEYWORD_COUNT: usize = 10;
@@ -147,7 +148,11 @@ impl LangLexer<KEYWORD_COUNT> for JustLexer {
             }
             TOK_QUOTE => {
                 *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'"');
+                let end_i = if i + 2 < content_len && content[i + 1] == b'"' && content[i + 2] == b'"' {
+                    skip_triple_literal(content, i + 3, b'"')
+                } else {
+                    skip_literal(content, i + 1, b'"')
+                };
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
@@ -157,7 +162,11 @@ impl LangLexer<KEYWORD_COUNT> for JustLexer {
             }
             TOK_APOSTROPHE => {
                 *line_state |= STATE_CODE;
-                let end_i = skip_literal(content, i + 1, b'\'');
+                let end_i = if i + 2 < content_len && content[i + 1] == b'\'' && content[i + 2] == b'\'' {
+                    skip_triple_literal(content, i + 3, b'\'')
+                } else {
+                    skip_literal(content, i + 1, b'\'')
+                };
                 let nl = count_newlines_avx2(&content[i + 1..end_i]);
                 if nl > 0 {
                     acc.code_lines += nl as i64;
@@ -201,5 +210,11 @@ mod tests {
         assert_eq!(acc.lines_processed, 2);
         assert_eq!(acc.comment_lines, 1);
         assert_eq!(acc.code_lines, 1);
+        let triple = b"x = \"\"\"quote \" inside\n# not a comment\n\"\"\"\n'''single ' inside\n# also code\n'''\n";
+        let mut acc2 = ParseResult::default();
+        parse_into(triple, &mut acc2);
+        assert_eq!(acc2.lines_processed, 6);
+        assert_eq!(acc2.code_lines, 6);
+        assert_eq!(acc2.comment_lines, 0);
     }
 }
