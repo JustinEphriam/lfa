@@ -208,27 +208,145 @@ fn count_block_comment_doc_line(
     in_block: &mut bool,
     stats: &mut DocStats,
 ) {
-    let search_start = if *in_block {
-        0
-    } else if trimmed.starts_with(open) {
-        open.len()
-    } else {
-        stats.content_lines += 1;
-        return;
-    };
-    let tail = &trimmed[search_start..];
-    if let Some(close_pos) = tail.windows(close.len()).position(|w| w == close) {
-        let after = &tail[close_pos + close.len()..];
-        if after.iter().any(|&b| b != b' ' && b != b'\t') {
-            stats.content_lines += 1;
+    let mut has_content = false;
+    let mut has_comment = *in_block;
+    let mut rest = trimmed;
+    while !rest.is_empty() {
+        if *in_block {
+            if let Some(close_pos) = rest.windows(close.len()).position(|w| w == close) {
+                *in_block = false;
+                rest = &rest[close_pos + close.len()..];
+            } else {
+                break;
+            }
         } else {
-            stats.comment_lines += 1;
+            let mut ws = 0;
+            while ws < rest.len() && (rest[ws] == b' ' || rest[ws] == b'\t') {
+                ws += 1;
+            }
+            rest = &rest[ws..];
+            if rest.is_empty() {
+                break;
+            }
+            if rest.starts_with(open) {
+                has_comment = true;
+                *in_block = true;
+                rest = &rest[open.len()..];
+            } else {
+                has_content = true;
+                if let Some(open_pos) = rest.windows(open.len()).position(|w| w == open) {
+                    has_comment = true;
+                    *in_block = true;
+                    rest = &rest[open_pos + open.len()..];
+                } else {
+                    break;
+                }
+            }
         }
-        *in_block = false;
-    } else {
-        stats.comment_lines += 1;
-        *in_block = true;
     }
+    if has_content {
+        stats.content_lines += 1;
+    } else if has_comment {
+        stats.comment_lines += 1;
+    } else {
+        stats.blank_lines += 1;
+    }
+}
+
+fn count_json5_doc_line(trimmed: &[u8], in_block: &mut bool, stats: &mut DocStats) {
+    let mut has_content = false;
+    let mut has_comment = *in_block;
+    let mut idx = 0usize;
+    let len = trimmed.len();
+    while idx < len {
+        if *in_block {
+            if idx + 1 < len && trimmed[idx] == b'*' && trimmed[idx + 1] == b'/' {
+                *in_block = false;
+                idx += 2;
+            } else {
+                idx += 1;
+            }
+            continue;
+        }
+        let b = trimmed[idx];
+        if b == b' ' || b == b'\t' {
+            idx += 1;
+            continue;
+        }
+        if idx + 1 < len && b == b'/' && trimmed[idx + 1] == b'/' {
+            has_comment = true;
+            break;
+        }
+        if idx + 1 < len && b == b'/' && trimmed[idx + 1] == b'*' {
+            has_comment = true;
+            *in_block = true;
+            idx += 2;
+            continue;
+        }
+        has_content = true;
+        if b == b'"' || b == b'\'' {
+            let quote = b;
+            idx += 1;
+            while idx < len {
+                if trimmed[idx] == b'\\' {
+                    idx += 2;
+                } else if trimmed[idx] == quote {
+                    idx += 1;
+                    break;
+                } else {
+                    idx += 1;
+                }
+            }
+        } else {
+            idx += 1;
+        }
+    }
+    if has_content {
+        stats.content_lines += 1;
+    } else if has_comment {
+        stats.comment_lines += 1;
+    } else {
+        stats.blank_lines += 1;
+    }
+}
+
+fn is_rst_comment(trimmed: &[u8]) -> bool {
+    if trimmed == b".." {
+        return true;
+    }
+    let Some(rest) = trimmed.strip_prefix(b".. ") else {
+        return false;
+    };
+    let mut ws = 0;
+    while ws < rest.len() && (rest[ws] == b' ' || rest[ws] == b'\t') {
+        ws += 1;
+    }
+    let rest = &rest[ws..];
+    if rest.is_empty() {
+        return true;
+    }
+    if matches!(rest[0], b'_' | b'[' | b'|') {
+        return false;
+    }
+    let mut p = 0;
+    while p < rest.len() {
+        let b = rest[p];
+        if b.is_ascii_alphanumeric()
+            || matches!(b, b'-' | b'_' | b'.' | b'+')
+            || (b == b':' && p + 1 < rest.len() && rest[p + 1] != b':')
+        {
+            p += 1;
+        } else {
+            break;
+        }
+    }
+    if p > 0
+        && rest[p..].starts_with(b"::")
+        && (p + 2 == rest.len() || rest[p + 2] == b' ' || rest[p + 2] == b'\t')
+    {
+        return false;
+    }
+    true
 }
 
 pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
@@ -279,7 +397,7 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
                 }
             }
             DocFormatId::RestructuredText => {
-                if trimmed.starts_with(b".. ") {
+                if is_rst_comment(trimmed) {
                     stats.comment_lines += 1;
                 } else {
                     stats.content_lines += 1;
@@ -289,11 +407,7 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
                 stats.content_lines += 1;
             }
             DocFormatId::Json5 => {
-                if !in_block && trimmed.starts_with(b"//") {
-                    stats.comment_lines += 1;
-                } else {
-                    count_block_comment_doc_line(trimmed, b"/*", b"*/", &mut in_block, stats);
-                }
+                count_json5_doc_line(trimmed, &mut in_block, stats);
             }
         }
     }

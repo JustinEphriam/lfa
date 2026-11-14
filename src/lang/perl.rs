@@ -1,8 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, finish_line_comment, handle_quoted_literal, kw_hash_fsl_add,
-    make_kw_table_fsl_add, make_token_kind, make_token_lut_lo, match_keyword_with,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE, STATE_COMMENT,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_doc_tail_lines,
+    finish_line_comment, handle_quoted_literal, kw_hash_fsl_add, make_kw_table_fsl_add,
+    make_token_kind, make_token_lut_lo, match_keyword_with, skip_ident_cont_avx2,
+    skip_line_delimited_doc_block, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 #[cfg(test)]
@@ -159,35 +159,14 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
             && ((content[i + 1] >= b'a' && content[i + 1] <= b'z')
                 || (content[i + 1] >= b'A' && content[i + 1] <= b'Z'))
         {
-            let mut pod_i = i;
-            while pod_i < content_len {
-                let Some(pos) = find_byte_avx2(&content[pod_i..], b'\n') else {
-                    *line_state = STATE_COMMENT;
-                    return content_len;
-                };
-                let nl_abs = pod_i + pos;
-                acc.comment_lines += 1;
-                acc.lines_processed += 1;
-                pod_i = nl_abs + 1;
-                if pod_i + 3 < content_len && &content[pod_i..pod_i + 4] == b"=cut" {
-                    let term = if pod_i + 4 < content_len {
-                        content[pod_i + 4]
-                    } else {
-                        b'\n'
-                    };
-                    if term == b' ' || term == b'\t' || term == b'\r' || term == b'\n' {
-                        if let Some(cut_pos) = find_byte_avx2(&content[pod_i..], b'\n') {
-                            acc.comment_lines += 1;
-                            acc.lines_processed += 1;
-                            return pod_i + cut_pos + 1;
-                        } else {
-                            *line_state = STATE_COMMENT;
-                            return content_len;
-                        }
-                    }
-                }
+            if i + 4 <= content_len
+                && &content[i..i + 4] == b"=cut"
+                && (i + 4 == content_len
+                    || matches!(content[i + 4], b' ' | b'\t' | b'\r' | b'\n'))
+            {
+                return finish_line_comment(content, i + 4, line_state, acc);
             }
-            return pod_i;
+            return skip_line_delimited_doc_block(content, i, b"=cut", line_state, acc);
         }
         i
     }
@@ -212,16 +191,13 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
                 p += 1;
             }
             if p == content_len {
+                *line_state |= STATE_CODE;
                 return content_len;
             }
             if content[p] == b'\n' {
                 acc.code_lines += 1;
                 acc.lines_processed += 1;
-                let rem_nls = count_newlines_avx2(&content[p + 1..]);
-                acc.comment_lines += rem_nls as i64;
-                acc.lines_processed += rem_nls as i64;
-                *line_state = STATE_COMMENT;
-                return content_len;
+                return count_doc_tail_lines(content, p + 1, line_state, acc);
             }
         }
 
@@ -263,7 +239,13 @@ impl LangLexer<KEYWORD_COUNT> for PerlLexer {
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
         match kind {
-            TOK_HASH => finish_line_comment(content, i + 1, line_state, acc),
+            TOK_HASH => {
+                if i > 0 && content[i - 1] == b'$' && (i < 2 || content[i - 2] != b'$') {
+                    *line_state |= STATE_CODE;
+                    return skip_ident_cont_avx2(content, i + 1);
+                }
+                finish_line_comment(content, i + 1, line_state, acc)
+            }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
             TOK_BACKTICK => handle_quoted_literal(content, i, b'`', line_state, acc),
@@ -443,8 +425,8 @@ mod tests {
         assert_eq!(res.keyword_counts[find_kw_id("if")], 0);
         assert_eq!(res.total_keywords, 5);
         assert_eq!(res.lines_processed, 14);
-        assert_eq!(res.comment_lines, 5);
-        assert_eq!(res.blank_lines, 2);
+        assert_eq!(res.comment_lines, 3);
+        assert_eq!(res.blank_lines, 4);
         assert_eq!(res.code_lines, 7);
     }
 
@@ -550,5 +532,36 @@ mod tests {
             parse_into(empty_or_tiny.as_bytes(), &mut res);
             assert_eq!(res.total_keywords, 0);
         }
+    }
+
+    #[test]
+    fn test_perl_pod_and_end_blanks_and_dollar_hash() {
+        let mut res = ParseResult::default();
+        parse_into(b"=pod\n\n=cut\n", &mut res);
+        assert_eq!(res.lines_processed, 3);
+        assert_eq!(res.comment_lines, 2);
+        assert_eq!(res.blank_lines, 1);
+        assert_eq!(res.code_lines, 0);
+
+        let mut res = ParseResult::default();
+        parse_into(b"=cut\n$x = 1;\n", &mut res);
+        assert_eq!(res.lines_processed, 2);
+        assert_eq!(res.comment_lines, 1);
+        assert_eq!(res.code_lines, 1);
+        assert_eq!(res.blank_lines, 0);
+
+        let mut res = ParseResult::default();
+        parse_into(b"__END__\n\nfoo\n   \nbar\n", &mut res);
+        assert_eq!(res.lines_processed, 5);
+        assert_eq!(res.code_lines, 1);
+        assert_eq!(res.comment_lines, 2);
+        assert_eq!(res.blank_lines, 2);
+
+        let mut res = ParseResult::default();
+        parse_into(b"my $n = $#array + 1; if ($n) { my $k = $#if; }\n", &mut res);
+        assert_eq!(res.lines_processed, 1);
+        assert_eq!(res.code_lines, 1);
+        assert_eq!(res.keyword_counts[find_kw_id("my")], 2);
+        assert_eq!(res.keyword_counts[find_kw_id("if")], 1);
     }
 }

@@ -1,8 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, finish_line_comment, handle_quoted_literal, kw_hash_fml_add,
-    make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
-    unified_parse_into, LangLexer, ParseResult, STATE_COMMENT,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_doc_tail_lines,
+    finish_line_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
+    make_token_kind, make_token_lut_lo, match_keyword_with, skip_line_delimited_doc_block,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 39;
@@ -118,35 +118,7 @@ impl LangLexer<KEYWORD_COUNT> for RubyLexer {
                 b'\n'
             };
             if next_byte == b' ' || next_byte == b'\t' || next_byte == b'\r' || next_byte == b'\n' {
-                let mut block_i = i;
-                while block_i < content_len {
-                    let Some(pos) = find_byte_avx2(&content[block_i..], b'\n') else {
-                        *line_state = STATE_COMMENT;
-                        return content_len;
-                    };
-                    let nl_abs = block_i + pos;
-                    acc.comment_lines += 1;
-                    acc.lines_processed += 1;
-                    block_i = nl_abs + 1;
-                    if block_i + 3 < content_len && &content[block_i..block_i + 4] == b"=end" {
-                        let term = if block_i + 4 < content_len {
-                            content[block_i + 4]
-                        } else {
-                            b'\n'
-                        };
-                        if term == b' ' || term == b'\t' || term == b'\r' || term == b'\n' {
-                            if let Some(end_pos) = find_byte_avx2(&content[block_i..], b'\n') {
-                                acc.comment_lines += 1;
-                                acc.lines_processed += 1;
-                                return block_i + end_pos + 1;
-                            } else {
-                                *line_state = STATE_COMMENT;
-                                return content_len;
-                            }
-                        }
-                    }
-                }
-                return block_i;
+                return skip_line_delimited_doc_block(content, i, b"=end", line_state, acc);
             }
         }
         i
@@ -170,16 +142,13 @@ impl LangLexer<KEYWORD_COUNT> for RubyLexer {
                 p += 1;
             }
             if p == content_len {
+                *line_state |= STATE_CODE;
                 return content_len;
             }
             if content[p] == b'\n' {
                 acc.code_lines += 1;
                 acc.lines_processed += 1;
-                let rem_nls = count_newlines_avx2(&content[p + 1..]);
-                acc.comment_lines += rem_nls as i64;
-                acc.lines_processed += rem_nls as i64;
-                *line_state = STATE_COMMENT;
-                return content_len;
+                return count_doc_tail_lines(content, p + 1, line_state, acc);
             }
         }
 

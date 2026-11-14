@@ -2519,6 +2519,87 @@ pub fn finish_trailing_line<const N: usize>(
     acc.lines_processed += 1;
 }
 
+#[inline(always)]
+fn is_blank_line_bytes(line: &[u8]) -> bool {
+    line.iter().all(|&b| b == b' ' || b == b'\t' || b == b'\r')
+}
+
+#[inline(always)]
+pub(crate) fn count_doc_tail_lines<const N: usize>(
+    content: &[u8],
+    start: usize,
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    let mut cur = start;
+    while cur < content_len {
+        let Some(pos) = find_byte_avx2(&content[cur..], b'\n') else {
+            *line_state = if is_blank_line_bytes(&content[cur..]) {
+                STATE_NONE
+            } else {
+                STATE_COMMENT
+            };
+            return content_len;
+        };
+        let nl_abs = cur + pos;
+        if is_blank_line_bytes(&content[cur..nl_abs]) {
+            acc.blank_lines += 1;
+        } else {
+            acc.comment_lines += 1;
+        }
+        acc.lines_processed += 1;
+        cur = nl_abs + 1;
+    }
+    *line_state = STATE_NONE;
+    content_len
+}
+
+#[inline(always)]
+pub(crate) fn skip_line_delimited_doc_block<const N: usize>(
+    content: &[u8],
+    start: usize,
+    end_marker: &[u8],
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    let content_len = content.len();
+    let marker_len = end_marker.len();
+    let mut block_i = start;
+    while block_i < content_len {
+        let Some(pos) = find_byte_avx2(&content[block_i..], b'\n') else {
+            *line_state = if is_blank_line_bytes(&content[block_i..]) {
+                STATE_NONE
+            } else {
+                STATE_COMMENT
+            };
+            return content_len;
+        };
+        let nl_abs = block_i + pos;
+        if is_blank_line_bytes(&content[block_i..nl_abs]) {
+            acc.blank_lines += 1;
+        } else {
+            acc.comment_lines += 1;
+        }
+        acc.lines_processed += 1;
+        block_i = nl_abs + 1;
+        if block_i + marker_len <= content_len
+            && &content[block_i..block_i + marker_len] == end_marker
+        {
+            let term = if block_i + marker_len < content_len {
+                content[block_i + marker_len]
+            } else {
+                b'\n'
+            };
+            if term == b' ' || term == b'\t' || term == b'\r' || term == b'\n' {
+                return finish_line_comment(content, block_i + marker_len, line_state, acc);
+            }
+        }
+    }
+    *line_state = STATE_NONE;
+    content_len
+}
+
 pub trait LangLexer<const N: usize> {
     const TOKEN_KIND: [u8; 256];
     const TOKEN_LUT_LO: [i8; 32];
@@ -5674,6 +5755,205 @@ mod tests {
                 let mut stats = LangStats::default();
                 parse_into(lang, slice, &mut stats);
                 assert_keyword_sum_and_metrics(lang, &stats, slice);
+            }
+        }
+    }
+
+    fn assert_doc_invariants(doc_fmt: doc::DocFormatId, slice: &[u8]) {
+        let mut stats = doc::DocStats::default();
+        doc::parse_doc_into(doc_fmt, slice, &mut stats);
+        let expected_lines = count_newlines_avx2(slice) as i64
+            + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
+        assert_eq!(
+            stats.lines,
+            stats.content_lines + stats.comment_lines + stats.blank_lines,
+            "doc {:?} sum mismatch",
+            doc_fmt
+        );
+        assert_eq!(
+            stats.lines, expected_lines,
+            "doc {:?} lines mismatch",
+            doc_fmt
+        );
+        if slice.last().is_some_and(|&b| b != b'\n') {
+            let mut with_nl = Vec::with_capacity(slice.len() + 1);
+            with_nl.extend_from_slice(slice);
+            with_nl.push(b'\n');
+            let mut stats_nl = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, &with_nl, &mut stats_nl);
+            assert_eq!(stats, stats_nl, "doc {:?} +nl mismatch", doc_fmt);
+        }
+    }
+
+    #[test]
+    fn test_torture_weird_edge_cases_all_languages_and_docs() {
+        let ruby_pod = b"=begin\n\nhello\n  \n=end\n";
+        let mut s = LangStats::default();
+        parse_into(LangId::Ruby, ruby_pod, &mut s);
+        assert_eq!(s.lines(LangId::Ruby), 5);
+        assert_eq!(s.comment_lines(LangId::Ruby), 3);
+        assert_eq!(s.blank_lines(LangId::Ruby), 2);
+        assert_eq!(s.code_lines(LangId::Ruby), 0);
+
+        let ruby_end = b"__END__\n\ncomment\n   ";
+        let mut s = LangStats::default();
+        parse_into(LangId::Ruby, ruby_end, &mut s);
+        assert_eq!(s.lines(LangId::Ruby), 4);
+        assert_eq!(s.code_lines(LangId::Ruby), 1);
+        assert_eq!(s.comment_lines(LangId::Ruby), 1);
+        assert_eq!(s.blank_lines(LangId::Ruby), 2);
+        assert_keyword_sum_and_metrics(LangId::Ruby, &s, ruby_end);
+
+        let objc_at = b"@class Foo;\n@return @YES;\n";
+        let mut s = LangStats::default();
+        parse_into(LangId::ObjectiveC, objc_at, &mut s);
+        assert_eq!(s.lines(LangId::ObjectiveC), 2);
+        assert_eq!(s.code_lines(LangId::ObjectiveC), 2);
+        let objc_kw = |kw: &str| {
+            objc::KEYWORD_NAMES
+                .iter()
+                .position(|&name| name == kw)
+                .unwrap()
+        };
+        let counts = s.keyword_counts(LangId::ObjectiveC);
+        assert_eq!(counts[objc_kw("class")], 1);
+        assert_eq!(counts[objc_kw("return")], 1);
+        assert_eq!(counts[objc_kw("yes")], 1);
+
+        let tex_esc = b"100\\% real % actual comment\n\\% only escaped percent\n";
+        let mut s = LangStats::default();
+        parse_into(LangId::Tex, tex_esc, &mut s);
+        assert_eq!(s.lines(LangId::Tex), 2);
+        assert_eq!(s.code_lines(LangId::Tex), 2);
+        assert_eq!(s.comment_lines(LangId::Tex), 0);
+
+        let scala_sym = b"'symbol + 'other\nval c = 'a'\n";
+        let mut s = LangStats::default();
+        parse_into(LangId::Scala, scala_sym, &mut s);
+        assert_eq!(s.lines(LangId::Scala), 2);
+        assert_eq!(s.code_lines(LangId::Scala), 2);
+        assert_eq!(s.comment_lines(LangId::Scala), 0);
+
+        for doc_fmt in [doc::DocFormatId::Markdown, doc::DocFormatId::Svg] {
+            let mut ds = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, b"<!-- a --> <!-- b -->\n", &mut ds);
+            assert_eq!(ds.lines, 1);
+            assert_eq!(ds.comment_lines, 1);
+            assert_eq!(ds.content_lines, 0);
+
+            let mut ds = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, b"<!-- a --> text <!-- b -->\n", &mut ds);
+            assert_eq!(ds.lines, 1);
+            assert_eq!(ds.content_lines, 1);
+            assert_eq!(ds.comment_lines, 0);
+
+            let mut ds = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, b"text <!--\n inside \n-->\n", &mut ds);
+            assert_eq!(ds.lines, 3);
+            assert_eq!(ds.content_lines, 1);
+            assert_eq!(ds.comment_lines, 2);
+            assert_eq!(ds.blank_lines, 0);
+        }
+
+        let mut ds = doc::DocStats::default();
+        doc::parse_doc_into(doc::DocFormatId::Json5, b"/* a */ /* b */\n", &mut ds);
+        assert_eq!(ds.lines, 1);
+        assert_eq!(ds.comment_lines, 1);
+        assert_eq!(ds.content_lines, 0);
+
+        let mut ds = doc::DocStats::default();
+        doc::parse_doc_into(doc::DocFormatId::Json5, b"/* a */ // b\n", &mut ds);
+        assert_eq!(ds.lines, 1);
+        assert_eq!(ds.comment_lines, 1);
+        assert_eq!(ds.content_lines, 0);
+
+        let mut ds = doc::DocStats::default();
+        doc::parse_doc_into(
+            doc::DocFormatId::Json5,
+            b"\"// not comment\",\n\"/* not comment */\",\n1, /*\n comment \n*/\n",
+            &mut ds,
+        );
+        assert_eq!(ds.lines, 5);
+        assert_eq!(ds.content_lines, 3);
+        assert_eq!(ds.comment_lines, 2);
+
+        let mut ds = doc::DocStats::default();
+        doc::parse_doc_into(
+            doc::DocFormatId::RestructuredText,
+            b".. note::\n.. code-block:: rust\n.. _target:\n.. [cit] ref\n.. |sub| replace:: x\n..\n.. actual comment\n",
+            &mut ds,
+        );
+        assert_eq!(ds.lines, 7);
+        assert_eq!(ds.content_lines, 5);
+        assert_eq!(ds.comment_lines, 2);
+        assert_eq!(ds.blank_lines, 0);
+
+        let weird_universal = concat!(
+            "\n",
+            "   \t  \n",
+            "#include \"a.h\"\n",
+            ".globl main\n",
+            "$#array $#if\n",
+            "=pod\n\n=cut\n",
+            "=cut\n",
+            "__END__\n\nend_tail\n   \n",
+            "@class @return\n",
+            "100\\% ok % cmt\n",
+            "'symbol + 'x'\n",
+            "\"esc \\\" quote\"\n",
+            "`tmpl ${1} \\` ok`\n",
+            "/* block\n\n*/ // tail\n",
+            "<!-- html --> text <!--\n multi \n-->\n",
+            "tail_no_nl"
+        );
+        let mut weird_crlf = String::with_capacity(weird_universal.len() + 64);
+        for b in weird_universal.bytes() {
+            if b == b'\n' {
+                weird_crlf.push('\r');
+            }
+            weird_crlf.push(b as char);
+        }
+
+        for &lang in &ALL_LANGS {
+            let mut s_lf = LangStats::default();
+            parse_into(lang, weird_universal.as_bytes(), &mut s_lf);
+            assert_keyword_sum_and_metrics(lang, &s_lf, weird_universal.as_bytes());
+
+            let mut s_crlf = LangStats::default();
+            parse_into(lang, weird_crlf.as_bytes(), &mut s_crlf);
+            assert_keyword_sum_and_metrics(lang, &s_crlf, weird_crlf.as_bytes());
+            assert_eq!(s_lf.lines(lang), s_crlf.lines(lang), "lang {:?} crlf lines", lang);
+            assert_eq!(s_lf.code_lines(lang), s_crlf.code_lines(lang), "lang {:?} crlf code", lang);
+            assert_eq!(s_lf.comment_lines(lang), s_crlf.comment_lines(lang), "lang {:?} crlf comm", lang);
+            assert_eq!(s_lf.blank_lines(lang), s_crlf.blank_lines(lang), "lang {:?} crlf blnk", lang);
+
+            let bytes = weird_universal.as_bytes();
+            for offset in 0..=bytes.len() {
+                let slice = &bytes[..offset];
+                let mut st = LangStats::default();
+                parse_into(lang, slice, &mut st);
+                assert_keyword_sum_and_metrics(lang, &st, slice);
+            }
+        }
+
+        let weird_doc = b"\n  \n<!-- a --> <!-- b -->\n<!-- x --> text <!--\ninside\n-->\n.. note::\n.. comment\n.. _ref:\n// line\n/* block */\n\"/* not */\"\n1, /*\ncmt\n*/\ntail";
+        let mut weird_doc_crlf = Vec::with_capacity(weird_doc.len() + 32);
+        for &b in weird_doc {
+            if b == b'\n' {
+                weird_doc_crlf.push(b'\r');
+            }
+            weird_doc_crlf.push(b);
+        }
+        for &doc_fmt in &doc::ALL_DOC_FORMATS {
+            assert_doc_invariants(doc_fmt, weird_doc);
+            assert_doc_invariants(doc_fmt, &weird_doc_crlf);
+            let mut d_lf = doc::DocStats::default();
+            let mut d_crlf = doc::DocStats::default();
+            doc::parse_doc_into(doc_fmt, weird_doc, &mut d_lf);
+            doc::parse_doc_into(doc_fmt, &weird_doc_crlf, &mut d_crlf);
+            assert_eq!(d_lf, d_crlf, "doc {:?} crlf mismatch", doc_fmt);
+            for offset in 0..=weird_doc.len() {
+                assert_doc_invariants(doc_fmt, &weird_doc[..offset]);
             }
         }
     }

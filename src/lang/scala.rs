@@ -1,8 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_nested_c_slash_comments,
-    handle_quoted_literal, handle_triple_or_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
-    make_token_kind, make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, handle_char_or_lifetime,
+    handle_nested_c_slash_comments, handle_triple_or_quoted_literal, kw_hash_fml_add,
+    make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 52;
@@ -146,7 +146,7 @@ impl LangLexer<KEYWORD_COUNT> for ScalaLexer {
                 }
             }
             TOK_QUOTE => handle_triple_or_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
+            TOK_APOSTROPHE => handle_char_or_lifetime(content, i, line_state),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

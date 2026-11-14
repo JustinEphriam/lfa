@@ -92,6 +92,11 @@ impl LangLexer<KEYWORD_COUNT> for ObjectiveCLexer {
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
+        let cand = if !cand.is_empty() && cand[0] == b'@' {
+            &cand[1..]
+        } else {
+            cand
+        };
         match_keyword_caseless_with(
             cand,
             KW_MIN_LEN,

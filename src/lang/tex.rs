@@ -91,7 +91,20 @@ impl LangLexer<KEYWORD_COUNT> for TexLexer {
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
         match kind {
-            TOK_PERCENT => finish_line_comment(content, i + 1, line_state, acc),
+            TOK_PERCENT => {
+                let mut bs = 0usize;
+                let mut k = i;
+                while k > 0 && content[k - 1] == b'\\' {
+                    bs += 1;
+                    k -= 1;
+                }
+                if bs % 2 == 1 {
+                    *line_state |= STATE_CODE;
+                    i + 1
+                } else {
+                    finish_line_comment(content, i + 1, line_state, acc)
+                }
+            }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
