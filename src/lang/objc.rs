@@ -155,7 +155,39 @@ fn scan_ident(bytes: &[u8], start: usize) -> usize {
     end
 }
 
+#[inline(always)]
+fn is_c_brace_control_line(trimmed: &[u8]) -> bool {
+    if trimmed.ends_with(b"{") {
+        let mut k = trimmed.len() - 1;
+        while k > 0 && (trimmed[k - 1] == b' ' || trimmed[k - 1] == b'\t') {
+            k -= 1;
+        }
+        if k > 0 && trimmed[k - 1] == b')' {
+            return true;
+        }
+        for kw in [b"else".as_slice(), b"do".as_slice()] {
+            if trimmed.starts_with(kw) && k == kw.len() {
+                return true;
+            }
+        }
+    }
+    if trimmed.starts_with(b"}") {
+        let mut k = 1;
+        while k < trimmed.len() && (trimmed[k] == b' ' || trimmed[k] == b'\t') {
+            k += 1;
+        }
+        let after = &trimmed[k..];
+        if after.starts_with(b"else")
+            && (after.len() == 4 || matches!(after[4], b' ' | b'\t' | b'{'))
+        {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn is_objc_file(content: &[u8]) -> bool {
+    let mut matlab_block_depth = 0usize;
     for raw_line in content.split(|&b| b == b'\n') {
         let mut line = raw_line;
         if line.ends_with(b"\r") {
@@ -165,11 +197,25 @@ pub fn is_objc_file(content: &[u8]) -> bool {
         while s < line.len() && (line[s] == b' ' || line[s] == b'\t') {
             s += 1;
         }
-        let trimmed = &line[s..];
+        let mut e = line.len();
+        while e > s && (line[e - 1] == b' ' || line[e - 1] == b'\t') {
+            e -= 1;
+        }
+        let trimmed = &line[s..e];
+        if trimmed == b"%{" {
+            matlab_block_depth += 1;
+            continue;
+        }
+        if matlab_block_depth > 0 {
+            if trimmed == b"%}" {
+                matlab_block_depth -= 1;
+            }
+            continue;
+        }
         if trimmed.is_empty() || trimmed[0] == b'%' {
             continue;
         }
-        if trimmed[0] == b'}'
+        if is_c_brace_control_line(trimmed)
             || trimmed.starts_with(b"//")
             || trimmed.starts_with(b"/*")
             || trimmed.starts_with(b"- (")
@@ -252,6 +298,11 @@ pub fn is_objc_file(content: &[u8]) -> bool {
                     &trimmed[..end],
                     b"void"
                         | b"int"
+                        | b"char"
+                        | b"short"
+                        | b"long"
+                        | b"float"
+                        | b"double"
                         | b"typedef"
                         | b"static"
                         | b"extern"
@@ -267,11 +318,27 @@ pub fn is_objc_file(content: &[u8]) -> bool {
                         | b"goto"
                         | b"bool"
                         | b"BOOL"
+                        | b"size_t"
+                        | b"ssize_t"
+                        | b"ptrdiff_t"
+                        | b"intptr_t"
+                        | b"uintptr_t"
+                        | b"int8_t"
+                        | b"int16_t"
+                        | b"int32_t"
+                        | b"int64_t"
+                        | b"uint8_t"
+                        | b"uint16_t"
+                        | b"uint32_t"
+                        | b"uint64_t"
                         | b"id"
                         | b"Class"
                         | b"SEL"
                         | b"IMP"
                         | b"instancetype"
+                        | b"NSInteger"
+                        | b"NSUInteger"
+                        | b"CGFloat"
                 )
             {
                 let mut q = end;
@@ -344,6 +411,10 @@ pub mod tests {
         ));
         assert!(!is_objc_file(b"f = @(x) x.^2;\nA = [1, 2; 3, 4];\n"));
         assert!(!is_objc_file(b"c = {1, 2};\nfunction y = f(x)\n  y = x;\nend\n"));
+        assert!(!is_objc_file(b"c = {\n    1, 2;\n    3, 4\n};\n"));
+        assert!(!is_objc_file(
+            b"%{\n@interface Foo\nint main(void) {\n}\n%}\nfunction y = f(x)\n  y = double(x) + char(x);\nend\n"
+        ));
 
         let mut padded = vec![b'\n'; 5100];
         padded.extend_from_slice(b"@implementation Foo\n@end\n");
@@ -353,5 +424,11 @@ pub mod tests {
         assert!(is_objc_file(b"static void helper(int x) {}\n"));
         assert!(is_objc_file(b"typedef struct { int a; } Foo;\n"));
         assert!(is_objc_file(b"#if DEBUG\n}\n#endif\n"));
+        assert!(is_objc_file(
+            b"char *msg = \"hi\";\ndouble x = 1.0;\nlong n = 2;\nfloat f = 3.0f;\nshort s = 4;\n"
+        ));
+        assert!(is_objc_file(
+            b"if (x > 0) {\n    foo();\n} else {\n    bar();\n}\n"
+        ));
     }
 }
