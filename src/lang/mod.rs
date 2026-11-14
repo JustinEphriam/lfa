@@ -3046,17 +3046,24 @@ pub fn skip_nested_block_comment(content: &[u8], start_i: usize) -> usize {
 }
 
 #[inline(always)]
-pub fn skip_nested_plus_slash_comment(content: &[u8], start_i: usize) -> usize {
+pub fn skip_nested_2byte_comment(
+    content: &[u8],
+    start_i: usize,
+    open0: u8,
+    open1: u8,
+    close0: u8,
+    close1: u8,
+) -> usize {
     let content_len = content.len();
     let mut i = start_i;
     let mut depth = 1usize;
     while i + 1 < content_len {
         let b0 = content[i];
         let b1 = content[i + 1];
-        if b0 == b'/' && b1 == b'+' {
+        if b0 == open0 && b1 == open1 {
             depth += 1;
             i += 2;
-        } else if b0 == b'+' && b1 == b'/' {
+        } else if b0 == close0 && b1 == close1 {
             depth -= 1;
             i += 2;
             if depth == 0 {
@@ -3067,54 +3074,39 @@ pub fn skip_nested_plus_slash_comment(content: &[u8], start_i: usize) -> usize {
         }
     }
     content_len
+}
+
+#[inline(always)]
+pub fn handle_nested_2byte_comment<const N: usize>(
+    content: &[u8],
+    i: usize,
+    open: [u8; 2],
+    close: [u8; 2],
+    line_state: &mut u8,
+    acc: &mut ParseResult<N>,
+) -> usize {
+    if i + 1 < content.len() && content[i + 1] == open[1] {
+        let end_i = skip_nested_2byte_comment(content, i + 2, open[0], open[1], close[0], close[1]);
+        finish_block_comment(content, i + 2, end_i, line_state, acc)
+    } else {
+        *line_state |= STATE_CODE;
+        i + 1
+    }
+}
+
+#[inline(always)]
+pub fn skip_nested_plus_slash_comment(content: &[u8], start_i: usize) -> usize {
+    skip_nested_2byte_comment(content, start_i, b'/', b'+', b'+', b'/')
 }
 
 #[inline(always)]
 pub fn skip_nested_hash_bracket_comment(content: &[u8], start_i: usize) -> usize {
-    let content_len = content.len();
-    let mut i = start_i;
-    let mut depth = 1usize;
-    while i + 1 < content_len {
-        let b0 = content[i];
-        let b1 = content[i + 1];
-        if b0 == b'#' && b1 == b'[' {
-            depth += 1;
-            i += 2;
-        } else if b0 == b']' && b1 == b'#' {
-            depth -= 1;
-            i += 2;
-            if depth == 0 {
-                return i;
-            }
-        } else {
-            i += 1;
-        }
-    }
-    content_len
+    skip_nested_2byte_comment(content, start_i, b'#', b'[', b']', b'#')
 }
 
 #[inline(always)]
 pub fn skip_nested_hash_equal_comment(content: &[u8], start_i: usize) -> usize {
-    let content_len = content.len();
-    let mut i = start_i;
-    let mut depth = 1usize;
-    while i + 1 < content_len {
-        let b0 = content[i];
-        let b1 = content[i + 1];
-        if b0 == b'#' && b1 == b'=' {
-            depth += 1;
-            i += 2;
-        } else if b0 == b'=' && b1 == b'#' {
-            depth -= 1;
-            i += 2;
-            if depth == 0 {
-                return i;
-            }
-        } else {
-            i += 1;
-        }
-    }
-    content_len
+    skip_nested_2byte_comment(content, start_i, b'#', b'=', b'=', b'#')
 }
 
 #[inline(always)]

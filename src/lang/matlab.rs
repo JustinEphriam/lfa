@@ -1,7 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
     finish_line_comment, handle_quoted_literal, kw_match_2_to_16, make_token_kind,
-    make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    make_token_lut_lo, skip_nested_2byte_comment, unified_parse_into, LangLexer, ParseResult,
+    STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 20;
@@ -85,21 +86,6 @@ const fn len_matches(n: usize, idx: usize) -> bool {
     n == KEYWORD_LENS[idx] as usize
 }
 
-#[inline(always)]
-fn skip_matlab_block_comment(content: &[u8], start_i: usize) -> usize {
-    let content_len = content.len();
-    let mut i = start_i;
-    while i + 1 < content_len {
-        let b0 = content[i];
-        let b1 = content[i + 1];
-        if b0 == b'%' && b1 == b'}' {
-            return i + 2;
-        }
-        i += 1;
-    }
-    content_len
-}
-
 #[cfg(test)]
 #[inline(always)]
 pub fn is_matlab_extension(name: &[u8]) -> bool {
@@ -144,7 +130,7 @@ impl LangLexer<KEYWORD_COUNT> for MatlabLexer {
         match kind {
             TOK_PERCENT => {
                 if i + 1 < content_len && content[i + 1] == b'{' {
-                    let end_i = skip_matlab_block_comment(content, i + 2);
+                    let end_i = skip_nested_2byte_comment(content, i + 2, b'%', b'{', b'%', b'}');
                     finish_block_comment(content, i + 2, end_i, line_state, acc)
                 } else {
                     finish_line_comment(content, i + 1, line_state, acc)

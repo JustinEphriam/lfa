@@ -1,6 +1,6 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
-    finish_line_comment, handle_quoted_literal, make_token_kind, make_token_lut_lo,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
+    handle_nested_2byte_comment, handle_quoted_literal, make_token_kind, make_token_lut_lo,
     unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
@@ -111,33 +111,10 @@ impl LangLexer<KEYWORD_COUNT> for CommonLispLexer {
         line_state: &mut u8,
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
-        let content_len = content.len();
         match kind {
             TOK_SEMI => finish_line_comment(content, i + 1, line_state, acc),
             TOK_HASH => {
-                if i + 1 < content_len && content[i + 1] == b'|' {
-                    let mut cur = i + 2;
-                    let mut depth = 1usize;
-                    while cur < content_len && depth > 0 {
-                        if cur + 1 < content_len && content[cur] == b'#' && content[cur + 1] == b'|'
-                        {
-                            depth += 1;
-                            cur += 2;
-                        } else if cur + 1 < content_len
-                            && content[cur] == b'|'
-                            && content[cur + 1] == b'#'
-                        {
-                            depth -= 1;
-                            cur += 2;
-                        } else {
-                            cur += 1;
-                        }
-                    }
-                    finish_block_comment(content, i + 2, cur, line_state, acc)
-                } else {
-                    *line_state |= STATE_CODE;
-                    i + 1
-                }
+                handle_nested_2byte_comment(content, i, *b"#|", *b"|#", line_state, acc)
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             _ => {

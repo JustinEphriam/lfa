@@ -1,6 +1,6 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
-    finish_line_comment, handle_quoted_literal, kw_match_2_to_16, make_token_kind,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
+    handle_nested_2byte_comment, handle_quoted_literal, kw_match_2_to_16, make_token_kind,
     make_token_lut_lo, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
@@ -157,28 +157,7 @@ impl LangLexer<KEYWORD_COUNT> for HaskellLexer {
                 }
             }
             TOK_LBRACE => {
-                if i + 1 < content_len && content[i + 1] == b'-' {
-                    let mut cur = i + 2;
-                    let mut depth = 1usize;
-                    while cur + 1 < content_len {
-                        if content[cur] == b'{' && content[cur + 1] == b'-' {
-                            depth += 1;
-                            cur += 2;
-                        } else if content[cur] == b'-' && content[cur + 1] == b'}' {
-                            depth -= 1;
-                            cur += 2;
-                            if depth == 0 {
-                                return finish_block_comment(content, i + 2, cur, line_state, acc);
-                            }
-                        } else {
-                            cur += 1;
-                        }
-                    }
-                    finish_block_comment(content, i + 2, content_len, line_state, acc)
-                } else {
-                    *line_state |= STATE_CODE;
-                    i + 1
-                }
+                handle_nested_2byte_comment(content, i, *b"{-", *b"-}", line_state, acc)
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
