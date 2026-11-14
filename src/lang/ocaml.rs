@@ -1,8 +1,8 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    handle_nested_2byte_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
-    make_token_kind, make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer,
-    ParseResult, STATE_CODE,
+    handle_char_or_lifetime, handle_nested_2byte_comment, handle_quoted_literal, kw_hash_fml_add,
+    make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 56;
@@ -177,7 +177,7 @@ impl LangLexer<KEYWORD_COUNT> for OCamlLexer {
                 i + 1
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
+            TOK_APOSTROPHE => handle_char_or_lifetime(content, i, line_state),
             _ => i + 1,
         }
     }

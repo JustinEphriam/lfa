@@ -2,7 +2,7 @@ use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
     handle_quoted_literal, kw_hash_fml_xor, make_kw_table_fml_xor, make_token_kind,
     make_token_lut_lo, match_keyword_caseless_with, unified_parse_into, LangLexer, ParseResult,
-    STATE_CODE, STATE_NONE, TOK_CODE,
+    STATE_CODE, TOK_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 44;
@@ -49,17 +49,6 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
 
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
-#[inline(always)]
-fn is_column_7_indicator(content: &[u8], i: usize) -> bool {
-    if i == 6 {
-        return true;
-    }
-    if i > 6 && content[i - 7] == b'\n' {
-        return true;
-    }
-    false
-}
-
 pub struct CobolLexer;
 
 impl LangLexer<KEYWORD_COUNT> for CobolLexer {
@@ -67,6 +56,32 @@ impl LangLexer<KEYWORD_COUNT> for CobolLexer {
     const TOKEN_LUT_LO: [i8; 32] = TOKEN_LUT_LO;
     const HAS_DOLLAR_IDENT: bool = false;
     const SUPPORTS_TEMPLATES: bool = false;
+    const HAS_LINE_START_HOOK: bool = true;
+
+    #[inline(always)]
+    fn handle_line_start(
+        content: &[u8],
+        i: usize,
+        line_state: &mut u8,
+        acc: &mut ParseResult<KEYWORD_COUNT>,
+    ) -> usize {
+        let mut line_start = i;
+        let min_start = i.saturating_sub(6);
+        while line_start > min_start && content[line_start - 1] != b'\n' {
+            line_start -= 1;
+        }
+        if (line_start == 0 || content[line_start - 1] == b'\n') && line_start + 6 < content.len() {
+            let ind = content[line_start + 6];
+            if (ind == b'*' || ind == b'/')
+                && content[line_start..line_start + 6]
+                    .iter()
+                    .all(|&b| b == b' ' || b.is_ascii_digit())
+            {
+                return finish_line_comment(content, line_start + 7, line_state, acc);
+            }
+        }
+        i
+    }
 
     #[inline(always)]
     fn match_keyword(cand: &[u8]) -> Option<usize> {
@@ -92,9 +107,7 @@ impl LangLexer<KEYWORD_COUNT> for CobolLexer {
         let content_len = content.len();
         match kind {
             TOK_STAR => {
-                if (i + 1 < content_len && content[i + 1] == b'>')
-                    || (*line_state == STATE_NONE && is_column_7_indicator(content, i))
-                {
+                if i + 1 < content_len && content[i + 1] == b'>' {
                     finish_line_comment(content, i + 1, line_state, acc)
                 } else {
                     *line_state |= STATE_CODE;
@@ -102,12 +115,8 @@ impl LangLexer<KEYWORD_COUNT> for CobolLexer {
                 }
             }
             TOK_SLASH => {
-                if *line_state == STATE_NONE && is_column_7_indicator(content, i) {
-                    finish_line_comment(content, i + 1, line_state, acc)
-                } else {
-                    *line_state |= STATE_CODE;
-                    i + 1
-                }
+                *line_state |= STATE_CODE;
+                i + 1
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
             TOK_SQUOTE => handle_quoted_literal(content, i, b'\'', line_state, acc),

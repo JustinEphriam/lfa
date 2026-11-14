@@ -3400,174 +3400,202 @@ pub fn handle_nested_2byte_comment<const N: usize>(
     }
 }
 
-pub fn skip_lisp_datum(content: &[u8], start_i: usize) -> usize {
+pub fn skip_lisp_datum_with(content: &[u8], start_i: usize, datum_marker: u8) -> usize {
     let content_len = content.len();
     let mut p = start_i;
-    let mut crossed_nl = false;
-    loop {
-        while p < content_len
-            && (content[p] == b' ' || content[p] == b'\t' || content[p] == b'\r')
-        {
-            p += 1;
-        }
-        if p >= content_len {
-            return p;
-        }
-        if content[p] == b'\n' {
-            if crossed_nl {
-                return p;
-            }
-            let mut q = p + 1;
-            while q < content_len
-                && (content[q] == b' ' || content[q] == b'\t' || content[q] == b'\r')
+    let mut checkpoint = start_i;
+    let mut rem_datums = 1usize;
+
+    while rem_datums > 0 {
+        loop {
+            while p < content_len
+                && (content[p] == b' '
+                    || content[p] == b'\t'
+                    || content[p] == b'\r'
+                    || content[p] == b'\n')
             {
-                q += 1;
-            }
-            if q < content_len && content[q] != b'\n' && content[q] != b';' {
-                crossed_nl = true;
-                p = q;
-            } else {
-                return p;
-            }
-        }
-        let b = content[p];
-        if b == b'\'' || b == b'`' {
-            p += 1;
-            continue;
-        }
-        if b == b',' {
-            if p + 1 < content_len && content[p + 1] == b'@' {
-                p += 2;
-            } else {
                 p += 1;
             }
-            continue;
-        }
-        if b == b'#' && p + 1 < content_len {
-            let next = content[p + 1];
-            if next == b'\'' || next == b'`' || next == b';' {
-                p += 2;
-                continue;
+            if p >= content_len {
+                return checkpoint;
             }
-            if next == b',' {
-                if p + 2 < content_len && content[p + 2] == b'@' {
-                    p += 3;
-                } else {
-                    p += 2;
+            let b = content[p];
+            if b == b';' {
+                if let Some(pos) = find_byte_avx2(&content[p + 1..], b'\n') {
+                    p = p + 1 + pos;
+                    continue;
                 }
-                continue;
+                return checkpoint;
             }
-            if next == b'|' {
-                p = skip_nested_2byte_comment(content, p + 2, b'#', b'|', b'|', b'#');
-                continue;
-            }
-            if next == b'(' || next == b'[' || next == b'{' || next == b'"' {
+            if b == b'\'' || b == b'`' || (datum_marker == b'_' && b == b'^') {
                 p += 1;
+                continue;
             }
-        }
-        break;
-    }
-    if p >= content_len || content[p] == b'\n' || content[p] == b';' {
-        return p;
-    }
-    match content[p] {
-        b'(' | b'[' | b'{' => {
-            let mut depth = 1usize;
-            p += 1;
-            while p < content_len && depth > 0 {
-                match content[p] {
-                    b'(' | b'[' | b'{' => {
-                        depth += 1;
-                        p += 1;
-                    }
-                    b')' | b']' | b'}' => {
-                        depth -= 1;
-                        p += 1;
-                    }
-                    b'"' => {
-                        p = skip_literal(content, p + 1, b'"');
-                    }
-                    b';' => {
-                        if let Some(pos) = find_byte_avx2(&content[p + 1..], b'\n') {
-                            p += 1 + pos;
-                        } else {
-                            return content_len;
-                        }
-                    }
-                    b'#' if p + 1 < content_len && content[p + 1] == b'|' => {
-                        p = skip_nested_2byte_comment(content, p + 2, b'#', b'|', b'|', b'#');
-                    }
-                    b'#' if p + 2 < content_len
-                        && content[p + 1] == b'\\'
-                        && content[p + 2] != b'\n' =>
-                    {
-                        p += 3;
-                    }
-                    b'|' => {
-                        p += 1;
-                        while p < content_len && content[p] != b'|' {
-                            if content[p] == b'\\' && p + 1 < content_len {
-                                p += 2;
-                            } else {
-                                p += 1;
-                            }
-                        }
-                        if p < content_len {
-                            p += 1;
-                        }
-                    }
-                    _ => {
-                        p += 1;
-                    }
-                }
-            }
-            p
-        }
-        b'"' => skip_literal(content, p + 1, b'"'),
-        b'|' => {
-            p += 1;
-            while p < content_len && content[p] != b'|' {
-                if content[p] == b'\\' && p + 1 < content_len {
+            if b == b',' {
+                if p + 1 < content_len && content[p + 1] == b'@' {
                     p += 2;
                 } else {
                     p += 1;
                 }
+                continue;
             }
-            if p < content_len {
-                p += 1;
-            }
-            p
-        }
-        _ => {
-            if content[p] == b'#'
-                && p + 2 < content_len
-                && content[p + 1] == b'\\'
-                && content[p + 2] != b'\n'
-            {
-                p += 3;
-            }
-            while p < content_len {
-                let b = content[p];
-                if b == b' '
-                    || b == b'\t'
-                    || b == b'\r'
-                    || b == b'\n'
-                    || b == b';'
-                    || b == b'('
-                    || b == b')'
-                    || b == b'['
-                    || b == b']'
-                    || b == b'{'
-                    || b == b'}'
-                    || b == b'"'
-                {
-                    break;
+            if b == b'#' && p + 1 < content_len {
+                let next = content[p + 1];
+                if next == datum_marker {
+                    rem_datums += 1;
+                    p += 2;
+                    continue;
                 }
-                p += 1;
+                if next == b'\'' || next == b'`' || (datum_marker == b'_' && next == b'^') {
+                    p += 2;
+                    continue;
+                }
+                if next == b',' {
+                    if p + 2 < content_len && content[p + 2] == b'@' {
+                        p += 3;
+                    } else {
+                        p += 2;
+                    }
+                    continue;
+                }
+                if datum_marker == b'_' && next == b'?' {
+                    if p + 2 < content_len && content[p + 2] == b'@' {
+                        p += 3;
+                    } else {
+                        p += 2;
+                    }
+                    continue;
+                }
+                if datum_marker == b';' && next == b'|' {
+                    p = skip_nested_2byte_comment(content, p + 2, b'#', b'|', b'|', b'#');
+                    continue;
+                }
+                if next == b'(' || next == b'[' || next == b'{' || next == b'"' {
+                    p += 1;
+                }
             }
-            p
+            break;
         }
+        if p >= content_len || content[p] == b')' || content[p] == b']' || content[p] == b'}' {
+            return checkpoint;
+        }
+        p = match content[p] {
+            b'(' | b'[' | b'{' => {
+                let mut depth = 1usize;
+                let mut q = p + 1;
+                while q < content_len && depth > 0 {
+                    match content[q] {
+                        b'(' | b'[' | b'{' => {
+                            depth += 1;
+                            q += 1;
+                        }
+                        b')' | b']' | b'}' => {
+                            depth -= 1;
+                            q += 1;
+                        }
+                        b'"' => {
+                            q = skip_literal(content, q + 1, b'"');
+                        }
+                        b';' => {
+                            if let Some(pos) = find_byte_avx2(&content[q + 1..], b'\n') {
+                                q += 1 + pos;
+                            } else {
+                                q = content_len;
+                                break;
+                            }
+                        }
+                        b'#' if datum_marker == b';'
+                            && q + 1 < content_len
+                            && content[q + 1] == b'|' =>
+                        {
+                            q = skip_nested_2byte_comment(content, q + 2, b'#', b'|', b'|', b'#');
+                        }
+                        b'#' if q + 2 < content_len
+                            && content[q + 1] == b'\\'
+                            && content[q + 2] != b'\n' =>
+                        {
+                            q += 3;
+                        }
+                        b'\\' if q + 1 < content_len && content[q + 1] != b'\n' => {
+                            q += 2;
+                        }
+                        b'|' if datum_marker == b';' => {
+                            q += 1;
+                            while q < content_len && content[q] != b'|' {
+                                if content[q] == b'\\' && q + 1 < content_len {
+                                    q += 2;
+                                } else {
+                                    q += 1;
+                                }
+                            }
+                            if q < content_len {
+                                q += 1;
+                            }
+                        }
+                        _ => {
+                            q += 1;
+                        }
+                    }
+                }
+                q
+            }
+            b'"' => skip_literal(content, p + 1, b'"'),
+            b'|' if datum_marker == b';' => {
+                let mut q = p + 1;
+                while q < content_len && content[q] != b'|' {
+                    if content[q] == b'\\' && q + 1 < content_len {
+                        q += 2;
+                    } else {
+                        q += 1;
+                    }
+                }
+                if q < content_len {
+                    q += 1;
+                }
+                q
+            }
+            _ => {
+                let mut q = p;
+                if content[q] == b'#'
+                    && q + 2 < content_len
+                    && content[q + 1] == b'\\'
+                    && content[q + 2] != b'\n'
+                {
+                    q += 3;
+                } else if content[q] == b'\\' && q + 1 < content_len && content[q + 1] != b'\n' {
+                    q += 2;
+                }
+                while q < content_len {
+                    let b = content[q];
+                    if b == b' '
+                        || b == b'\t'
+                        || b == b'\r'
+                        || b == b'\n'
+                        || b == b';'
+                        || b == b'('
+                        || b == b')'
+                        || b == b'['
+                        || b == b']'
+                        || b == b'{'
+                        || b == b'}'
+                        || b == b'"'
+                    {
+                        break;
+                    }
+                    q += 1;
+                }
+                q
+            }
+        };
+        checkpoint = p;
+        rem_datums -= 1;
     }
+    checkpoint
+}
+
+#[inline(always)]
+pub fn skip_lisp_datum(content: &[u8], start_i: usize) -> usize {
+    skip_lisp_datum_with(content, start_i, b';')
 }
 
 #[inline(always)]
@@ -3807,6 +3835,42 @@ pub fn handle_nested_c_slash_comments<const N: usize>(
         }
     }
     *line_state |= STATE_CODE;
+    i + 1
+}
+
+#[inline(always)]
+pub fn handle_char_or_lifetime(content: &[u8], i: usize, line_state: &mut u8) -> usize {
+    *line_state |= STATE_CODE;
+    let content_len = content.len();
+    if i + 1 >= content_len {
+        return i + 1;
+    }
+    let next = content[i + 1];
+    if next == b'\\' {
+        if i + 2 < content_len && content[i + 2] != b'\n' {
+            let mut p = i + 3;
+            while p < content_len && content[p] != b'\n' {
+                if content[p] == b'\'' {
+                    return p + 1;
+                }
+                p += 1;
+            }
+        }
+        return i + 1;
+    }
+    if next != b'\'' && next != b'\n' && i + 2 < content_len && content[i + 2] == b'\'' {
+        return i + 3;
+    }
+    if next >= 0x80 {
+        let max_end = (i + 5).min(content_len);
+        let mut p = i + 2;
+        while p < max_end && content[p] >= 0x80 {
+            p += 1;
+        }
+        if p < content_len && content[p] == b'\'' {
+            return p + 1;
+        }
+    }
     i + 1
 }
 
@@ -4278,6 +4342,7 @@ mod tests {
                 samples.push("a\n#= x\ny =#".to_string());
                 samples.push("a #= x\ny".to_string());
                 samples.push("a\n#= x =# b".to_string());
+                samples.push("y = A'\nif x\n  c = '\\''\nend\n# c".to_string());
             }
             if lang == LangId::Matlab {
                 samples.push("a\n%{\nx\n%}".to_string());
@@ -4295,6 +4360,13 @@ mod tests {
             }
             if lang == LangId::OCaml {
                 samples.push("let x = {a = 1} | {b = 2}\n(* c *)".to_string());
+                samples.push("type 'a t = 'a\nlet x = 'c'\n(* c *)".to_string());
+            }
+            if lang == LangId::FSharp {
+                samples.push("type 'a t = 'a\nlet x = 'c'\n// c".to_string());
+            }
+            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript {
+                samples.push("f x' = x'' + 1\nc = '\\''\n-- c".to_string());
             }
             if lang == LangId::Nix {
                 samples.push("''\n#".to_string());
@@ -4303,10 +4375,54 @@ mod tests {
                 samples.push("a\n#;   ".to_string());
                 samples.push("#;(define (f x)\n  (if x 1 2))\n(let ([y 3]) y)".to_string());
                 samples.push("#;\n(define x 1)".to_string());
+                samples.push("#; ; note\n(define x 1)".to_string());
+                samples.push("#;\n\n(define x 1)".to_string());
+                samples.push("#; #| block\nnote |#\n(define x 1)".to_string());
+                samples.push("#;#;\n(define a 1)\n(let ([x 2]) x)\n(if 1 2 3)".to_string());
+                samples.push("a\n#; ; orphan".to_string());
+                samples.push("a\n#;\n; orphan".to_string());
             }
             if lang == LangId::Scheme {
                 samples.push("#;(define (f x)\n  (if x 1 2))\n(let ([y 3]) y)".to_string());
                 samples.push("#;\n(define x 1)".to_string());
+                samples.push("#; ; note\n(define x 1)".to_string());
+                samples.push("#;\n\n(define x 1)".to_string());
+                samples.push("#; #| block\nnote |#\n(define x 1)".to_string());
+                samples.push("#;#;\n(define a 1)\n(let ([x 2]) x)\n(if 1 2 3)".to_string());
+                samples.push("a\n#; ; orphan".to_string());
+                samples.push("a\n#;\n; orphan".to_string());
+            }
+            if lang == LangId::Clojure {
+                samples.push("#_(defn f [x] (if x 1 2))\n(let [y 3] y)".to_string());
+                samples.push("#_\n(defn f [x] x)".to_string());
+                samples.push("#_ ; note\n(def x 1)".to_string());
+                samples.push("#_\n\n(def x 1)".to_string());
+                samples.push("a\n#_ ; orphan".to_string());
+                samples.push("#_#_ (def a 1)\n(def b 2)\n(when true 1)".to_string());
+                samples.push("(let [x# 1]\n  x#)".to_string());
+            }
+            if lang == LangId::Fortran {
+                samples.push(
+                    "call foo()\n  contains\n  cycle\nc = 1\nC fixed comment\n* star comment\n! bang comment"
+                        .to_string(),
+                );
+                samples.push("  * code\n! comment".to_string());
+            }
+            if lang == LangId::Cobol {
+                samples.push("000100* SEQ COMMENT\n000200 DISPLAY 'HI'.".to_string());
+                samples.push(
+                    "000100/ PAGE COMMENT\n      * SPACE COMMENT\n000300 MOVE A TO B."
+                        .to_string(),
+                );
+                samples.push("foobar*2\n*> inline".to_string());
+            }
+            if lang == LangId::Matlab {
+                samples.push("y = A';\nif x\nend\n% c".to_string());
+                samples.push("B = (a + b)' + [1]' + c{1}' + A.';\n% c".to_string());
+            }
+            if lang == LangId::SystemVerilog {
+                samples.push("logic a = 1'b0;\nmodule m;\nendmodule\n// c".to_string());
+                samples.push("wire x = '0;\n// c".to_string());
             }
             if lang == LangId::Perl {
                 samples.push("a\n=pod\nx\ny".to_string());
@@ -4391,6 +4507,171 @@ mod tests {
         assert_eq!(line_metrics(LangId::Perl, b"__END__ = 1;\n# c\n"), [2, 1, 1, 0]);
         assert_eq!(line_metrics(LangId::Ruby, b"puts __END__\n# c\n"), [2, 1, 1, 0]);
         assert_eq!(line_metrics(LangId::Ruby, b"__END__ = 1\n# c\n"), [2, 1, 1, 0]);
+        for lang in [LangId::Racket, LangId::Scheme] {
+            assert_eq!(
+                line_metrics(lang, b"#; ; note\n(define x 1)\n"),
+                [2, 0, 2, 0],
+                "{}",
+                lang.name()
+            );
+            assert_eq!(
+                line_metrics(lang, b"#;\n\n(define x 1)\n"),
+                [3, 0, 3, 0],
+                "{}",
+                lang.name()
+            );
+            assert_eq!(
+                line_metrics(lang, b"#; #| block\nnote |#\n(define x 1)\n"),
+                [3, 0, 3, 0],
+                "{}",
+                lang.name()
+            );
+            let mut kw_stats = LangStats::default();
+            parse_into(
+                lang,
+                b"#;#;\n(define a 1)\n(let ([x 2]) x)\n(if 1 2 3)\n",
+                &mut kw_stats,
+            );
+            assert_eq!(
+                [
+                    kw_stats.lines(lang),
+                    kw_stats.code_lines(lang),
+                    kw_stats.comment_lines(lang),
+                    kw_stats.blank_lines(lang),
+                ],
+                [4, 1, 3, 0],
+                "{}",
+                lang.name()
+            );
+            assert_eq!(kw_stats.total_keywords(lang), 1, "{}", lang.name());
+            assert_eq!(line_metrics(lang, b"a\n#; ; orphan\n"), [2, 1, 1, 0], "{}", lang.name());
+            assert_eq!(line_metrics(lang, b"a\n#;\n; orphan\n"), [3, 1, 2, 0], "{}", lang.name());
+        }
+        assert_eq!(
+            line_metrics(LangId::Clojure, b"#_(defn f [x] (if x 1 2))\n(let [y 3] y)\n"),
+            [2, 1, 1, 0]
+        );
+        assert_eq!(
+            line_metrics(LangId::Clojure, b"#_ ; note\n(def x 1)\n"),
+            [2, 0, 2, 0]
+        );
+        assert_eq!(
+            line_metrics(LangId::Clojure, b"#_\n\n(def x 1)\n"),
+            [3, 0, 3, 0]
+        );
+        assert_eq!(
+            line_metrics(LangId::Clojure, b"a\n#_ ; orphan\n"),
+            [2, 1, 1, 0]
+        );
+        let mut clj_kw = LangStats::default();
+        parse_into(
+            LangId::Clojure,
+            b"#_#_(def a 1)\n(def b 2)\n(let [x# 1]\n  (when x# 2))\n",
+            &mut clj_kw,
+        );
+        assert_eq!(
+            [
+                clj_kw.lines(LangId::Clojure),
+                clj_kw.code_lines(LangId::Clojure),
+                clj_kw.comment_lines(LangId::Clojure),
+                clj_kw.blank_lines(LangId::Clojure),
+            ],
+            [4, 2, 2, 0]
+        );
+        assert_eq!(clj_kw.total_keywords(LangId::Clojure), 2);
+        assert_eq!(
+            line_metrics(
+                LangId::Fortran,
+                b"call foo()\n  contains\n  cycle\nc = 1\nC fixed comment\n* star comment\n! bang comment\n"
+            ),
+            [7, 4, 3, 0]
+        );
+        assert_eq!(line_metrics(LangId::Fortran, b"  * code\n! comment\n"), [2, 1, 1, 0]);
+        let mut cobol_kw = LangStats::default();
+        parse_into(
+            LangId::Cobol,
+            b"000100* SEQ COMMENT\n000200 DISPLAY 'HI'.\n000300/ PAGE\n      * SPACE\n",
+            &mut cobol_kw,
+        );
+        assert_eq!(
+            [
+                cobol_kw.lines(LangId::Cobol),
+                cobol_kw.code_lines(LangId::Cobol),
+                cobol_kw.comment_lines(LangId::Cobol),
+                cobol_kw.blank_lines(LangId::Cobol),
+            ],
+            [4, 1, 3, 0]
+        );
+        assert_eq!(cobol_kw.total_keywords(LangId::Cobol), 1);
+        assert_eq!(line_metrics(LangId::Cobol, b"foobar*2\n*> inline\n"), [2, 1, 1, 0]);
+        let mut matlab_kw = LangStats::default();
+        parse_into(
+            LangId::Matlab,
+            b"y = A';\nif x\n  B = (a + b)' + [1]' + c{1}' + A.';\nend\n% c\n",
+            &mut matlab_kw,
+        );
+        assert_eq!(
+            [
+                matlab_kw.lines(LangId::Matlab),
+                matlab_kw.code_lines(LangId::Matlab),
+                matlab_kw.comment_lines(LangId::Matlab),
+                matlab_kw.blank_lines(LangId::Matlab),
+            ],
+            [5, 4, 1, 0]
+        );
+        assert_eq!(matlab_kw.total_keywords(LangId::Matlab), 2);
+        let mut sv_kw = LangStats::default();
+        parse_into(
+            LangId::SystemVerilog,
+            b"logic a = 1'b0;\nwire y = '0;\nmodule m;\nendmodule\n// c\n",
+            &mut sv_kw,
+        );
+        assert_eq!(
+            [
+                sv_kw.lines(LangId::SystemVerilog),
+                sv_kw.code_lines(LangId::SystemVerilog),
+                sv_kw.comment_lines(LangId::SystemVerilog),
+                sv_kw.blank_lines(LangId::SystemVerilog),
+            ],
+            [5, 4, 1, 0]
+        );
+        assert_eq!(sv_kw.total_keywords(LangId::SystemVerilog), 3);
+        assert_eq!(
+            line_metrics(LangId::OCaml, b"type 'a t = 'a\nlet x = 'c'\n(* c *)\n"),
+            [3, 2, 1, 0]
+        );
+        assert_eq!(
+            line_metrics(LangId::FSharp, b"type 'a t = 'a\nlet x = 'c'\n// c\n"),
+            [3, 2, 1, 0]
+        );
+        for lang in [LangId::Haskell, LangId::Elm, LangId::PureScript] {
+            assert_eq!(
+                line_metrics(lang, b"f x' = x'' + 1\nc = '\\''\n-- c\n"),
+                [3, 2, 1, 0],
+                "{}",
+                lang.name()
+            );
+        }
+        let mut julia_kw = LangStats::default();
+        parse_into(
+            LangId::Julia,
+            b"y = A'\nif x\n  c = '\\''\nend\n# c\n",
+            &mut julia_kw,
+        );
+        assert_eq!(
+            [
+                julia_kw.lines(LangId::Julia),
+                julia_kw.code_lines(LangId::Julia),
+                julia_kw.comment_lines(LangId::Julia),
+                julia_kw.blank_lines(LangId::Julia),
+            ],
+            [5, 4, 1, 0]
+        );
+        assert_eq!(julia_kw.total_keywords(LangId::Julia), 2);
+        assert_eq!(
+            line_metrics(LangId::Rust, "let u = 'é';\nlet b = b'\\'';\n// c\n".as_bytes()),
+            [3, 2, 1, 0]
+        );
     }
 
     #[test]
@@ -5138,6 +5419,41 @@ mod tests {
                 parse_into(lang, &prefixed, &mut stats2);
                 assert_keyword_sum_and_metrics(lang, &stats2, &prefixed);
                 assert_eq!(stats2.total_keywords(lang), 0, "lang {:?} kw {}", lang, kw);
+
+                for prefix in [b"".as_slice(), b"  ".as_slice()] {
+                    let mut start_src = Vec::with_capacity(kw.len() + prefix.len() + 1);
+                    start_src.extend_from_slice(prefix);
+                    start_src.extend_from_slice(kw.as_bytes());
+                    start_src.push(b'\n');
+
+                    let mut stats_start = LangStats::default();
+                    parse_into(lang, &start_src, &mut stats_start);
+                    assert_keyword_sum_and_metrics(lang, &stats_start, &start_src);
+                    assert_eq!(
+                        stats_start.total_keywords(lang),
+                        1,
+                        "line-start lang {:?} prefix {:?} kw {}",
+                        lang,
+                        prefix,
+                        kw
+                    );
+                    assert_eq!(
+                        stats_start.keyword_counts(lang)[i],
+                        1,
+                        "line-start lang {:?} prefix {:?} kw {}",
+                        lang,
+                        prefix,
+                        kw
+                    );
+                    assert_eq!(
+                        stats_start.code_lines(lang),
+                        1,
+                        "line-start lang {:?} prefix {:?} kw {}",
+                        lang,
+                        prefix,
+                        kw
+                    );
+                }
             }
         }
     }
@@ -5352,7 +5668,7 @@ mod tests {
                 assert_keyword_sum_and_metrics(lang, &stats, slice);
             }
 
-            let polyglot_special = b"SELECT 'a\\\nb' FROM t;\nlet x = {a = 1} | {b = 2}\n{|ocaml\nraw|}\n''\nnix\n#''\n#;   \r\n#;(define (f x)\n  (if x 1 2))\n#;\n(let ([y 3]) y)\n__END__ = 1\n=pod\npod line\n=cut\n=begin\nruby line\n=end\n__END__\ntrailing\n";
+            let polyglot_special = b"SELECT 'a\\\nb' FROM t;\nlet x = {a = 1} | {b = 2}\n{|ocaml\nraw|}\n''\nnix\n#''\n#;   \r\n#;(define (f x)\n  (if x 1 2))\n#;\n(let ([y 3]) y)\n#; ; note\n#;\n; orphan\n#_(defn f [x] x)\n000100* SEQ\n000200/ PAGE\ncall foo()\nc = 1\ny = A';\nlogic a = 1'b0;\ntype 'a t = 'a\nf x' = x''\n__END__ = 1\n=pod\npod line\n=cut\n=begin\nruby line\n=end\n__END__\ntrailing\n";
             for offset in 1..=polyglot_special.len() {
                 let slice = &polyglot_special[..offset];
                 let mut stats = LangStats::default();

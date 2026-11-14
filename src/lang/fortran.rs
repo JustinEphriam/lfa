@@ -196,12 +196,39 @@ impl LangLexer<KEYWORD_COUNT> for FortranLexer {
         line_state: &mut u8,
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
-        let b = content[i];
-        if b == b'c' || b == b'C' || b == b'*' {
-            finish_line_comment(content, i + 1, line_state, acc)
-        } else {
-            i
+        if i > 0 && content[i - 1] != b'\n' {
+            return i;
         }
+        let b = content[i];
+        if b == b'*' {
+            return finish_line_comment(content, i + 1, line_state, acc);
+        }
+        if b == b'c' || b == b'C' {
+            let content_len = content.len();
+            if i + 1 < content_len {
+                let next = content[i + 1];
+                if next.is_ascii_alphanumeric()
+                    || next == b'_'
+                    || next == b'('
+                    || next == b'%'
+                    || next == b'['
+                {
+                    return i;
+                }
+                let mut k = i + 1;
+                while k < content_len && (content[k] == b' ' || content[k] == b'\t') {
+                    k += 1;
+                }
+                if k < content_len
+                    && content[k] == b'='
+                    && (k + 1 >= content_len || content[k + 1] != b'=')
+                {
+                    return i;
+                }
+            }
+            return finish_line_comment(content, i + 1, line_state, acc);
+        }
+        i
     }
 
     #[inline(always)]

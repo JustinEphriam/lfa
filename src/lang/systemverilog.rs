@@ -62,14 +62,12 @@ const KW_TABLE: [u8; 128] = make_kw_table_fml_add(&KEYWORD_NAMES, [5989, 7618, 5
 const TOK_IDENT: u8 = 3;
 const TOK_SLASH: u8 = 4;
 const TOK_QUOTE: u8 = 5;
-const TOK_SQUOTE: u8 = 6;
 
 pub const TOKEN_KIND: [u8; 256] = make_token_kind(
     TOK_IDENT,
     &[
         (b'/', TOK_SLASH),
         (b'"', TOK_QUOTE),
-        (b'\'', TOK_SQUOTE),
     ],
 );
 
@@ -107,7 +105,6 @@ impl LangLexer<KEYWORD_COUNT> for SystemVerilogLexer {
         match kind {
             TOK_SLASH => handle_c_slash_comments(content, i, line_state, acc),
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_SQUOTE => handle_quoted_literal(content, i, b'\'', line_state, acc),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

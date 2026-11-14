@@ -2,7 +2,7 @@ use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
     finish_line_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
     make_token_kind, make_token_lut_lo, match_keyword_with, skip_nested_2byte_comment,
-    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    unified_parse_into, LangLexer, ParseResult, IDENT_CONT, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 20;
@@ -104,7 +104,21 @@ impl LangLexer<KEYWORD_COUNT> for MatlabLexer {
                 }
             }
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
+            TOK_APOSTROPHE => {
+                if i > 0 {
+                    let prev = content[i - 1];
+                    if IDENT_CONT[prev as usize] != 0
+                        || prev == b')'
+                        || prev == b']'
+                        || prev == b'}'
+                        || prev == b'.'
+                    {
+                        *line_state |= STATE_CODE;
+                        return i + 1;
+                    }
+                }
+                handle_quoted_literal(content, i, b'\'', line_state, acc)
+            }
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

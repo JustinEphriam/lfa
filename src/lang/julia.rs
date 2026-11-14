@@ -1,6 +1,6 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
-    finish_line_comment, handle_quoted_literal, handle_triple_or_quoted_literal, kw_hash_fml_add,
+    finish_line_comment, handle_char_or_lifetime, handle_triple_or_quoted_literal, kw_hash_fml_add,
     make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
     skip_nested_hash_equal_comment, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
@@ -113,7 +113,7 @@ impl LangLexer<KEYWORD_COUNT> for JuliaLexer {
                 }
             }
             TOK_QUOTE => handle_triple_or_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_APOSTROPHE => handle_quoted_literal(content, i, b'\'', line_state, acc),
+            TOK_APOSTROPHE => handle_char_or_lifetime(content, i, line_state),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

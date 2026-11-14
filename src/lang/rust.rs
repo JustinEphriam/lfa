@@ -1,7 +1,7 @@
 use super::{
     compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, count_newlines_avx2,
-    find_byte_avx2, handle_nested_c_slash_comments, handle_quoted_literal, kw_hash_fml_add,
-    make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
+    find_byte_avx2, handle_char_or_lifetime, handle_nested_c_slash_comments, handle_quoted_literal,
+    kw_hash_fml_add, make_kw_table_fml_add, make_token_kind, make_token_lut_lo, match_keyword_with,
     skip_ident_cont_avx2, unified_parse_into, LangLexer, ParseResult, IDENT_CONT, STATE_CODE,
 };
 
@@ -207,26 +207,10 @@ impl LangLexer<KEYWORD_COUNT> for RustLexer {
         line_state: &mut u8,
         acc: &mut ParseResult<KEYWORD_COUNT>,
     ) -> usize {
-        let content_len = content.len();
         match kind {
             TOK_SLASH => handle_nested_c_slash_comments(content, i, line_state, acc),
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
-            TOK_APOSTROPHE => {
-                *line_state |= STATE_CODE;
-                if i + 1 < content_len {
-                    let next_b = content[i + 1];
-                    if next_b == b'\\' {
-                        return handle_quoted_literal(content, i, b'\'', line_state, acc);
-                    }
-                    if next_b != b'\n' && i + 2 < content_len && content[i + 2] == b'\'' {
-                        return i + 3;
-                    }
-                    if IDENT_CONT[next_b as usize] != 0 {
-                        return i + 1;
-                    }
-                }
-                i + 1
-            }
+            TOK_APOSTROPHE => handle_char_or_lifetime(content, i, line_state),
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1

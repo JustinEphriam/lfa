@@ -1,7 +1,8 @@
 use super::{
-    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_line_comment,
-    handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add, make_token_kind,
-    make_token_lut_lo, match_keyword_with, unified_parse_into, LangLexer, ParseResult, STATE_CODE,
+    compute_keyword_lens, compute_kw_max_len, compute_kw_min_len, finish_block_comment,
+    finish_line_comment, handle_quoted_literal, kw_hash_fml_add, make_kw_table_fml_add,
+    make_token_kind, make_token_lut_lo, match_keyword_with, skip_lisp_datum_with,
+    unified_parse_into, LangLexer, ParseResult, STATE_CODE,
 };
 
 pub const KEYWORD_COUNT: usize = 29;
@@ -53,6 +54,7 @@ const KW_TABLE: [u8; 64] = make_kw_table_fml_add(&KEYWORD_NAMES, [1, 1, 206, 160
 const TOK_IDENT: u8 = 3;
 const TOK_SEMICOLON: u8 = 4;
 const TOK_QUOTE: u8 = 5;
+const TOK_HASH: u8 = 6;
 
 pub const TOKEN_KIND: [u8; 256] = make_token_kind(
     TOK_IDENT,
@@ -62,6 +64,7 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
         (b'?', TOK_IDENT),
         (b';', TOK_SEMICOLON),
         (b'"', TOK_QUOTE),
+        (b'#', TOK_HASH),
     ],
 );
 
@@ -99,6 +102,14 @@ impl LangLexer<KEYWORD_COUNT> for ClojureLexer {
         match kind {
             TOK_SEMICOLON => finish_line_comment(content, i + 1, line_state, acc),
             TOK_QUOTE => handle_quoted_literal(content, i, b'"', line_state, acc),
+            TOK_HASH => {
+                if i + 1 < content.len() && content[i + 1] == b'_' {
+                    let end_i = skip_lisp_datum_with(content, i + 2, b'_');
+                    return finish_block_comment(content, i + 2, end_i, line_state, acc);
+                }
+                *line_state |= STATE_CODE;
+                i + 1
+            }
             _ => {
                 *line_state |= STATE_CODE;
                 i + 1
