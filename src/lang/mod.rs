@@ -2591,6 +2591,7 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
             }
             if L::HAS_LINE_START_HOOK {
                 let next_i = L::handle_line_start(content, i, &mut line_state, acc);
+                assert!(next_i >= i && next_i <= content_len);
                 if next_i != i {
                     i = next_i;
                     continue;
@@ -2658,6 +2659,7 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
                 };
                 if L::HAS_SPECIAL_IDENT {
                     let next_i = L::handle_ident(content, start, end, &mut line_state, acc);
+                    assert!(next_i >= end && next_i <= content_len);
                     if next_i != end {
                         i = next_i;
                         continue;
@@ -2699,7 +2701,9 @@ pub fn unified_parse_into<const N: usize, L: LangLexer<N>>(
                 }
             }
             _ => {
-                i = L::handle_special(kind, content, i, &mut line_state, acc);
+                let next_i = L::handle_special(kind, content, i, &mut line_state, acc);
+                assert!(next_i > i && next_i <= content_len);
+                i = next_i;
             }
         }
     }
@@ -2988,6 +2992,7 @@ pub const AVX2_ASCII_LUT_HI: [i8; 32] = [
 ];
 
 pub const fn make_token_kind(tok_ident: u8, specials: &[(u8, u8)]) -> [u8; 256] {
+    assert!(tok_ident >= TOK_CODE);
     let mut table = [TOK_CODE; 256];
     table[b' ' as usize] = TOK_WS;
     table[b'\t' as usize] = TOK_WS;
@@ -3009,6 +3014,7 @@ pub const fn make_token_kind(tok_ident: u8, specials: &[(u8, u8)]) -> [u8; 256] 
     let mut i = 0;
     while i < specials.len() {
         let (byte, kind) = specials[i];
+        assert!(byte != b'\n' && byte < 128 && kind >= TOK_CODE);
         table[byte as usize] = kind;
         i += 1;
     }
@@ -3352,6 +3358,7 @@ pub fn skip_nested_2byte_comment(
     close0: u8,
     close1: u8,
 ) -> usize {
+    assert!(start_i <= content.len());
     let content_len = content.len();
     let mut i = start_i;
     let mut depth = 1usize;
@@ -3365,6 +3372,7 @@ pub fn skip_nested_2byte_comment(
             depth -= 1;
             i += 2;
             if depth == 0 {
+                assert!(i <= content_len);
                 return i;
             }
         } else {
@@ -4037,7 +4045,7 @@ mod tests {
                 samples.push("a /* x\ny".to_string());
                 samples.push("a\n/* x */ b".to_string());
             }
-            if lang == LangId::Scheme || lang == LangId::CommonLisp {
+            if lang == LangId::Scheme || lang == LangId::CommonLisp || lang == LangId::Racket {
                 samples.push("a\n#| x\ny |#".to_string());
                 samples.push("a #| x\ny".to_string());
                 samples.push("a\n#| x |# b".to_string());
@@ -4047,12 +4055,12 @@ mod tests {
                 samples.push("a (; x\ny".to_string());
                 samples.push("a\n(; x ;) b".to_string());
             }
-            if lang == LangId::Haskell {
+            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript {
                 samples.push("a\n{- x\ny -}".to_string());
                 samples.push("a {- x\ny".to_string());
                 samples.push("a\n{- x -} b".to_string());
             }
-            if lang == LangId::OCaml || lang == LangId::FSharp || lang == LangId::Pascal {
+            if lang == LangId::OCaml || lang == LangId::FSharp || lang == LangId::Pascal || lang == LangId::Sml {
                 samples.push("a\n(* x\ny *)".to_string());
                 samples.push("a (* x\ny".to_string());
                 samples.push("a\n(* x *) b".to_string());
@@ -4067,10 +4075,35 @@ mod tests {
                 samples.push("a <# x\ny".to_string());
                 samples.push("a\n<# x #> b".to_string());
             }
-            if lang == LangId::Html || lang == LangId::Xml {
+            if lang == LangId::Html
+                || lang == LangId::Xml
+                || lang == LangId::Svelte
+                || lang == LangId::Vue
+                || lang == LangId::Astro
+            {
                 samples.push("a\n<!-- x\ny -->".to_string());
                 samples.push("a <!-- x\ny".to_string());
                 samples.push("a\n<!-- x --> b".to_string());
+            }
+            if lang == LangId::D {
+                samples.push("a\n/+ x\ny +/".to_string());
+                samples.push("a /+ x\ny".to_string());
+                samples.push("a\n/+ x +/ b".to_string());
+            }
+            if lang == LangId::Nim {
+                samples.push("a\n#[ x\ny ]#".to_string());
+                samples.push("a #[ x\ny".to_string());
+                samples.push("a\n#[ x ]# b".to_string());
+            }
+            if lang == LangId::Julia {
+                samples.push("a\n#= x\ny =#".to_string());
+                samples.push("a #= x\ny".to_string());
+                samples.push("a\n#= x =# b".to_string());
+            }
+            if lang == LangId::Matlab {
+                samples.push("a\n%{\nx\n%}".to_string());
+                samples.push("a %{\nx".to_string());
+                samples.push("a\n%{ x %} b".to_string());
             }
             if lang == LangId::Lua {
                 samples.push("a\n--[[ x\ny ]]".to_string());
@@ -4780,14 +4813,14 @@ mod tests {
                 LangId::Wat => "(;",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::PowerShell => "<#",
+                LangId::Nim => "#[",
+                LangId::Julia => "#=",
+                LangId::Matlab => "%{",
                 LangId::Fortran
                 | LangId::Bash
-                | LangId::Nim
                 | LangId::Elixir
                 | LangId::Erlang
-                | LangId::Julia
                 | LangId::R
-                | LangId::Matlab
                 | LangId::Python
                 | LangId::Ruby
                 | LangId::Mojo
@@ -4821,14 +4854,14 @@ mod tests {
                 LangId::Wat => ";)",
                 LangId::Html | LangId::Xml => "-->",
                 LangId::PowerShell => "#>",
+                LangId::Nim => "]#",
+                LangId::Julia => "=#",
+                LangId::Matlab => "%}",
                 LangId::Fortran
                 | LangId::Bash
-                | LangId::Nim
                 | LangId::Elixir
                 | LangId::Erlang
-                | LangId::Julia
                 | LangId::R
-                | LangId::Matlab
                 | LangId::Python
                 | LangId::Ruby
                 | LangId::Mojo
@@ -4884,10 +4917,19 @@ mod tests {
                 let code = stats.code_lines(lang);
                 let comm = stats.comment_lines(lang);
                 let blnk = stats.blank_lines(lang);
+                let expected_lines = count_newlines_avx2(slice) as i64
+                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
                 assert_eq!(
                     lines,
                     code + comm + blnk,
                     "lang {:?} at offset {offset}/{}: lines={lines}, code={code}, comm={comm}, blnk={blnk}",
+                    lang,
+                    sample_bytes.len()
+                );
+                assert_eq!(
+                    lines,
+                    expected_lines,
+                    "lang {:?} at offset {offset}/{}: lines={lines} != expected={expected_lines}",
                     lang,
                     sample_bytes.len()
                 );
@@ -4914,6 +4956,31 @@ mod tests {
                     lines,
                     expected_lines,
                     "lang {:?} quote slice offset {offset}: lines={lines} != expected={expected_lines}",
+                    lang
+                );
+            }
+
+            let nested_and_special = b"/* a /* b\nc */ d */\n{- a {- b\nc -} d -}\n(* a (* b\nc *) d *)\n#| a #| b\nc |# d |#\n/+ a /+ b\nc +/ d +/\n#[ a #[ b\nc ]# d ]#\n#= a #= b\nc =# d =#\n\"\"\"triple\nquote\"\"\"\n`tmpl ${a + `${b\nc}`} end`\n";
+            for offset in 1..=nested_and_special.len() {
+                let slice = &nested_and_special[..offset];
+                let mut stats = LangStats::default();
+                parse_into(lang, slice, &mut stats);
+                let lines = stats.lines(lang);
+                let code = stats.code_lines(lang);
+                let comm = stats.comment_lines(lang);
+                let blnk = stats.blank_lines(lang);
+                let expected_lines = count_newlines_avx2(slice) as i64
+                    + i64::from(slice.last().is_some_and(|&b| b != b'\n'));
+                assert_eq!(
+                    lines,
+                    code + comm + blnk,
+                    "lang {:?} nested slice offset {offset}: sum mismatch",
+                    lang
+                );
+                assert_eq!(
+                    lines,
+                    expected_lines,
+                    "lang {:?} nested slice offset {offset}: lines={lines} != expected={expected_lines}",
                     lang
                 );
             }
