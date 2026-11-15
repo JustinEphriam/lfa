@@ -962,6 +962,14 @@ define_doc_oracle_specs! {
         non_cmt: &["= Document Title", "== Section Title", "* list item", "https://example.com"],
         neutral: "AsciiDoc paragraph text",
     },
+    Org => {
+        file: "sample.org",
+        line: &["# "],
+        block: &[("#+BEGIN_COMMENT", "#+END_COMMENT")],
+        quoted: false,
+        non_cmt: &["* Heading 1", "** Heading 2", "#+TITLE: Document", "#+AUTHOR: Someone"],
+        neutral: "Org mode paragraph line",
+    },
 }
 
 const _: () = assert!(ORACLE_LANG_SPECS.len() == LANG_COUNT);

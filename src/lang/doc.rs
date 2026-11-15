@@ -10,9 +10,10 @@ pub enum DocFormatId {
     Patch = 6,
     Json5 = 7,
     AsciiDoc = 8,
+    Org = 9,
 }
 
-pub const DOC_FORMAT_COUNT: usize = 9;
+pub const DOC_FORMAT_COUNT: usize = 10;
 pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::Markdown,
     DocFormatId::PlainText,
@@ -23,6 +24,7 @@ pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::Patch,
     DocFormatId::Json5,
     DocFormatId::AsciiDoc,
+    DocFormatId::Org,
 ];
 
 impl DocFormatId {
@@ -38,6 +40,7 @@ impl DocFormatId {
             Self::Patch => "Patch / Diff",
             Self::Json5 => "JSON5 / JSONC",
             Self::AsciiDoc => "AsciiDoc",
+            Self::Org => "Org-mode",
         }
     }
 }
@@ -144,6 +147,7 @@ pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
             b"svg" => return Some(DocFormatId::Svg),
             b"ini" => return Some(DocFormatId::Ini),
             b"rst" => return Some(DocFormatId::RestructuredText),
+            b"org" => return Some(DocFormatId::Org),
             _ => {}
         }
     }
@@ -270,6 +274,66 @@ fn count_block_comment_doc_line(
     } else {
         stats.blank_lines += 1;
     }
+}
+
+fn count_block_comment_doc_line_caseless(
+    trimmed: &[u8],
+    open: &[u8],
+    close: &[u8],
+    in_block: &mut bool,
+    stats: &mut DocStats,
+) {
+    let mut has_content = false;
+    let mut has_comment = *in_block;
+    let mut rest = trimmed;
+    while !rest.is_empty() {
+        if *in_block {
+            if let Some(close_pos) = rest.windows(close.len()).position(|w| w.eq_ignore_ascii_case(close)) {
+                *in_block = false;
+                rest = &rest[close_pos + close.len()..];
+            } else {
+                break;
+            }
+        } else {
+            let mut ws = 0;
+            while ws < rest.len() && (rest[ws] == b' ' || rest[ws] == b'\t') {
+                ws += 1;
+            }
+            rest = &rest[ws..];
+            if rest.is_empty() {
+                break;
+            }
+            if rest.len() >= open.len() && rest[..open.len()].eq_ignore_ascii_case(open) {
+                has_comment = true;
+                *in_block = true;
+                rest = &rest[open.len()..];
+            } else {
+                has_content = true;
+                if let Some(open_pos) = rest.windows(open.len()).position(|w| w.eq_ignore_ascii_case(open)) {
+                    has_comment = true;
+                    *in_block = true;
+                    rest = &rest[open_pos + open.len()..];
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+    if has_content {
+        stats.content_lines += 1;
+    } else if has_comment {
+        stats.comment_lines += 1;
+    } else {
+        stats.blank_lines += 1;
+    }
+}
+
+fn count_org_doc_line(trimmed: &[u8], in_block: &mut bool, stats: &mut DocStats) {
+    if !*in_block && (trimmed.starts_with(b"# ") || trimmed.starts_with(b"#\t") || trimmed == b"#") {
+        stats.comment_lines += 1;
+        return;
+    }
+    count_block_comment_doc_line_caseless(trimmed, b"#+BEGIN_COMMENT", b"#+END_COMMENT", in_block, stats);
 }
 
 fn count_json5_doc_line(trimmed: &[u8], in_block: &mut bool, stats: &mut DocStats) {
@@ -442,6 +506,9 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
             }
             DocFormatId::AsciiDoc => {
                 count_asciidoc_doc_line(trimmed, &mut in_block, stats);
+            }
+            DocFormatId::Org => {
+                count_org_doc_line(trimmed, &mut in_block, stats);
             }
         }
     }

@@ -2011,6 +2011,7 @@ mod tests {
         assert_eq!(detect_doc_format(b"settings.jsonc"), Some(DocFormatId::Json5));
         assert_eq!(detect_doc_format(b"doc.adoc"), Some(DocFormatId::AsciiDoc));
         assert_eq!(detect_doc_format(b"doc.asciidoc"), Some(DocFormatId::AsciiDoc));
+        assert_eq!(detect_doc_format(b"notes.org"), Some(DocFormatId::Org));
         assert_eq!(detect_doc_format(b"unknown.xyz"), None);
 
         let parse_doc = |doc: DocFormatId, bytes: &[u8]| -> DocStats {
