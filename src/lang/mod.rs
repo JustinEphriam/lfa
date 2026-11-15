@@ -82,6 +82,7 @@ pub mod crystal;
 pub mod vala;
 pub mod chapel;
 pub mod pony;
+pub mod ballerina;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -191,9 +192,10 @@ pub enum LangId {
     Vala = 91,
     Chapel = 92,
     Pony = 93,
+    Ballerina = 94,
 }
 
-pub const LANG_COUNT: usize = 94;
+pub const LANG_COUNT: usize = 95;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -213,6 +215,7 @@ pub const LANG_CRYSTAL_MASK: u128 = 1 << (LangId::Crystal as u128);
 pub const LANG_VALA_MASK: u128 = 1 << (LangId::Vala as u128);
 pub const LANG_CHAPEL_MASK: u128 = 1 << (LangId::Chapel as u128);
 pub const LANG_PONY_MASK: u128 = 1 << (LangId::Pony as u128);
+pub const LANG_BALLERINA_MASK: u128 = 1 << (LangId::Ballerina as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -389,6 +392,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Vala,
     LangId::Chapel,
     LangId::Pony,
+    LangId::Ballerina,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -499,6 +503,7 @@ impl LangId {
             Self::Vala => "Vala",
             Self::Chapel => "Chapel",
             Self::Pony => "Pony",
+            Self::Ballerina => "Ballerina",
         }
     }
 
@@ -604,6 +609,7 @@ impl LangId {
             Self::Vala => &["-vala", "--vala"],
             Self::Chapel => &["-chpl", "--chpl", "-chapel", "--chapel"],
             Self::Pony => &["-pony", "--pony"],
+            Self::Ballerina => &["-bal", "--bal", "-ballerina", "--ballerina"],
         }
     }
 
@@ -815,6 +821,7 @@ impl LangId {
             b"-vala" | b"--vala" | b"-VALA" | b"--VALA" => Some(Self::Vala),
             b"-chpl" | b"--chpl" | b"-CHPL" | b"--CHPL" | b"-chapel" | b"--chapel" | b"-CHAPEL" | b"--CHAPEL" => Some(Self::Chapel),
             b"-pony" | b"--pony" | b"-PONY" | b"--PONY" => Some(Self::Pony),
+            b"-bal" | b"--bal" | b"-BAL" | b"--BAL" | b"-ballerina" | b"--ballerina" | b"-BALLERINA" | b"--BALLERINA" => Some(Self::Ballerina),
             _ => None,
         }
     }
@@ -953,6 +960,7 @@ pub struct LangStats {
     pub vala: ParseResult<{ vala::KEYWORD_COUNT }>,
     pub chapel: ParseResult<{ chapel::KEYWORD_COUNT }>,
     pub pony: ParseResult<{ pony::KEYWORD_COUNT }>,
+    pub ballerina: ParseResult<{ ballerina::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1052,6 +1060,7 @@ impl LangStats {
         self.vala.add(&other.vala);
         self.chapel.add(&other.chapel);
         self.pony.add(&other.pony);
+        self.ballerina.add(&other.ballerina);
     }
 
     #[inline(always)]
@@ -1151,6 +1160,7 @@ impl LangStats {
             LangId::Vala => self.vala.lines_processed,
             LangId::Chapel => self.chapel.lines_processed,
             LangId::Pony => self.pony.lines_processed,
+            LangId::Ballerina => self.ballerina.lines_processed,
         }
     }
 
@@ -1251,6 +1261,7 @@ impl LangStats {
             LangId::Vala => self.vala.code_lines,
             LangId::Chapel => self.chapel.code_lines,
             LangId::Pony => self.pony.code_lines,
+            LangId::Ballerina => self.ballerina.code_lines,
         }
     }
 
@@ -1351,6 +1362,7 @@ impl LangStats {
             LangId::Vala => self.vala.comment_lines,
             LangId::Chapel => self.chapel.comment_lines,
             LangId::Pony => self.pony.comment_lines,
+            LangId::Ballerina => self.ballerina.comment_lines,
         }
     }
 
@@ -1451,6 +1463,7 @@ impl LangStats {
             LangId::Vala => self.vala.blank_lines,
             LangId::Chapel => self.chapel.blank_lines,
             LangId::Pony => self.pony.blank_lines,
+            LangId::Ballerina => self.ballerina.blank_lines,
         }
     }
 
@@ -1551,6 +1564,7 @@ impl LangStats {
             LangId::Vala => self.vala.total_keywords,
             LangId::Chapel => self.chapel.total_keywords,
             LangId::Pony => self.pony.total_keywords,
+            LangId::Ballerina => self.ballerina.total_keywords,
         }
     }
 
@@ -1651,6 +1665,7 @@ impl LangStats {
             LangId::Vala => &vala::KEYWORD_NAMES,
             LangId::Chapel => &chapel::KEYWORD_NAMES,
             LangId::Pony => &pony::KEYWORD_NAMES,
+            LangId::Ballerina => &ballerina::KEYWORD_NAMES,
         }
     }
 
@@ -1751,6 +1766,7 @@ impl LangStats {
             LangId::Vala => &self.vala.keyword_counts,
             LangId::Chapel => &self.chapel.keyword_counts,
             LangId::Pony => &self.pony.keyword_counts,
+            LangId::Ballerina => &self.ballerina.keyword_counts,
         }
     }
 
@@ -1851,6 +1867,7 @@ impl LangStats {
             LangId::Vala => &vala::KEYWORD_LENS,
             LangId::Chapel => &chapel::KEYWORD_LENS,
             LangId::Pony => &pony::KEYWORD_LENS,
+            LangId::Ballerina => &ballerina::KEYWORD_LENS,
         }
     }
 
@@ -1951,6 +1968,7 @@ impl LangStats {
             LangId::Vala => (vala::KW_MIN_LEN, vala::KW_MAX_LEN),
             LangId::Chapel => (chapel::KW_MIN_LEN, chapel::KW_MAX_LEN),
             LangId::Pony => (pony::KW_MIN_LEN, pony::KW_MAX_LEN),
+            LangId::Ballerina => (ballerina::KW_MIN_LEN, ballerina::KW_MAX_LEN),
         }
     }
 
@@ -2051,6 +2069,7 @@ impl LangStats {
             LangId::Vala => (&vala::TOKEN_KIND, &vala::TOKEN_LUT_LO),
             LangId::Chapel => (&chapel::TOKEN_KIND, &chapel::TOKEN_LUT_LO),
             LangId::Pony => (&pony::TOKEN_KIND, &pony::TOKEN_LUT_LO),
+            LangId::Ballerina => (&ballerina::TOKEN_KIND, &ballerina::TOKEN_LUT_LO),
         }
     }
 }
@@ -2253,6 +2272,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"bzl" if (enabled_mask & LANG_STARLARK_MASK) != 0 => return Some(LangId::Starlark),
             b"vue" if (enabled_mask & LANG_VUE_MASK) != 0 => return Some(LangId::Vue),
             b"ahk" if (enabled_mask & LANG_AUTOHOTKEY_MASK) != 0 => return Some(LangId::AutoHotkey),
+            b"bal" if (enabled_mask & LANG_BALLERINA_MASK) != 0 => return Some(LangId::Ballerina),
             _ => {}
         }
         return None;
@@ -4178,6 +4198,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Vala => vala::parse_into(content, &mut stats.vala),
         LangId::Chapel => chapel::parse_into(content, &mut stats.chapel),
         LangId::Pony => pony::parse_into(content, &mut stats.pony),
+        LangId::Ballerina => ballerina::parse_into(content, &mut stats.ballerina),
     }
 }
 
@@ -4453,6 +4474,7 @@ mod tests {
                     | LangId::Starlark
                     | LangId::Justfile
                     | LangId::Crystal
+                    | LangId::Ballerina
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -5358,6 +5380,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.vapi", LANG_ALL_MASK), Some(LangId::Vala));
         assert_eq!(detect_language(b"foo.chpl", LANG_ALL_MASK), Some(LangId::Chapel));
         assert_eq!(detect_language(b"foo.pony", LANG_ALL_MASK), Some(LangId::Pony));
+        assert_eq!(detect_language(b"foo.bal", LANG_ALL_MASK), Some(LangId::Ballerina));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5745,7 +5768,8 @@ mod tests {
                 | LangId::Meson
                 | LangId::Starlark
                 | LangId::Justfile
-                | LangId::Crystal => "",
+                | LangId::Crystal
+                | LangId::Ballerina => "",
                 _ => "/*",
             };
             let block_close = match lang {
@@ -5787,7 +5811,8 @@ mod tests {
                 | LangId::Meson
                 | LangId::Starlark
                 | LangId::Justfile
-                | LangId::Crystal => "",
+                | LangId::Crystal
+                | LangId::Ballerina => "",
                 _ => "*/",
             };
 
