@@ -16,7 +16,8 @@ use rustix::buffer::spare_capacity;
 use rustix::fd::{AsFd, OwnedFd};
 use rustix::ffi::CStr;
 use rustix::fs::{
-    openat, statx, AtFlags, FileType, Mode, OFlags, RawDir, RawMode, StatxFlags, CWD,
+    fadvise, openat, statx, Advice, AtFlags, FileType, Mode, OFlags, RawDir, RawMode, StatxFlags,
+    CWD,
 };
 use rustix::io::{dup, read, write, Errno};
 use rustix::stdio::stdout;
@@ -352,6 +353,8 @@ fn read_file_into<Fd: AsFd>(dirfd: Fd, path: &CStr, fb: &mut Vec<u8>) -> bool {
         return false;
     };
 
+    let _ = fadvise(&fd, 0, None, Advice::Sequential);
+
     fb.clear();
     if fb.capacity() < 131072 {
         fb.reserve(131072 - fb.capacity());
@@ -427,7 +430,7 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
     let hidden = sched.hidden;
     let mut res = WorkerResult::default();
     let mut fb = Vec::with_capacity(131072);
-    let mut dents_buf: Vec<u8> = Vec::with_capacity(32768);
+    let mut dents_buf: Vec<u8> = Vec::with_capacity(65536);
     let mut dir_buf: Vec<u8> = Vec::with_capacity(512);
     let mut subdirs_arena: Vec<u8> = Vec::with_capacity(4096);
     let mut subdirs_spans: Vec<(u32, u32)> = Vec::with_capacity(64);
