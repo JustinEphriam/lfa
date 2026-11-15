@@ -90,6 +90,7 @@ pub mod batch;
 pub mod haxe;
 pub mod qml;
 pub mod ron;
+pub mod thrift;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -207,9 +208,10 @@ pub enum LangId {
     Haxe = 99,
     Qml = 100,
     Ron = 101,
+    Thrift = 102,
 }
 
-pub const LANG_COUNT: usize = 102;
+pub const LANG_COUNT: usize = 103;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -237,6 +239,7 @@ pub const LANG_BATCH_MASK: u128 = 1 << (LangId::Batch as u128);
 pub const LANG_HAXE_MASK: u128 = 1 << (LangId::Haxe as u128);
 pub const LANG_QML_MASK: u128 = 1 << (LangId::Qml as u128);
 pub const LANG_RON_MASK: u128 = 1 << (LangId::Ron as u128);
+pub const LANG_THRIFT_MASK: u128 = 1 << (LangId::Thrift as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -421,6 +424,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Haxe,
     LangId::Qml,
     LangId::Ron,
+    LangId::Thrift,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -539,6 +543,7 @@ impl LangId {
             Self::Haxe => "Haxe",
             Self::Qml => "QML",
             Self::Ron => "RON",
+            Self::Thrift => "Thrift",
         }
     }
 
@@ -652,6 +657,7 @@ impl LangId {
             Self::Haxe => &["-hx", "--hx", "-haxe", "--haxe"],
             Self::Qml => &["-qml", "--qml"],
             Self::Ron => &["-ron", "--ron"],
+            Self::Thrift => &["-thrift", "--thrift"],
         }
     }
 
@@ -871,6 +877,7 @@ impl LangId {
             b"-hx" | b"--hx" | b"-HX" | b"--HX" | b"-haxe" | b"--haxe" | b"-HAXE" | b"--HAXE" => Some(Self::Haxe),
             b"-qml" | b"--qml" | b"-QML" | b"--QML" => Some(Self::Qml),
             b"-ron" | b"--ron" | b"-RON" | b"--RON" => Some(Self::Ron),
+            b"-thrift" | b"--thrift" | b"-THRIFT" | b"--THRIFT" => Some(Self::Thrift),
             _ => None,
         }
     }
@@ -1017,6 +1024,7 @@ pub struct LangStats {
     pub haxe: ParseResult<{ haxe::KEYWORD_COUNT }>,
     pub qml: ParseResult<{ qml::KEYWORD_COUNT }>,
     pub ron: ParseResult<{ ron::KEYWORD_COUNT }>,
+    pub thrift: ParseResult<{ thrift::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1124,6 +1132,7 @@ impl LangStats {
         self.haxe.add(&other.haxe);
         self.qml.add(&other.qml);
         self.ron.add(&other.ron);
+        self.thrift.add(&other.thrift);
     }
 
     #[inline(always)]
@@ -1231,6 +1240,7 @@ impl LangStats {
             LangId::Haxe => self.haxe.lines_processed,
             LangId::Qml => self.qml.lines_processed,
             LangId::Ron => self.ron.lines_processed,
+            LangId::Thrift => self.thrift.lines_processed,
         }
     }
 
@@ -1339,6 +1349,7 @@ impl LangStats {
             LangId::Haxe => self.haxe.code_lines,
             LangId::Qml => self.qml.code_lines,
             LangId::Ron => self.ron.code_lines,
+            LangId::Thrift => self.thrift.code_lines,
         }
     }
 
@@ -1447,6 +1458,7 @@ impl LangStats {
             LangId::Haxe => self.haxe.comment_lines,
             LangId::Qml => self.qml.comment_lines,
             LangId::Ron => self.ron.comment_lines,
+            LangId::Thrift => self.thrift.comment_lines,
         }
     }
 
@@ -1555,6 +1567,7 @@ impl LangStats {
             LangId::Haxe => self.haxe.blank_lines,
             LangId::Qml => self.qml.blank_lines,
             LangId::Ron => self.ron.blank_lines,
+            LangId::Thrift => self.thrift.blank_lines,
         }
     }
 
@@ -1663,6 +1676,7 @@ impl LangStats {
             LangId::Haxe => self.haxe.total_keywords,
             LangId::Qml => self.qml.total_keywords,
             LangId::Ron => self.ron.total_keywords,
+            LangId::Thrift => self.thrift.total_keywords,
         }
     }
 
@@ -1771,6 +1785,7 @@ impl LangStats {
             LangId::Haxe => &haxe::KEYWORD_NAMES,
             LangId::Qml => &qml::KEYWORD_NAMES,
             LangId::Ron => &ron::KEYWORD_NAMES,
+            LangId::Thrift => &thrift::KEYWORD_NAMES,
         }
     }
 
@@ -1879,6 +1894,7 @@ impl LangStats {
             LangId::Haxe => &self.haxe.keyword_counts,
             LangId::Qml => &self.qml.keyword_counts,
             LangId::Ron => &self.ron.keyword_counts,
+            LangId::Thrift => &self.thrift.keyword_counts,
         }
     }
 
@@ -1987,6 +2003,7 @@ impl LangStats {
             LangId::Haxe => &haxe::KEYWORD_LENS,
             LangId::Qml => &qml::KEYWORD_LENS,
             LangId::Ron => &ron::KEYWORD_LENS,
+            LangId::Thrift => &thrift::KEYWORD_LENS,
         }
     }
 
@@ -2095,6 +2112,7 @@ impl LangStats {
             LangId::Haxe => (haxe::KW_MIN_LEN, haxe::KW_MAX_LEN),
             LangId::Qml => (qml::KW_MIN_LEN, qml::KW_MAX_LEN),
             LangId::Ron => (ron::KW_MIN_LEN, ron::KW_MAX_LEN),
+            LangId::Thrift => (thrift::KW_MIN_LEN, thrift::KW_MAX_LEN),
         }
     }
 
@@ -2203,6 +2221,7 @@ impl LangStats {
             LangId::Haxe => (&haxe::TOKEN_KIND, &haxe::TOKEN_LUT_LO),
             LangId::Qml => (&qml::TOKEN_KIND, &qml::TOKEN_LUT_LO),
             LangId::Ron => (&ron::TOKEN_KIND, &ron::TOKEN_LUT_LO),
+            LangId::Thrift => (&thrift::TOKEN_KIND, &thrift::TOKEN_LUT_LO),
         }
     }
 }
@@ -2526,6 +2545,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         if &ext == b"coffee" && (enabled_mask & LANG_COFFEESCRIPT_MASK) != 0 {
             return Some(LangId::CoffeeScript);
+        }
+        if &ext == b"thrift" && (enabled_mask & LANG_THRIFT_MASK) != 0 {
+            return Some(LangId::Thrift);
         }
     }
     if len >= 9 && name[len - 8] == b'.' {
@@ -4355,6 +4377,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Haxe => haxe::parse_into(content, &mut stats.haxe),
         LangId::Qml => qml::parse_into(content, &mut stats.qml),
         LangId::Ron => ron::parse_into(content, &mut stats.ron),
+        LangId::Thrift => thrift::parse_into(content, &mut stats.thrift),
     }
 }
 
@@ -5552,6 +5575,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.hx", LANG_ALL_MASK), Some(LangId::Haxe));
         assert_eq!(detect_language(b"foo.qml", LANG_ALL_MASK), Some(LangId::Qml));
         assert_eq!(detect_language(b"foo.ron", LANG_ALL_MASK), Some(LangId::Ron));
+        assert_eq!(detect_language(b"foo.thrift", LANG_ALL_MASK), Some(LangId::Thrift));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
