@@ -87,6 +87,7 @@ pub mod coffeescript;
 pub mod less;
 pub mod vim;
 pub mod batch;
+pub mod haxe;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -201,9 +202,10 @@ pub enum LangId {
     Less = 96,
     VimScript = 97,
     Batch = 98,
+    Haxe = 99,
 }
 
-pub const LANG_COUNT: usize = 99;
+pub const LANG_COUNT: usize = 100;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -228,6 +230,7 @@ pub const LANG_COFFEESCRIPT_MASK: u128 = 1 << (LangId::CoffeeScript as u128);
 pub const LANG_LESS_MASK: u128 = 1 << (LangId::Less as u128);
 pub const LANG_VIMSCRIPT_MASK: u128 = 1 << (LangId::VimScript as u128);
 pub const LANG_BATCH_MASK: u128 = 1 << (LangId::Batch as u128);
+pub const LANG_HAXE_MASK: u128 = 1 << (LangId::Haxe as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -409,6 +412,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Less,
     LangId::VimScript,
     LangId::Batch,
+    LangId::Haxe,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -524,6 +528,7 @@ impl LangId {
             Self::Less => "Less",
             Self::VimScript => "Vim Script",
             Self::Batch => "Batch",
+            Self::Haxe => "Haxe",
         }
     }
 
@@ -634,6 +639,7 @@ impl LangId {
             Self::Less => &["-less", "--less"],
             Self::VimScript => &["-vim", "--vim", "-vimscript", "--vimscript"],
             Self::Batch => &["-bat", "--bat", "-batch", "--batch", "-cmd", "--cmd"],
+            Self::Haxe => &["-hx", "--hx", "-haxe", "--haxe"],
         }
     }
 
@@ -850,6 +856,7 @@ impl LangId {
             b"-less" | b"--less" | b"-LESS" | b"--LESS" => Some(Self::Less),
             b"-vim" | b"--vim" | b"-VIM" | b"--VIM" | b"-vimscript" | b"--vimscript" | b"-VIMSCRIPT" | b"--VIMSCRIPT" => Some(Self::VimScript),
             b"-bat" | b"--bat" | b"-BAT" | b"--BAT" | b"-batch" | b"--batch" | b"-BATCH" | b"--BATCH" | b"-cmd" | b"--cmd" | b"-CMD" | b"--CMD" => Some(Self::Batch),
+            b"-hx" | b"--hx" | b"-HX" | b"--HX" | b"-haxe" | b"--haxe" | b"-HAXE" | b"--HAXE" => Some(Self::Haxe),
             _ => None,
         }
     }
@@ -993,6 +1000,7 @@ pub struct LangStats {
     pub less: ParseResult<{ less::KEYWORD_COUNT }>,
     pub vimscript: ParseResult<{ vim::KEYWORD_COUNT }>,
     pub batch: ParseResult<{ batch::KEYWORD_COUNT }>,
+    pub haxe: ParseResult<{ haxe::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1097,6 +1105,7 @@ impl LangStats {
         self.less.add(&other.less);
         self.vimscript.add(&other.vimscript);
         self.batch.add(&other.batch);
+        self.haxe.add(&other.haxe);
     }
 
     #[inline(always)]
@@ -1201,6 +1210,7 @@ impl LangStats {
             LangId::Less => self.less.lines_processed,
             LangId::VimScript => self.vimscript.lines_processed,
             LangId::Batch => self.batch.lines_processed,
+            LangId::Haxe => self.haxe.lines_processed,
         }
     }
 
@@ -1306,6 +1316,7 @@ impl LangStats {
             LangId::Less => self.less.code_lines,
             LangId::VimScript => self.vimscript.code_lines,
             LangId::Batch => self.batch.code_lines,
+            LangId::Haxe => self.haxe.code_lines,
         }
     }
 
@@ -1411,6 +1422,7 @@ impl LangStats {
             LangId::Less => self.less.comment_lines,
             LangId::VimScript => self.vimscript.comment_lines,
             LangId::Batch => self.batch.comment_lines,
+            LangId::Haxe => self.haxe.comment_lines,
         }
     }
 
@@ -1516,6 +1528,7 @@ impl LangStats {
             LangId::Less => self.less.blank_lines,
             LangId::VimScript => self.vimscript.blank_lines,
             LangId::Batch => self.batch.blank_lines,
+            LangId::Haxe => self.haxe.blank_lines,
         }
     }
 
@@ -1621,6 +1634,7 @@ impl LangStats {
             LangId::Less => self.less.total_keywords,
             LangId::VimScript => self.vimscript.total_keywords,
             LangId::Batch => self.batch.total_keywords,
+            LangId::Haxe => self.haxe.total_keywords,
         }
     }
 
@@ -1726,6 +1740,7 @@ impl LangStats {
             LangId::Less => &less::KEYWORD_NAMES,
             LangId::VimScript => &vim::KEYWORD_NAMES,
             LangId::Batch => &batch::KEYWORD_NAMES,
+            LangId::Haxe => &haxe::KEYWORD_NAMES,
         }
     }
 
@@ -1831,6 +1846,7 @@ impl LangStats {
             LangId::Less => &self.less.keyword_counts,
             LangId::VimScript => &self.vimscript.keyword_counts,
             LangId::Batch => &self.batch.keyword_counts,
+            LangId::Haxe => &self.haxe.keyword_counts,
         }
     }
 
@@ -1936,6 +1952,7 @@ impl LangStats {
             LangId::Less => &less::KEYWORD_LENS,
             LangId::VimScript => &vim::KEYWORD_LENS,
             LangId::Batch => &batch::KEYWORD_LENS,
+            LangId::Haxe => &haxe::KEYWORD_LENS,
         }
     }
 
@@ -2041,6 +2058,7 @@ impl LangStats {
             LangId::Less => (less::KW_MIN_LEN, less::KW_MAX_LEN),
             LangId::VimScript => (vim::KW_MIN_LEN, vim::KW_MAX_LEN),
             LangId::Batch => (batch::KW_MIN_LEN, batch::KW_MAX_LEN),
+            LangId::Haxe => (haxe::KW_MIN_LEN, haxe::KW_MAX_LEN),
         }
     }
 
@@ -2146,6 +2164,7 @@ impl LangStats {
             LangId::Less => (&less::TOKEN_KIND, &less::TOKEN_LUT_LO),
             LangId::VimScript => (&vim::TOKEN_KIND, &vim::TOKEN_LUT_LO),
             LangId::Batch => (&batch::TOKEN_KIND, &batch::TOKEN_LUT_LO),
+            LangId::Haxe => (&haxe::TOKEN_KIND, &haxe::TOKEN_LUT_LO),
         }
     }
 }
@@ -2260,6 +2279,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"ll" if (enabled_mask & LANG_LLVM_MASK) != 0 => return Some(LangId::Llvm),
             b"as" if (enabled_mask & LANG_ACTIONSCRIPT_MASK) != 0 => return Some(LangId::ActionScript),
             b"cr" if (enabled_mask & LANG_CRYSTAL_MASK) != 0 => return Some(LangId::Crystal),
+            b"hx" if (enabled_mask & LANG_HAXE_MASK) != 0 => return Some(LangId::Haxe),
             _ => {}
         }
         return None;
@@ -4292,6 +4312,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Less => less::parse_into(content, &mut stats.less),
         LangId::VimScript => vim::parse_into(content, &mut stats.vimscript),
         LangId::Batch => batch::parse_into(content, &mut stats.batch),
+        LangId::Haxe => haxe::parse_into(content, &mut stats.haxe),
     }
 }
 
@@ -5486,6 +5507,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.vim", LANG_ALL_MASK), Some(LangId::VimScript));
         assert_eq!(detect_language(b"foo.bat", LANG_ALL_MASK), Some(LangId::Batch));
         assert_eq!(detect_language(b"foo.cmd", LANG_ALL_MASK), Some(LangId::Batch));
+        assert_eq!(detect_language(b"foo.hx", LANG_ALL_MASK), Some(LangId::Haxe));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
