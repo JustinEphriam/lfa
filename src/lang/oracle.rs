@@ -954,6 +954,14 @@ define_doc_oracle_specs! {
         non_cmt: &["\"http://example.com /* not comment */\""],
         neutral: "key: 123,",
     },
+    AsciiDoc => {
+        file: "sample.adoc",
+        line: &["//"],
+        block: &[("////", "////")],
+        quoted: false,
+        non_cmt: &["= Document Title", "== Section Title", "* list item", "https://example.com"],
+        neutral: "AsciiDoc paragraph text",
+    },
 }
 
 const _: () = assert!(ORACLE_LANG_SPECS.len() == LANG_COUNT);

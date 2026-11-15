@@ -9,9 +9,10 @@ pub enum DocFormatId {
     RestructuredText = 5,
     Patch = 6,
     Json5 = 7,
+    AsciiDoc = 8,
 }
 
-pub const DOC_FORMAT_COUNT: usize = 8;
+pub const DOC_FORMAT_COUNT: usize = 9;
 pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::Markdown,
     DocFormatId::PlainText,
@@ -21,6 +22,7 @@ pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::RestructuredText,
     DocFormatId::Patch,
     DocFormatId::Json5,
+    DocFormatId::AsciiDoc,
 ];
 
 impl DocFormatId {
@@ -35,6 +37,7 @@ impl DocFormatId {
             Self::RestructuredText => "reStructuredText",
             Self::Patch => "Patch / Diff",
             Self::Json5 => "JSON5 / JSONC",
+            Self::AsciiDoc => "AsciiDoc",
         }
     }
 }
@@ -154,6 +157,7 @@ pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
         match &ext {
             b"conf" => return Some(DocFormatId::Ini),
             b"diff" => return Some(DocFormatId::Patch),
+            b"adoc" => return Some(DocFormatId::AsciiDoc),
             _ => {}
         }
     }
@@ -196,6 +200,21 @@ pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
         ];
         if &ext == b"service" {
             return Some(DocFormatId::Ini);
+        }
+    }
+    if len >= 10 && name[len - 9] == b'.' {
+        let ext = [
+            name[len - 8] | 0x20,
+            name[len - 7] | 0x20,
+            name[len - 6] | 0x20,
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"asciidoc" {
+            return Some(DocFormatId::AsciiDoc);
         }
     }
     None
@@ -349,6 +368,14 @@ fn is_rst_comment(trimmed: &[u8]) -> bool {
     true
 }
 
+fn count_asciidoc_doc_line(trimmed: &[u8], in_block: &mut bool, stats: &mut DocStats) {
+    if !*in_block && trimmed.starts_with(b"//") && !trimmed.starts_with(b"////") {
+        stats.comment_lines += 1;
+        return;
+    }
+    count_block_comment_doc_line(trimmed, b"////", b"////", in_block, stats);
+}
+
 pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
     if content.is_empty() {
         return;
@@ -412,6 +439,9 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
             }
             DocFormatId::Json5 => {
                 count_json5_doc_line(trimmed, &mut in_block, stats);
+            }
+            DocFormatId::AsciiDoc => {
+                count_asciidoc_doc_line(trimmed, &mut in_block, stats);
             }
         }
     }
