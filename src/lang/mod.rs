@@ -80,6 +80,7 @@ pub mod astro;
 pub mod autohotkey;
 pub mod crystal;
 pub mod vala;
+pub mod chapel;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -187,9 +188,10 @@ pub enum LangId {
     AutoHotkey = 89,
     Crystal = 90,
     Vala = 91,
+    Chapel = 92,
 }
 
-pub const LANG_COUNT: usize = 92;
+pub const LANG_COUNT: usize = 93;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -207,6 +209,7 @@ pub const LANG_APEX_MASK: u128 = 1 << (LangId::Apex as u128);
 pub const LANG_AUTOHOTKEY_MASK: u128 = 1 << (LangId::AutoHotkey as u128);
 pub const LANG_CRYSTAL_MASK: u128 = 1 << (LangId::Crystal as u128);
 pub const LANG_VALA_MASK: u128 = 1 << (LangId::Vala as u128);
+pub const LANG_CHAPEL_MASK: u128 = 1 << (LangId::Chapel as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -381,6 +384,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::AutoHotkey,
     LangId::Crystal,
     LangId::Vala,
+    LangId::Chapel,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -489,6 +493,7 @@ impl LangId {
             Self::AutoHotkey => "AutoHotkey",
             Self::Crystal => "Crystal",
             Self::Vala => "Vala",
+            Self::Chapel => "Chapel",
         }
     }
 
@@ -592,6 +597,7 @@ impl LangId {
             Self::AutoHotkey => &["-ahk", "--ahk", "-autohotkey", "--autohotkey"],
             Self::Crystal => &["-cr", "--cr", "-crystal", "--crystal"],
             Self::Vala => &["-vala", "--vala"],
+            Self::Chapel => &["-chpl", "--chpl", "-chapel", "--chapel"],
         }
     }
 
@@ -801,6 +807,7 @@ impl LangId {
             b"-ahk" | b"--ahk" | b"-AHK" | b"--AHK" | b"-autohotkey" | b"--autohotkey" | b"-AUTOHOTKEY" | b"--AUTOHOTKEY" => Some(Self::AutoHotkey),
             b"-cr" | b"--cr" | b"-CR" | b"--CR" | b"-crystal" | b"--crystal" | b"-CRYSTAL" | b"--CRYSTAL" => Some(Self::Crystal),
             b"-vala" | b"--vala" | b"-VALA" | b"--VALA" => Some(Self::Vala),
+            b"-chpl" | b"--chpl" | b"-CHPL" | b"--CHPL" | b"-chapel" | b"--chapel" | b"-CHAPEL" | b"--CHAPEL" => Some(Self::Chapel),
             _ => None,
         }
     }
@@ -937,6 +944,7 @@ pub struct LangStats {
     pub autohotkey: ParseResult<{ autohotkey::KEYWORD_COUNT }>,
     pub crystal: ParseResult<{ crystal::KEYWORD_COUNT }>,
     pub vala: ParseResult<{ vala::KEYWORD_COUNT }>,
+    pub chapel: ParseResult<{ chapel::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1034,6 +1042,7 @@ impl LangStats {
         self.autohotkey.add(&other.autohotkey);
         self.crystal.add(&other.crystal);
         self.vala.add(&other.vala);
+        self.chapel.add(&other.chapel);
     }
 
     #[inline(always)]
@@ -1131,6 +1140,7 @@ impl LangStats {
             LangId::AutoHotkey => self.autohotkey.lines_processed,
             LangId::Crystal => self.crystal.lines_processed,
             LangId::Vala => self.vala.lines_processed,
+            LangId::Chapel => self.chapel.lines_processed,
         }
     }
 
@@ -1229,6 +1239,7 @@ impl LangStats {
             LangId::AutoHotkey => self.autohotkey.code_lines,
             LangId::Crystal => self.crystal.code_lines,
             LangId::Vala => self.vala.code_lines,
+            LangId::Chapel => self.chapel.code_lines,
         }
     }
 
@@ -1327,6 +1338,7 @@ impl LangStats {
             LangId::AutoHotkey => self.autohotkey.comment_lines,
             LangId::Crystal => self.crystal.comment_lines,
             LangId::Vala => self.vala.comment_lines,
+            LangId::Chapel => self.chapel.comment_lines,
         }
     }
 
@@ -1425,6 +1437,7 @@ impl LangStats {
             LangId::AutoHotkey => self.autohotkey.blank_lines,
             LangId::Crystal => self.crystal.blank_lines,
             LangId::Vala => self.vala.blank_lines,
+            LangId::Chapel => self.chapel.blank_lines,
         }
     }
 
@@ -1523,6 +1536,7 @@ impl LangStats {
             LangId::AutoHotkey => self.autohotkey.total_keywords,
             LangId::Crystal => self.crystal.total_keywords,
             LangId::Vala => self.vala.total_keywords,
+            LangId::Chapel => self.chapel.total_keywords,
         }
     }
 
@@ -1621,6 +1635,7 @@ impl LangStats {
             LangId::AutoHotkey => &autohotkey::KEYWORD_NAMES,
             LangId::Crystal => &crystal::KEYWORD_NAMES,
             LangId::Vala => &vala::KEYWORD_NAMES,
+            LangId::Chapel => &chapel::KEYWORD_NAMES,
         }
     }
 
@@ -1719,6 +1734,7 @@ impl LangStats {
             LangId::AutoHotkey => &self.autohotkey.keyword_counts,
             LangId::Crystal => &self.crystal.keyword_counts,
             LangId::Vala => &self.vala.keyword_counts,
+            LangId::Chapel => &self.chapel.keyword_counts,
         }
     }
 
@@ -1817,6 +1833,7 @@ impl LangStats {
             LangId::AutoHotkey => &autohotkey::KEYWORD_LENS,
             LangId::Crystal => &crystal::KEYWORD_LENS,
             LangId::Vala => &vala::KEYWORD_LENS,
+            LangId::Chapel => &chapel::KEYWORD_LENS,
         }
     }
 
@@ -1915,6 +1932,7 @@ impl LangStats {
             LangId::AutoHotkey => (autohotkey::KW_MIN_LEN, autohotkey::KW_MAX_LEN),
             LangId::Crystal => (crystal::KW_MIN_LEN, crystal::KW_MAX_LEN),
             LangId::Vala => (vala::KW_MIN_LEN, vala::KW_MAX_LEN),
+            LangId::Chapel => (chapel::KW_MIN_LEN, chapel::KW_MAX_LEN),
         }
     }
 
@@ -2013,6 +2031,7 @@ impl LangStats {
             LangId::AutoHotkey => (&autohotkey::TOKEN_KIND, &autohotkey::TOKEN_LUT_LO),
             LangId::Crystal => (&crystal::TOKEN_KIND, &crystal::TOKEN_LUT_LO),
             LangId::Vala => (&vala::TOKEN_KIND, &vala::TOKEN_LUT_LO),
+            LangId::Chapel => (&chapel::TOKEN_KIND, &chapel::TOKEN_LUT_LO),
         }
     }
 }
@@ -2254,6 +2273,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"vhdl" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
             b"purs" if (enabled_mask & LANG_PURESCRIPT_MASK) != 0 => return Some(LangId::PureScript),
             b"vala" | b"vapi" if (enabled_mask & LANG_VALA_MASK) != 0 => return Some(LangId::Vala),
+            b"chpl" if (enabled_mask & LANG_CHAPEL_MASK) != 0 => return Some(LangId::Chapel),
             _ => {}
         }
         return None;
@@ -4136,6 +4156,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::AutoHotkey => autohotkey::parse_into(content, &mut stats.autohotkey),
         LangId::Crystal => crystal::parse_into(content, &mut stats.crystal),
         LangId::Vala => vala::parse_into(content, &mut stats.vala),
+        LangId::Chapel => chapel::parse_into(content, &mut stats.chapel),
     }
 }
 
@@ -5314,6 +5335,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.cr", LANG_ALL_MASK), Some(LangId::Crystal));
         assert_eq!(detect_language(b"foo.vala", LANG_ALL_MASK), Some(LangId::Vala));
         assert_eq!(detect_language(b"foo.vapi", LANG_ALL_MASK), Some(LangId::Vala));
+        assert_eq!(detect_language(b"foo.chpl", LANG_ALL_MASK), Some(LangId::Chapel));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
