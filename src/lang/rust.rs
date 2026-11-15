@@ -97,7 +97,7 @@ pub const TOKEN_KIND: [u8; 256] = make_token_kind(
 pub const TOKEN_LUT_LO: [i8; 32] = make_token_lut_lo(&TOKEN_KIND);
 
 #[inline(always)]
-fn skip_rust_raw_string(content: &[u8], start_i: usize, hashes: usize) -> usize {
+pub(crate) fn skip_rust_raw_string(content: &[u8], start_i: usize, hashes: usize) -> usize {
     let content_len = content.len();
     let mut i = start_i;
     while i < content_len {

@@ -887,6 +887,13 @@ define_lang_oracle_specs! {
         prefixes: &[], sigils: &[], suffixes: &[], datum: &[], eof: &[],
         spliced: false, tmpl: false, char_life: false, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
     },
+    Ron => {
+        file: "sample.ron", caseless: false,
+        line: &["//"], line_start: &[], block: &[("/*", "*/", true)], doc_block: &[],
+        quotes: &[("\"", true)], raw: &[rq("r\"", "\""), rq("r#\"", "\"#"), rq("br#\"", "\"#")],
+        prefixes: &[], sigils: &["r#"], suffixes: &[], datum: &[], eof: &[],
+        spliced: false, tmpl: false, char_life: true, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
+    },
 }
 
 define_doc_oracle_specs! {
