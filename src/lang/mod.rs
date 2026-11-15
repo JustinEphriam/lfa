@@ -92,6 +92,7 @@ pub mod qml;
 pub mod ron;
 pub mod thrift;
 pub mod prisma;
+pub mod kdl;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -211,9 +212,10 @@ pub enum LangId {
     Ron = 101,
     Thrift = 102,
     Prisma = 103,
+    Kdl = 104,
 }
 
-pub const LANG_COUNT: usize = 104;
+pub const LANG_COUNT: usize = 105;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -243,6 +245,7 @@ pub const LANG_QML_MASK: u128 = 1 << (LangId::Qml as u128);
 pub const LANG_RON_MASK: u128 = 1 << (LangId::Ron as u128);
 pub const LANG_THRIFT_MASK: u128 = 1 << (LangId::Thrift as u128);
 pub const LANG_PRISMA_MASK: u128 = 1 << (LangId::Prisma as u128);
+pub const LANG_KDL_MASK: u128 = 1 << (LangId::Kdl as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -429,6 +432,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Ron,
     LangId::Thrift,
     LangId::Prisma,
+    LangId::Kdl,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -549,6 +553,7 @@ impl LangId {
             Self::Ron => "RON",
             Self::Thrift => "Thrift",
             Self::Prisma => "Prisma",
+            Self::Kdl => "KDL",
         }
     }
 
@@ -664,6 +669,7 @@ impl LangId {
             Self::Ron => &["-ron", "--ron"],
             Self::Thrift => &["-thrift", "--thrift"],
             Self::Prisma => &["-prisma", "--prisma"],
+            Self::Kdl => &["-kdl", "--kdl"],
         }
     }
 
@@ -885,6 +891,7 @@ impl LangId {
             b"-ron" | b"--ron" | b"-RON" | b"--RON" => Some(Self::Ron),
             b"-thrift" | b"--thrift" | b"-THRIFT" | b"--THRIFT" => Some(Self::Thrift),
             b"-prisma" | b"--prisma" | b"-PRISMA" | b"--PRISMA" => Some(Self::Prisma),
+            b"-kdl" | b"--kdl" | b"-KDL" | b"--KDL" => Some(Self::Kdl),
             _ => None,
         }
     }
@@ -1033,6 +1040,7 @@ pub struct LangStats {
     pub ron: ParseResult<{ ron::KEYWORD_COUNT }>,
     pub thrift: ParseResult<{ thrift::KEYWORD_COUNT }>,
     pub prisma: ParseResult<{ prisma::KEYWORD_COUNT }>,
+    pub kdl: ParseResult<{ kdl::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1142,6 +1150,7 @@ impl LangStats {
         self.ron.add(&other.ron);
         self.thrift.add(&other.thrift);
         self.prisma.add(&other.prisma);
+        self.kdl.add(&other.kdl);
     }
 
     #[inline(always)]
@@ -1251,6 +1260,7 @@ impl LangStats {
             LangId::Ron => self.ron.lines_processed,
             LangId::Thrift => self.thrift.lines_processed,
             LangId::Prisma => self.prisma.lines_processed,
+            LangId::Kdl => self.kdl.lines_processed,
         }
     }
 
@@ -1361,6 +1371,7 @@ impl LangStats {
             LangId::Ron => self.ron.code_lines,
             LangId::Thrift => self.thrift.code_lines,
             LangId::Prisma => self.prisma.code_lines,
+            LangId::Kdl => self.kdl.code_lines,
         }
     }
 
@@ -1471,6 +1482,7 @@ impl LangStats {
             LangId::Ron => self.ron.comment_lines,
             LangId::Thrift => self.thrift.comment_lines,
             LangId::Prisma => self.prisma.comment_lines,
+            LangId::Kdl => self.kdl.comment_lines,
         }
     }
 
@@ -1581,6 +1593,7 @@ impl LangStats {
             LangId::Ron => self.ron.blank_lines,
             LangId::Thrift => self.thrift.blank_lines,
             LangId::Prisma => self.prisma.blank_lines,
+            LangId::Kdl => self.kdl.blank_lines,
         }
     }
 
@@ -1691,6 +1704,7 @@ impl LangStats {
             LangId::Ron => self.ron.total_keywords,
             LangId::Thrift => self.thrift.total_keywords,
             LangId::Prisma => self.prisma.total_keywords,
+            LangId::Kdl => self.kdl.total_keywords,
         }
     }
 
@@ -1801,6 +1815,7 @@ impl LangStats {
             LangId::Ron => &ron::KEYWORD_NAMES,
             LangId::Thrift => &thrift::KEYWORD_NAMES,
             LangId::Prisma => &prisma::KEYWORD_NAMES,
+            LangId::Kdl => &kdl::KEYWORD_NAMES,
         }
     }
 
@@ -1911,6 +1926,7 @@ impl LangStats {
             LangId::Ron => &self.ron.keyword_counts,
             LangId::Thrift => &self.thrift.keyword_counts,
             LangId::Prisma => &self.prisma.keyword_counts,
+            LangId::Kdl => &self.kdl.keyword_counts,
         }
     }
 
@@ -2021,6 +2037,7 @@ impl LangStats {
             LangId::Ron => &ron::KEYWORD_LENS,
             LangId::Thrift => &thrift::KEYWORD_LENS,
             LangId::Prisma => &prisma::KEYWORD_LENS,
+            LangId::Kdl => &kdl::KEYWORD_LENS,
         }
     }
 
@@ -2131,6 +2148,7 @@ impl LangStats {
             LangId::Ron => (ron::KW_MIN_LEN, ron::KW_MAX_LEN),
             LangId::Thrift => (thrift::KW_MIN_LEN, thrift::KW_MAX_LEN),
             LangId::Prisma => (prisma::KW_MIN_LEN, prisma::KW_MAX_LEN),
+            LangId::Kdl => (kdl::KW_MIN_LEN, kdl::KW_MAX_LEN),
         }
     }
 
@@ -2241,6 +2259,7 @@ impl LangStats {
             LangId::Ron => (&ron::TOKEN_KIND, &ron::TOKEN_LUT_LO),
             LangId::Thrift => (&thrift::TOKEN_KIND, &thrift::TOKEN_LUT_LO),
             LangId::Prisma => (&prisma::TOKEN_KIND, &prisma::TOKEN_LUT_LO),
+            LangId::Kdl => (&kdl::TOKEN_KIND, &kdl::TOKEN_LUT_LO),
         }
     }
 }
@@ -2449,6 +2468,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"bat" | b"cmd" if (enabled_mask & LANG_BATCH_MASK) != 0 => return Some(LangId::Batch),
             b"qml" if (enabled_mask & LANG_QML_MASK) != 0 => return Some(LangId::Qml),
             b"ron" if (enabled_mask & LANG_RON_MASK) != 0 => return Some(LangId::Ron),
+            b"kdl" if (enabled_mask & LANG_KDL_MASK) != 0 => return Some(LangId::Kdl),
             _ => {}
         }
         return None;
@@ -4401,6 +4421,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Ron => ron::parse_into(content, &mut stats.ron),
         LangId::Thrift => thrift::parse_into(content, &mut stats.thrift),
         LangId::Prisma => prisma::parse_into(content, &mut stats.prisma),
+        LangId::Kdl => kdl::parse_into(content, &mut stats.kdl),
     }
 }
 
@@ -5601,6 +5622,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.ron", LANG_ALL_MASK), Some(LangId::Ron));
         assert_eq!(detect_language(b"foo.thrift", LANG_ALL_MASK), Some(LangId::Thrift));
         assert_eq!(detect_language(b"foo.prisma", LANG_ALL_MASK), Some(LangId::Prisma));
+        assert_eq!(detect_language(b"foo.kdl", LANG_ALL_MASK), Some(LangId::Kdl));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
