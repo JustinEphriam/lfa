@@ -85,6 +85,7 @@ pub mod pony;
 pub mod ballerina;
 pub mod coffeescript;
 pub mod less;
+pub mod vim;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -197,9 +198,10 @@ pub enum LangId {
     Ballerina = 94,
     CoffeeScript = 95,
     Less = 96,
+    VimScript = 97,
 }
 
-pub const LANG_COUNT: usize = 97;
+pub const LANG_COUNT: usize = 98;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -222,6 +224,7 @@ pub const LANG_PONY_MASK: u128 = 1 << (LangId::Pony as u128);
 pub const LANG_BALLERINA_MASK: u128 = 1 << (LangId::Ballerina as u128);
 pub const LANG_COFFEESCRIPT_MASK: u128 = 1 << (LangId::CoffeeScript as u128);
 pub const LANG_LESS_MASK: u128 = 1 << (LangId::Less as u128);
+pub const LANG_VIMSCRIPT_MASK: u128 = 1 << (LangId::VimScript as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -401,6 +404,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Ballerina,
     LangId::CoffeeScript,
     LangId::Less,
+    LangId::VimScript,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -514,6 +518,7 @@ impl LangId {
             Self::Ballerina => "Ballerina",
             Self::CoffeeScript => "CoffeeScript",
             Self::Less => "Less",
+            Self::VimScript => "Vim Script",
         }
     }
 
@@ -622,6 +627,7 @@ impl LangId {
             Self::Ballerina => &["-bal", "--bal", "-ballerina", "--ballerina"],
             Self::CoffeeScript => &["-coffee", "--coffee", "-coffeescript", "--coffeescript"],
             Self::Less => &["-less", "--less"],
+            Self::VimScript => &["-vim", "--vim", "-vimscript", "--vimscript"],
         }
     }
 
@@ -836,6 +842,7 @@ impl LangId {
             b"-bal" | b"--bal" | b"-BAL" | b"--BAL" | b"-ballerina" | b"--ballerina" | b"-BALLERINA" | b"--BALLERINA" => Some(Self::Ballerina),
             b"-coffee" | b"--coffee" | b"-COFFEE" | b"--COFFEE" | b"-coffeescript" | b"--coffeescript" | b"-COFFEESCRIPT" | b"--COFFEESCRIPT" => Some(Self::CoffeeScript),
             b"-less" | b"--less" | b"-LESS" | b"--LESS" => Some(Self::Less),
+            b"-vim" | b"--vim" | b"-VIM" | b"--VIM" | b"-vimscript" | b"--vimscript" | b"-VIMSCRIPT" | b"--VIMSCRIPT" => Some(Self::VimScript),
             _ => None,
         }
     }
@@ -977,6 +984,7 @@ pub struct LangStats {
     pub ballerina: ParseResult<{ ballerina::KEYWORD_COUNT }>,
     pub coffeescript: ParseResult<{ coffeescript::KEYWORD_COUNT }>,
     pub less: ParseResult<{ less::KEYWORD_COUNT }>,
+    pub vimscript: ParseResult<{ vim::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1079,6 +1087,7 @@ impl LangStats {
         self.ballerina.add(&other.ballerina);
         self.coffeescript.add(&other.coffeescript);
         self.less.add(&other.less);
+        self.vimscript.add(&other.vimscript);
     }
 
     #[inline(always)]
@@ -1181,6 +1190,7 @@ impl LangStats {
             LangId::Ballerina => self.ballerina.lines_processed,
             LangId::CoffeeScript => self.coffeescript.lines_processed,
             LangId::Less => self.less.lines_processed,
+            LangId::VimScript => self.vimscript.lines_processed,
         }
     }
 
@@ -1284,6 +1294,7 @@ impl LangStats {
             LangId::Ballerina => self.ballerina.code_lines,
             LangId::CoffeeScript => self.coffeescript.code_lines,
             LangId::Less => self.less.code_lines,
+            LangId::VimScript => self.vimscript.code_lines,
         }
     }
 
@@ -1387,6 +1398,7 @@ impl LangStats {
             LangId::Ballerina => self.ballerina.comment_lines,
             LangId::CoffeeScript => self.coffeescript.comment_lines,
             LangId::Less => self.less.comment_lines,
+            LangId::VimScript => self.vimscript.comment_lines,
         }
     }
 
@@ -1490,6 +1502,7 @@ impl LangStats {
             LangId::Ballerina => self.ballerina.blank_lines,
             LangId::CoffeeScript => self.coffeescript.blank_lines,
             LangId::Less => self.less.blank_lines,
+            LangId::VimScript => self.vimscript.blank_lines,
         }
     }
 
@@ -1593,6 +1606,7 @@ impl LangStats {
             LangId::Ballerina => self.ballerina.total_keywords,
             LangId::CoffeeScript => self.coffeescript.total_keywords,
             LangId::Less => self.less.total_keywords,
+            LangId::VimScript => self.vimscript.total_keywords,
         }
     }
 
@@ -1696,6 +1710,7 @@ impl LangStats {
             LangId::Ballerina => &ballerina::KEYWORD_NAMES,
             LangId::CoffeeScript => &coffeescript::KEYWORD_NAMES,
             LangId::Less => &less::KEYWORD_NAMES,
+            LangId::VimScript => &vim::KEYWORD_NAMES,
         }
     }
 
@@ -1799,6 +1814,7 @@ impl LangStats {
             LangId::Ballerina => &self.ballerina.keyword_counts,
             LangId::CoffeeScript => &self.coffeescript.keyword_counts,
             LangId::Less => &self.less.keyword_counts,
+            LangId::VimScript => &self.vimscript.keyword_counts,
         }
     }
 
@@ -1902,6 +1918,7 @@ impl LangStats {
             LangId::Ballerina => &ballerina::KEYWORD_LENS,
             LangId::CoffeeScript => &coffeescript::KEYWORD_LENS,
             LangId::Less => &less::KEYWORD_LENS,
+            LangId::VimScript => &vim::KEYWORD_LENS,
         }
     }
 
@@ -2005,6 +2022,7 @@ impl LangStats {
             LangId::Ballerina => (ballerina::KW_MIN_LEN, ballerina::KW_MAX_LEN),
             LangId::CoffeeScript => (coffeescript::KW_MIN_LEN, coffeescript::KW_MAX_LEN),
             LangId::Less => (less::KW_MIN_LEN, less::KW_MAX_LEN),
+            LangId::VimScript => (vim::KW_MIN_LEN, vim::KW_MAX_LEN),
         }
     }
 
@@ -2108,6 +2126,7 @@ impl LangStats {
             LangId::Ballerina => (&ballerina::TOKEN_KIND, &ballerina::TOKEN_LUT_LO),
             LangId::CoffeeScript => (&coffeescript::TOKEN_KIND, &coffeescript::TOKEN_LUT_LO),
             LangId::Less => (&less::TOKEN_KIND, &less::TOKEN_LUT_LO),
+            LangId::VimScript => (&vim::TOKEN_KIND, &vim::TOKEN_LUT_LO),
         }
     }
 }
@@ -2311,6 +2330,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"vue" if (enabled_mask & LANG_VUE_MASK) != 0 => return Some(LangId::Vue),
             b"ahk" if (enabled_mask & LANG_AUTOHOTKEY_MASK) != 0 => return Some(LangId::AutoHotkey),
             b"bal" if (enabled_mask & LANG_BALLERINA_MASK) != 0 => return Some(LangId::Ballerina),
+            b"vim" if (enabled_mask & LANG_VIMSCRIPT_MASK) != 0 => return Some(LangId::VimScript),
             _ => {}
         }
         return None;
@@ -4250,6 +4270,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Ballerina => ballerina::parse_into(content, &mut stats.ballerina),
         LangId::CoffeeScript => coffeescript::parse_into(content, &mut stats.coffeescript),
         LangId::Less => less::parse_into(content, &mut stats.less),
+        LangId::VimScript => vim::parse_into(content, &mut stats.vimscript),
     }
 }
 
@@ -4460,6 +4481,7 @@ mod tests {
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "//",
+                LangId::VimScript => "\"",
                 _ => "//",
             };
             let mut samples: Vec<String> = vec![
@@ -4528,6 +4550,7 @@ mod tests {
                     | LangId::Crystal
                     | LangId::Ballerina
                     | LangId::CoffeeScript
+                    | LangId::VimScript
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -5437,6 +5460,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.bal", LANG_ALL_MASK), Some(LangId::Ballerina));
         assert_eq!(detect_language(b"foo.coffee", LANG_ALL_MASK), Some(LangId::CoffeeScript));
         assert_eq!(detect_language(b"foo.cson", LANG_ALL_MASK), Some(LangId::CoffeeScript));
+        assert_eq!(detect_language(b"foo.vim", LANG_ALL_MASK), Some(LangId::VimScript));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5783,6 +5807,7 @@ mod tests {
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "",
+                LangId::VimScript => "\"",
                 _ => "//",
             };
 
@@ -5827,7 +5852,8 @@ mod tests {
                 | LangId::Starlark
                 | LangId::Justfile
                 | LangId::Crystal
-                | LangId::Ballerina => "",
+                | LangId::Ballerina
+                | LangId::VimScript => "",
                 _ => "/*",
             };
             let block_close = match lang {
@@ -5871,7 +5897,8 @@ mod tests {
                 | LangId::Starlark
                 | LangId::Justfile
                 | LangId::Crystal
-                | LangId::Ballerina => "",
+                | LangId::Ballerina
+                | LangId::VimScript => "",
                 _ => "*/",
             };
 

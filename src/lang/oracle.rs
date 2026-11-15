@@ -859,6 +859,13 @@ define_lang_oracle_specs! {
         prefixes: &["@"], sigils: &["-"], suffixes: &[], datum: &[], eof: &[],
         spliced: false, tmpl: false, char_life: false, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
     },
+    VimScript => {
+        file: "sample.vim", caseless: false,
+        line: &["\"", "#"], line_start: &[], block: &[], doc_block: &[],
+        quotes: &[("'", true)], raw: &[],
+        prefixes: &[], sigils: &[], suffixes: &[], datum: &[], eof: &[],
+        spliced: false, tmpl: false, char_life: false, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
+    },
 }
 
 define_doc_oracle_specs! {
