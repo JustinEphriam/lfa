@@ -81,6 +81,7 @@ pub mod autohotkey;
 pub mod crystal;
 pub mod vala;
 pub mod chapel;
+pub mod pony;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -189,9 +190,10 @@ pub enum LangId {
     Crystal = 90,
     Vala = 91,
     Chapel = 92,
+    Pony = 93,
 }
 
-pub const LANG_COUNT: usize = 93;
+pub const LANG_COUNT: usize = 94;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -210,6 +212,7 @@ pub const LANG_AUTOHOTKEY_MASK: u128 = 1 << (LangId::AutoHotkey as u128);
 pub const LANG_CRYSTAL_MASK: u128 = 1 << (LangId::Crystal as u128);
 pub const LANG_VALA_MASK: u128 = 1 << (LangId::Vala as u128);
 pub const LANG_CHAPEL_MASK: u128 = 1 << (LangId::Chapel as u128);
+pub const LANG_PONY_MASK: u128 = 1 << (LangId::Pony as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -385,6 +388,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Crystal,
     LangId::Vala,
     LangId::Chapel,
+    LangId::Pony,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -494,6 +498,7 @@ impl LangId {
             Self::Crystal => "Crystal",
             Self::Vala => "Vala",
             Self::Chapel => "Chapel",
+            Self::Pony => "Pony",
         }
     }
 
@@ -598,6 +603,7 @@ impl LangId {
             Self::Crystal => &["-cr", "--cr", "-crystal", "--crystal"],
             Self::Vala => &["-vala", "--vala"],
             Self::Chapel => &["-chpl", "--chpl", "-chapel", "--chapel"],
+            Self::Pony => &["-pony", "--pony"],
         }
     }
 
@@ -808,6 +814,7 @@ impl LangId {
             b"-cr" | b"--cr" | b"-CR" | b"--CR" | b"-crystal" | b"--crystal" | b"-CRYSTAL" | b"--CRYSTAL" => Some(Self::Crystal),
             b"-vala" | b"--vala" | b"-VALA" | b"--VALA" => Some(Self::Vala),
             b"-chpl" | b"--chpl" | b"-CHPL" | b"--CHPL" | b"-chapel" | b"--chapel" | b"-CHAPEL" | b"--CHAPEL" => Some(Self::Chapel),
+            b"-pony" | b"--pony" | b"-PONY" | b"--PONY" => Some(Self::Pony),
             _ => None,
         }
     }
@@ -945,6 +952,7 @@ pub struct LangStats {
     pub crystal: ParseResult<{ crystal::KEYWORD_COUNT }>,
     pub vala: ParseResult<{ vala::KEYWORD_COUNT }>,
     pub chapel: ParseResult<{ chapel::KEYWORD_COUNT }>,
+    pub pony: ParseResult<{ pony::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1043,6 +1051,7 @@ impl LangStats {
         self.crystal.add(&other.crystal);
         self.vala.add(&other.vala);
         self.chapel.add(&other.chapel);
+        self.pony.add(&other.pony);
     }
 
     #[inline(always)]
@@ -1141,6 +1150,7 @@ impl LangStats {
             LangId::Crystal => self.crystal.lines_processed,
             LangId::Vala => self.vala.lines_processed,
             LangId::Chapel => self.chapel.lines_processed,
+            LangId::Pony => self.pony.lines_processed,
         }
     }
 
@@ -1240,6 +1250,7 @@ impl LangStats {
             LangId::Crystal => self.crystal.code_lines,
             LangId::Vala => self.vala.code_lines,
             LangId::Chapel => self.chapel.code_lines,
+            LangId::Pony => self.pony.code_lines,
         }
     }
 
@@ -1339,6 +1350,7 @@ impl LangStats {
             LangId::Crystal => self.crystal.comment_lines,
             LangId::Vala => self.vala.comment_lines,
             LangId::Chapel => self.chapel.comment_lines,
+            LangId::Pony => self.pony.comment_lines,
         }
     }
 
@@ -1438,6 +1450,7 @@ impl LangStats {
             LangId::Crystal => self.crystal.blank_lines,
             LangId::Vala => self.vala.blank_lines,
             LangId::Chapel => self.chapel.blank_lines,
+            LangId::Pony => self.pony.blank_lines,
         }
     }
 
@@ -1537,6 +1550,7 @@ impl LangStats {
             LangId::Crystal => self.crystal.total_keywords,
             LangId::Vala => self.vala.total_keywords,
             LangId::Chapel => self.chapel.total_keywords,
+            LangId::Pony => self.pony.total_keywords,
         }
     }
 
@@ -1636,6 +1650,7 @@ impl LangStats {
             LangId::Crystal => &crystal::KEYWORD_NAMES,
             LangId::Vala => &vala::KEYWORD_NAMES,
             LangId::Chapel => &chapel::KEYWORD_NAMES,
+            LangId::Pony => &pony::KEYWORD_NAMES,
         }
     }
 
@@ -1735,6 +1750,7 @@ impl LangStats {
             LangId::Crystal => &self.crystal.keyword_counts,
             LangId::Vala => &self.vala.keyword_counts,
             LangId::Chapel => &self.chapel.keyword_counts,
+            LangId::Pony => &self.pony.keyword_counts,
         }
     }
 
@@ -1834,6 +1850,7 @@ impl LangStats {
             LangId::Crystal => &crystal::KEYWORD_LENS,
             LangId::Vala => &vala::KEYWORD_LENS,
             LangId::Chapel => &chapel::KEYWORD_LENS,
+            LangId::Pony => &pony::KEYWORD_LENS,
         }
     }
 
@@ -1933,6 +1950,7 @@ impl LangStats {
             LangId::Crystal => (crystal::KW_MIN_LEN, crystal::KW_MAX_LEN),
             LangId::Vala => (vala::KW_MIN_LEN, vala::KW_MAX_LEN),
             LangId::Chapel => (chapel::KW_MIN_LEN, chapel::KW_MAX_LEN),
+            LangId::Pony => (pony::KW_MIN_LEN, pony::KW_MAX_LEN),
         }
     }
 
@@ -2032,6 +2050,7 @@ impl LangStats {
             LangId::Crystal => (&crystal::TOKEN_KIND, &crystal::TOKEN_LUT_LO),
             LangId::Vala => (&vala::TOKEN_KIND, &vala::TOKEN_LUT_LO),
             LangId::Chapel => (&chapel::TOKEN_KIND, &chapel::TOKEN_LUT_LO),
+            LangId::Pony => (&pony::TOKEN_KIND, &pony::TOKEN_LUT_LO),
         }
     }
 }
@@ -2274,6 +2293,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"purs" if (enabled_mask & LANG_PURESCRIPT_MASK) != 0 => return Some(LangId::PureScript),
             b"vala" | b"vapi" if (enabled_mask & LANG_VALA_MASK) != 0 => return Some(LangId::Vala),
             b"chpl" if (enabled_mask & LANG_CHAPEL_MASK) != 0 => return Some(LangId::Chapel),
+            b"pony" if (enabled_mask & LANG_PONY_MASK) != 0 => return Some(LangId::Pony),
             _ => {}
         }
         return None;
@@ -4157,6 +4177,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Crystal => crystal::parse_into(content, &mut stats.crystal),
         LangId::Vala => vala::parse_into(content, &mut stats.vala),
         LangId::Chapel => chapel::parse_into(content, &mut stats.chapel),
+        LangId::Pony => pony::parse_into(content, &mut stats.pony),
     }
 }
 
@@ -5336,6 +5357,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.vala", LANG_ALL_MASK), Some(LangId::Vala));
         assert_eq!(detect_language(b"foo.vapi", LANG_ALL_MASK), Some(LangId::Vala));
         assert_eq!(detect_language(b"foo.chpl", LANG_ALL_MASK), Some(LangId::Chapel));
+        assert_eq!(detect_language(b"foo.pony", LANG_ALL_MASK), Some(LangId::Pony));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
