@@ -93,6 +93,7 @@ pub mod ron;
 pub mod thrift;
 pub mod prisma;
 pub mod kdl;
+pub mod capnp;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -213,9 +214,10 @@ pub enum LangId {
     Thrift = 102,
     Prisma = 103,
     Kdl = 104,
+    CapnProto = 105,
 }
 
-pub const LANG_COUNT: usize = 105;
+pub const LANG_COUNT: usize = 106;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -246,6 +248,7 @@ pub const LANG_RON_MASK: u128 = 1 << (LangId::Ron as u128);
 pub const LANG_THRIFT_MASK: u128 = 1 << (LangId::Thrift as u128);
 pub const LANG_PRISMA_MASK: u128 = 1 << (LangId::Prisma as u128);
 pub const LANG_KDL_MASK: u128 = 1 << (LangId::Kdl as u128);
+pub const LANG_CAPNPROTO_MASK: u128 = 1 << (LangId::CapnProto as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -433,6 +436,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Thrift,
     LangId::Prisma,
     LangId::Kdl,
+    LangId::CapnProto,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -554,6 +558,7 @@ impl LangId {
             Self::Thrift => "Thrift",
             Self::Prisma => "Prisma",
             Self::Kdl => "KDL",
+            Self::CapnProto => "Cap'n Proto",
         }
     }
 
@@ -670,6 +675,7 @@ impl LangId {
             Self::Thrift => &["-thrift", "--thrift"],
             Self::Prisma => &["-prisma", "--prisma"],
             Self::Kdl => &["-kdl", "--kdl"],
+            Self::CapnProto => &["-capnp", "--capnp"],
         }
     }
 
@@ -892,6 +898,7 @@ impl LangId {
             b"-thrift" | b"--thrift" | b"-THRIFT" | b"--THRIFT" => Some(Self::Thrift),
             b"-prisma" | b"--prisma" | b"-PRISMA" | b"--PRISMA" => Some(Self::Prisma),
             b"-kdl" | b"--kdl" | b"-KDL" | b"--KDL" => Some(Self::Kdl),
+            b"-capnp" | b"--capnp" | b"-CAPNP" | b"--CAPNP" => Some(Self::CapnProto),
             _ => None,
         }
     }
@@ -1041,6 +1048,7 @@ pub struct LangStats {
     pub thrift: ParseResult<{ thrift::KEYWORD_COUNT }>,
     pub prisma: ParseResult<{ prisma::KEYWORD_COUNT }>,
     pub kdl: ParseResult<{ kdl::KEYWORD_COUNT }>,
+    pub capnp: ParseResult<{ capnp::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1151,6 +1159,7 @@ impl LangStats {
         self.thrift.add(&other.thrift);
         self.prisma.add(&other.prisma);
         self.kdl.add(&other.kdl);
+        self.capnp.add(&other.capnp);
     }
 
     #[inline(always)]
@@ -1261,6 +1270,7 @@ impl LangStats {
             LangId::Thrift => self.thrift.lines_processed,
             LangId::Prisma => self.prisma.lines_processed,
             LangId::Kdl => self.kdl.lines_processed,
+            LangId::CapnProto => self.capnp.lines_processed,
         }
     }
 
@@ -1372,6 +1382,7 @@ impl LangStats {
             LangId::Thrift => self.thrift.code_lines,
             LangId::Prisma => self.prisma.code_lines,
             LangId::Kdl => self.kdl.code_lines,
+            LangId::CapnProto => self.capnp.code_lines,
         }
     }
 
@@ -1483,6 +1494,7 @@ impl LangStats {
             LangId::Thrift => self.thrift.comment_lines,
             LangId::Prisma => self.prisma.comment_lines,
             LangId::Kdl => self.kdl.comment_lines,
+            LangId::CapnProto => self.capnp.comment_lines,
         }
     }
 
@@ -1594,6 +1606,7 @@ impl LangStats {
             LangId::Thrift => self.thrift.blank_lines,
             LangId::Prisma => self.prisma.blank_lines,
             LangId::Kdl => self.kdl.blank_lines,
+            LangId::CapnProto => self.capnp.blank_lines,
         }
     }
 
@@ -1705,6 +1718,7 @@ impl LangStats {
             LangId::Thrift => self.thrift.total_keywords,
             LangId::Prisma => self.prisma.total_keywords,
             LangId::Kdl => self.kdl.total_keywords,
+            LangId::CapnProto => self.capnp.total_keywords,
         }
     }
 
@@ -1816,6 +1830,7 @@ impl LangStats {
             LangId::Thrift => &thrift::KEYWORD_NAMES,
             LangId::Prisma => &prisma::KEYWORD_NAMES,
             LangId::Kdl => &kdl::KEYWORD_NAMES,
+            LangId::CapnProto => &capnp::KEYWORD_NAMES,
         }
     }
 
@@ -1927,6 +1942,7 @@ impl LangStats {
             LangId::Thrift => &self.thrift.keyword_counts,
             LangId::Prisma => &self.prisma.keyword_counts,
             LangId::Kdl => &self.kdl.keyword_counts,
+            LangId::CapnProto => &self.capnp.keyword_counts,
         }
     }
 
@@ -2038,6 +2054,7 @@ impl LangStats {
             LangId::Thrift => &thrift::KEYWORD_LENS,
             LangId::Prisma => &prisma::KEYWORD_LENS,
             LangId::Kdl => &kdl::KEYWORD_LENS,
+            LangId::CapnProto => &capnp::KEYWORD_LENS,
         }
     }
 
@@ -2149,6 +2166,7 @@ impl LangStats {
             LangId::Thrift => (thrift::KW_MIN_LEN, thrift::KW_MAX_LEN),
             LangId::Prisma => (prisma::KW_MIN_LEN, prisma::KW_MAX_LEN),
             LangId::Kdl => (kdl::KW_MIN_LEN, kdl::KW_MAX_LEN),
+            LangId::CapnProto => (capnp::KW_MIN_LEN, capnp::KW_MAX_LEN),
         }
     }
 
@@ -2260,6 +2278,7 @@ impl LangStats {
             LangId::Thrift => (&thrift::TOKEN_KIND, &thrift::TOKEN_LUT_LO),
             LangId::Prisma => (&prisma::TOKEN_KIND, &prisma::TOKEN_LUT_LO),
             LangId::Kdl => (&kdl::TOKEN_KIND, &kdl::TOKEN_LUT_LO),
+            LangId::CapnProto => (&capnp::TOKEN_KIND, &capnp::TOKEN_LUT_LO),
         }
     }
 }
@@ -2553,6 +2572,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         if &ext == b"proto" && (enabled_mask & LANG_PROTOBUF_MASK) != 0 {
             return Some(LangId::Protobuf);
+        }
+        if &ext == b"capnp" && (enabled_mask & LANG_CAPNPROTO_MASK) != 0 {
+            return Some(LangId::CapnProto);
         }
     }
     if len >= 8 && name[len - 7] == b'.' {
@@ -4422,6 +4444,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Thrift => thrift::parse_into(content, &mut stats.thrift),
         LangId::Prisma => prisma::parse_into(content, &mut stats.prisma),
         LangId::Kdl => kdl::parse_into(content, &mut stats.kdl),
+        LangId::CapnProto => capnp::parse_into(content, &mut stats.capnp),
     }
 }
 
@@ -4620,7 +4643,8 @@ mod tests {
                 | LangId::Starlark
                 | LangId::Justfile
                 | LangId::Crystal
-                | LangId::CoffeeScript => "#",
+                | LangId::CoffeeScript
+                | LangId::CapnProto => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript => "--",
                 LangId::OCaml | LangId::Sml => "(*",
                 LangId::Fortran => "!",
@@ -4705,6 +4729,7 @@ mod tests {
                     | LangId::VimScript
                     | LangId::Batch
                     | LangId::Prisma
+                    | LangId::CapnProto
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -5623,6 +5648,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.thrift", LANG_ALL_MASK), Some(LangId::Thrift));
         assert_eq!(detect_language(b"foo.prisma", LANG_ALL_MASK), Some(LangId::Prisma));
         assert_eq!(detect_language(b"foo.kdl", LANG_ALL_MASK), Some(LangId::Kdl));
+        assert_eq!(detect_language(b"foo.capnp", LANG_ALL_MASK), Some(LangId::CapnProto));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5947,7 +5973,8 @@ mod tests {
                 | LangId::Starlark
                 | LangId::Justfile
                 | LangId::Crystal
-                | LangId::CoffeeScript => "#",
+                | LangId::CoffeeScript
+                | LangId::CapnProto => "#",
                 LangId::Lua
                 | LangId::Sql
                 | LangId::Haskell
