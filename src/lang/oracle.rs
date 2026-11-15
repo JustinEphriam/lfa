@@ -970,6 +970,14 @@ define_doc_oracle_specs! {
         non_cmt: &["* Heading 1", "** Heading 2", "#+TITLE: Document", "#+AUTHOR: Someone"],
         neutral: "Org mode paragraph line",
     },
+    BibTeX => {
+        file: "sample.bib",
+        line: &["%"],
+        block: &[],
+        quoted: false,
+        non_cmt: &["@article{ref,", "title = {My Paper},", "year = {2024}"],
+        neutral: "journal = {Nature},",
+    },
 }
 
 const _: () = assert!(ORACLE_LANG_SPECS.len() == LANG_COUNT);

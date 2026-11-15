@@ -11,9 +11,10 @@ pub enum DocFormatId {
     Json5 = 7,
     AsciiDoc = 8,
     Org = 9,
+    BibTeX = 10,
 }
 
-pub const DOC_FORMAT_COUNT: usize = 10;
+pub const DOC_FORMAT_COUNT: usize = 11;
 pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::Markdown,
     DocFormatId::PlainText,
@@ -25,6 +26,7 @@ pub const ALL_DOC_FORMATS: [DocFormatId; DOC_FORMAT_COUNT] = [
     DocFormatId::Json5,
     DocFormatId::AsciiDoc,
     DocFormatId::Org,
+    DocFormatId::BibTeX,
 ];
 
 impl DocFormatId {
@@ -41,6 +43,7 @@ impl DocFormatId {
             Self::Json5 => "JSON5 / JSONC",
             Self::AsciiDoc => "AsciiDoc",
             Self::Org => "Org-mode",
+            Self::BibTeX => "BibTeX",
         }
     }
 }
@@ -148,6 +151,7 @@ pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
             b"ini" => return Some(DocFormatId::Ini),
             b"rst" => return Some(DocFormatId::RestructuredText),
             b"org" => return Some(DocFormatId::Org),
+            b"bib" => return Some(DocFormatId::BibTeX),
             _ => {}
         }
     }
@@ -440,6 +444,18 @@ fn count_asciidoc_doc_line(trimmed: &[u8], in_block: &mut bool, stats: &mut DocS
     count_block_comment_doc_line(trimmed, b"////", b"////", in_block, stats);
 }
 
+fn count_bibtex_doc_line(trimmed: &[u8], stats: &mut DocStats) {
+    if trimmed.starts_with(b"%") {
+        stats.comment_lines += 1;
+        return;
+    }
+    if trimmed.len() >= 8 && trimmed[..8].eq_ignore_ascii_case(b"@comment") {
+        stats.comment_lines += 1;
+        return;
+    }
+    stats.content_lines += 1;
+}
+
 pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
     if content.is_empty() {
         return;
@@ -509,6 +525,9 @@ pub fn parse_doc_into(doc: DocFormatId, content: &[u8], stats: &mut DocStats) {
             }
             DocFormatId::Org => {
                 count_org_doc_line(trimmed, &mut in_block, stats);
+            }
+            DocFormatId::BibTeX => {
+                count_bibtex_doc_line(trimmed, stats);
             }
         }
     }

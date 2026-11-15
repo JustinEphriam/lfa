@@ -2012,6 +2012,7 @@ mod tests {
         assert_eq!(detect_doc_format(b"doc.adoc"), Some(DocFormatId::AsciiDoc));
         assert_eq!(detect_doc_format(b"doc.asciidoc"), Some(DocFormatId::AsciiDoc));
         assert_eq!(detect_doc_format(b"notes.org"), Some(DocFormatId::Org));
+        assert_eq!(detect_doc_format(b"references.bib"), Some(DocFormatId::BibTeX));
         assert_eq!(detect_doc_format(b"unknown.xyz"), None);
 
         let parse_doc = |doc: DocFormatId, bytes: &[u8]| -> DocStats {
