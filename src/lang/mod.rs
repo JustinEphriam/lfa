@@ -83,6 +83,7 @@ pub mod vala;
 pub mod chapel;
 pub mod pony;
 pub mod ballerina;
+pub mod coffeescript;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -193,9 +194,10 @@ pub enum LangId {
     Chapel = 92,
     Pony = 93,
     Ballerina = 94,
+    CoffeeScript = 95,
 }
 
-pub const LANG_COUNT: usize = 95;
+pub const LANG_COUNT: usize = 96;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -216,6 +218,7 @@ pub const LANG_VALA_MASK: u128 = 1 << (LangId::Vala as u128);
 pub const LANG_CHAPEL_MASK: u128 = 1 << (LangId::Chapel as u128);
 pub const LANG_PONY_MASK: u128 = 1 << (LangId::Pony as u128);
 pub const LANG_BALLERINA_MASK: u128 = 1 << (LangId::Ballerina as u128);
+pub const LANG_COFFEESCRIPT_MASK: u128 = 1 << (LangId::CoffeeScript as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -393,6 +396,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Chapel,
     LangId::Pony,
     LangId::Ballerina,
+    LangId::CoffeeScript,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -504,6 +508,7 @@ impl LangId {
             Self::Chapel => "Chapel",
             Self::Pony => "Pony",
             Self::Ballerina => "Ballerina",
+            Self::CoffeeScript => "CoffeeScript",
         }
     }
 
@@ -610,6 +615,7 @@ impl LangId {
             Self::Chapel => &["-chpl", "--chpl", "-chapel", "--chapel"],
             Self::Pony => &["-pony", "--pony"],
             Self::Ballerina => &["-bal", "--bal", "-ballerina", "--ballerina"],
+            Self::CoffeeScript => &["-coffee", "--coffee", "-coffeescript", "--coffeescript"],
         }
     }
 
@@ -822,6 +828,7 @@ impl LangId {
             b"-chpl" | b"--chpl" | b"-CHPL" | b"--CHPL" | b"-chapel" | b"--chapel" | b"-CHAPEL" | b"--CHAPEL" => Some(Self::Chapel),
             b"-pony" | b"--pony" | b"-PONY" | b"--PONY" => Some(Self::Pony),
             b"-bal" | b"--bal" | b"-BAL" | b"--BAL" | b"-ballerina" | b"--ballerina" | b"-BALLERINA" | b"--BALLERINA" => Some(Self::Ballerina),
+            b"-coffee" | b"--coffee" | b"-COFFEE" | b"--COFFEE" | b"-coffeescript" | b"--coffeescript" | b"-COFFEESCRIPT" | b"--COFFEESCRIPT" => Some(Self::CoffeeScript),
             _ => None,
         }
     }
@@ -961,6 +968,7 @@ pub struct LangStats {
     pub chapel: ParseResult<{ chapel::KEYWORD_COUNT }>,
     pub pony: ParseResult<{ pony::KEYWORD_COUNT }>,
     pub ballerina: ParseResult<{ ballerina::KEYWORD_COUNT }>,
+    pub coffeescript: ParseResult<{ coffeescript::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1061,6 +1069,7 @@ impl LangStats {
         self.chapel.add(&other.chapel);
         self.pony.add(&other.pony);
         self.ballerina.add(&other.ballerina);
+        self.coffeescript.add(&other.coffeescript);
     }
 
     #[inline(always)]
@@ -1161,6 +1170,7 @@ impl LangStats {
             LangId::Chapel => self.chapel.lines_processed,
             LangId::Pony => self.pony.lines_processed,
             LangId::Ballerina => self.ballerina.lines_processed,
+            LangId::CoffeeScript => self.coffeescript.lines_processed,
         }
     }
 
@@ -1262,6 +1272,7 @@ impl LangStats {
             LangId::Chapel => self.chapel.code_lines,
             LangId::Pony => self.pony.code_lines,
             LangId::Ballerina => self.ballerina.code_lines,
+            LangId::CoffeeScript => self.coffeescript.code_lines,
         }
     }
 
@@ -1363,6 +1374,7 @@ impl LangStats {
             LangId::Chapel => self.chapel.comment_lines,
             LangId::Pony => self.pony.comment_lines,
             LangId::Ballerina => self.ballerina.comment_lines,
+            LangId::CoffeeScript => self.coffeescript.comment_lines,
         }
     }
 
@@ -1464,6 +1476,7 @@ impl LangStats {
             LangId::Chapel => self.chapel.blank_lines,
             LangId::Pony => self.pony.blank_lines,
             LangId::Ballerina => self.ballerina.blank_lines,
+            LangId::CoffeeScript => self.coffeescript.blank_lines,
         }
     }
 
@@ -1565,6 +1578,7 @@ impl LangStats {
             LangId::Chapel => self.chapel.total_keywords,
             LangId::Pony => self.pony.total_keywords,
             LangId::Ballerina => self.ballerina.total_keywords,
+            LangId::CoffeeScript => self.coffeescript.total_keywords,
         }
     }
 
@@ -1666,6 +1680,7 @@ impl LangStats {
             LangId::Chapel => &chapel::KEYWORD_NAMES,
             LangId::Pony => &pony::KEYWORD_NAMES,
             LangId::Ballerina => &ballerina::KEYWORD_NAMES,
+            LangId::CoffeeScript => &coffeescript::KEYWORD_NAMES,
         }
     }
 
@@ -1767,6 +1782,7 @@ impl LangStats {
             LangId::Chapel => &self.chapel.keyword_counts,
             LangId::Pony => &self.pony.keyword_counts,
             LangId::Ballerina => &self.ballerina.keyword_counts,
+            LangId::CoffeeScript => &self.coffeescript.keyword_counts,
         }
     }
 
@@ -1868,6 +1884,7 @@ impl LangStats {
             LangId::Chapel => &chapel::KEYWORD_LENS,
             LangId::Pony => &pony::KEYWORD_LENS,
             LangId::Ballerina => &ballerina::KEYWORD_LENS,
+            LangId::CoffeeScript => &coffeescript::KEYWORD_LENS,
         }
     }
 
@@ -1969,6 +1986,7 @@ impl LangStats {
             LangId::Chapel => (chapel::KW_MIN_LEN, chapel::KW_MAX_LEN),
             LangId::Pony => (pony::KW_MIN_LEN, pony::KW_MAX_LEN),
             LangId::Ballerina => (ballerina::KW_MIN_LEN, ballerina::KW_MAX_LEN),
+            LangId::CoffeeScript => (coffeescript::KW_MIN_LEN, coffeescript::KW_MAX_LEN),
         }
     }
 
@@ -2070,6 +2088,7 @@ impl LangStats {
             LangId::Chapel => (&chapel::TOKEN_KIND, &chapel::TOKEN_LUT_LO),
             LangId::Pony => (&pony::TOKEN_KIND, &pony::TOKEN_LUT_LO),
             LangId::Ballerina => (&ballerina::TOKEN_KIND, &ballerina::TOKEN_LUT_LO),
+            LangId::CoffeeScript => (&coffeescript::TOKEN_KIND, &coffeescript::TOKEN_LUT_LO),
         }
     }
 }
@@ -2314,6 +2333,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"vala" | b"vapi" if (enabled_mask & LANG_VALA_MASK) != 0 => return Some(LangId::Vala),
             b"chpl" if (enabled_mask & LANG_CHAPEL_MASK) != 0 => return Some(LangId::Chapel),
             b"pony" if (enabled_mask & LANG_PONY_MASK) != 0 => return Some(LangId::Pony),
+            b"cson" if (enabled_mask & LANG_COFFEESCRIPT_MASK) != 0 => return Some(LangId::CoffeeScript),
             _ => {}
         }
         return None;
@@ -2377,6 +2397,9 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         if &ext == b"tfvars" && (enabled_mask & LANG_HCL_MASK) != 0 {
             return Some(LangId::Hcl);
+        }
+        if &ext == b"coffee" && (enabled_mask & LANG_COFFEESCRIPT_MASK) != 0 {
+            return Some(LangId::CoffeeScript);
         }
     }
     if len >= 9 && name[len - 8] == b'.' {
@@ -4199,6 +4222,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Chapel => chapel::parse_into(content, &mut stats.chapel),
         LangId::Pony => pony::parse_into(content, &mut stats.pony),
         LangId::Ballerina => ballerina::parse_into(content, &mut stats.ballerina),
+        LangId::CoffeeScript => coffeescript::parse_into(content, &mut stats.coffeescript),
     }
 }
 
@@ -4396,7 +4420,8 @@ mod tests {
                 | LangId::Meson
                 | LangId::Starlark
                 | LangId::Justfile
-                | LangId::Crystal => "#",
+                | LangId::Crystal
+                | LangId::CoffeeScript => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript => "--",
                 LangId::OCaml | LangId::Sml => "(*",
                 LangId::Fortran => "!",
@@ -4475,6 +4500,7 @@ mod tests {
                     | LangId::Justfile
                     | LangId::Crystal
                     | LangId::Ballerina
+                    | LangId::CoffeeScript
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -5381,6 +5407,8 @@ mod tests {
         assert_eq!(detect_language(b"foo.chpl", LANG_ALL_MASK), Some(LangId::Chapel));
         assert_eq!(detect_language(b"foo.pony", LANG_ALL_MASK), Some(LangId::Pony));
         assert_eq!(detect_language(b"foo.bal", LANG_ALL_MASK), Some(LangId::Ballerina));
+        assert_eq!(detect_language(b"foo.coffee", LANG_ALL_MASK), Some(LangId::CoffeeScript));
+        assert_eq!(detect_language(b"foo.cson", LANG_ALL_MASK), Some(LangId::CoffeeScript));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5704,7 +5732,8 @@ mod tests {
                 | LangId::Meson
                 | LangId::Starlark
                 | LangId::Justfile
-                | LangId::Crystal => "#",
+                | LangId::Crystal
+                | LangId::CoffeeScript => "#",
                 LangId::Lua
                 | LangId::Sql
                 | LangId::Haskell
@@ -5742,6 +5771,7 @@ mod tests {
                 LangId::Nim => "#[",
                 LangId::Julia => "#=",
                 LangId::Matlab => "%{",
+                LangId::CoffeeScript => "###",
                 LangId::Fortran
                 | LangId::Bash
                 | LangId::Elixir
@@ -5785,6 +5815,7 @@ mod tests {
                 LangId::Nim => "]#",
                 LangId::Julia => "=#",
                 LangId::Matlab => "%}",
+                LangId::CoffeeScript => "###",
                 LangId::Fortran
                 | LangId::Bash
                 | LangId::Elixir
