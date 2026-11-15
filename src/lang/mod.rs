@@ -78,6 +78,7 @@ pub mod actionscript;
 pub mod apex;
 pub mod astro;
 pub mod autohotkey;
+pub mod crystal;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -183,9 +184,10 @@ pub enum LangId {
     ActionScript = 87,
     Apex = 88,
     AutoHotkey = 89,
+    Crystal = 90,
 }
 
-pub const LANG_COUNT: usize = 90;
+pub const LANG_COUNT: usize = 91;
 pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
 pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
 pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
@@ -201,6 +203,7 @@ pub const LANG_OBJECTIVECPP_MASK: u128 = 1 << (LangId::ObjectiveCpp as u128);
 pub const LANG_ACTIONSCRIPT_MASK: u128 = 1 << (LangId::ActionScript as u128);
 pub const LANG_APEX_MASK: u128 = 1 << (LangId::Apex as u128);
 pub const LANG_AUTOHOTKEY_MASK: u128 = 1 << (LangId::AutoHotkey as u128);
+pub const LANG_CRYSTAL_MASK: u128 = 1 << (LangId::Crystal as u128);
 pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
 pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
 pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
@@ -373,6 +376,7 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::ActionScript,
     LangId::Apex,
     LangId::AutoHotkey,
+    LangId::Crystal,
 ];
 
 const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
@@ -479,6 +483,7 @@ impl LangId {
             Self::ActionScript => "ActionScript",
             Self::Apex => "Apex",
             Self::AutoHotkey => "AutoHotkey",
+            Self::Crystal => "Crystal",
         }
     }
 
@@ -580,6 +585,7 @@ impl LangId {
             Self::ActionScript => &["-as", "--as", "-actionscript", "--actionscript"],
             Self::Apex => &["-apex", "--apex"],
             Self::AutoHotkey => &["-ahk", "--ahk", "-autohotkey", "--autohotkey"],
+            Self::Crystal => &["-cr", "--cr", "-crystal", "--crystal"],
         }
     }
 
@@ -787,6 +793,7 @@ impl LangId {
             b"-as" | b"--as" | b"-AS" | b"--AS" | b"-actionscript" | b"--actionscript" | b"-ACTIONSCRIPT" | b"--ACTIONSCRIPT" => Some(Self::ActionScript),
             b"-apex" | b"--apex" | b"-APEX" | b"--APEX" => Some(Self::Apex),
             b"-ahk" | b"--ahk" | b"-AHK" | b"--AHK" | b"-autohotkey" | b"--autohotkey" | b"-AUTOHOTKEY" | b"--AUTOHOTKEY" => Some(Self::AutoHotkey),
+            b"-cr" | b"--cr" | b"-CR" | b"--CR" | b"-crystal" | b"--crystal" | b"-CRYSTAL" | b"--CRYSTAL" => Some(Self::Crystal),
             _ => None,
         }
     }
@@ -921,6 +928,7 @@ pub struct LangStats {
     pub actionscript: ParseResult<{ actionscript::KEYWORD_COUNT }>,
     pub apex: ParseResult<{ apex::KEYWORD_COUNT }>,
     pub autohotkey: ParseResult<{ autohotkey::KEYWORD_COUNT }>,
+    pub crystal: ParseResult<{ crystal::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1016,6 +1024,7 @@ impl LangStats {
         self.actionscript.add(&other.actionscript);
         self.apex.add(&other.apex);
         self.autohotkey.add(&other.autohotkey);
+        self.crystal.add(&other.crystal);
     }
 
     #[inline(always)]
@@ -1111,6 +1120,7 @@ impl LangStats {
             LangId::ActionScript => self.actionscript.lines_processed,
             LangId::Apex => self.apex.lines_processed,
             LangId::AutoHotkey => self.autohotkey.lines_processed,
+            LangId::Crystal => self.crystal.lines_processed,
         }
     }
 
@@ -1207,6 +1217,7 @@ impl LangStats {
             LangId::ActionScript => self.actionscript.code_lines,
             LangId::Apex => self.apex.code_lines,
             LangId::AutoHotkey => self.autohotkey.code_lines,
+            LangId::Crystal => self.crystal.code_lines,
         }
     }
 
@@ -1303,6 +1314,7 @@ impl LangStats {
             LangId::ActionScript => self.actionscript.comment_lines,
             LangId::Apex => self.apex.comment_lines,
             LangId::AutoHotkey => self.autohotkey.comment_lines,
+            LangId::Crystal => self.crystal.comment_lines,
         }
     }
 
@@ -1399,6 +1411,7 @@ impl LangStats {
             LangId::ActionScript => self.actionscript.blank_lines,
             LangId::Apex => self.apex.blank_lines,
             LangId::AutoHotkey => self.autohotkey.blank_lines,
+            LangId::Crystal => self.crystal.blank_lines,
         }
     }
 
@@ -1495,6 +1508,7 @@ impl LangStats {
             LangId::ActionScript => self.actionscript.total_keywords,
             LangId::Apex => self.apex.total_keywords,
             LangId::AutoHotkey => self.autohotkey.total_keywords,
+            LangId::Crystal => self.crystal.total_keywords,
         }
     }
 
@@ -1591,6 +1605,7 @@ impl LangStats {
             LangId::ActionScript => &actionscript::KEYWORD_NAMES,
             LangId::Apex => &apex::KEYWORD_NAMES,
             LangId::AutoHotkey => &autohotkey::KEYWORD_NAMES,
+            LangId::Crystal => &crystal::KEYWORD_NAMES,
         }
     }
 
@@ -1687,6 +1702,7 @@ impl LangStats {
             LangId::ActionScript => &self.actionscript.keyword_counts,
             LangId::Apex => &self.apex.keyword_counts,
             LangId::AutoHotkey => &self.autohotkey.keyword_counts,
+            LangId::Crystal => &self.crystal.keyword_counts,
         }
     }
 
@@ -1783,6 +1799,7 @@ impl LangStats {
             LangId::ActionScript => &actionscript::KEYWORD_LENS,
             LangId::Apex => &apex::KEYWORD_LENS,
             LangId::AutoHotkey => &autohotkey::KEYWORD_LENS,
+            LangId::Crystal => &crystal::KEYWORD_LENS,
         }
     }
 
@@ -1879,6 +1896,7 @@ impl LangStats {
             LangId::ActionScript => (actionscript::KW_MIN_LEN, actionscript::KW_MAX_LEN),
             LangId::Apex => (apex::KW_MIN_LEN, apex::KW_MAX_LEN),
             LangId::AutoHotkey => (autohotkey::KW_MIN_LEN, autohotkey::KW_MAX_LEN),
+            LangId::Crystal => (crystal::KW_MIN_LEN, crystal::KW_MAX_LEN),
         }
     }
 
@@ -1975,6 +1993,7 @@ impl LangStats {
             LangId::ActionScript => (&actionscript::TOKEN_KIND, &actionscript::TOKEN_LUT_LO),
             LangId::Apex => (&apex::TOKEN_KIND, &apex::TOKEN_LUT_LO),
             LangId::AutoHotkey => (&autohotkey::TOKEN_KIND, &autohotkey::TOKEN_LUT_LO),
+            LangId::Crystal => (&crystal::TOKEN_KIND, &crystal::TOKEN_LUT_LO),
         }
     }
 }
@@ -2088,6 +2107,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             b"tf" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
             b"ll" if (enabled_mask & LANG_LLVM_MASK) != 0 => return Some(LangId::Llvm),
             b"as" if (enabled_mask & LANG_ACTIONSCRIPT_MASK) != 0 => return Some(LangId::ActionScript),
+            b"cr" if (enabled_mask & LANG_CRYSTAL_MASK) != 0 => return Some(LangId::Crystal),
             _ => {}
         }
         return None;
@@ -2406,6 +2426,9 @@ pub fn detect_shebang(content: &[u8], enabled_mask: u128) -> Option<LangId> {
     }
     if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && (prog == b"node" || prog == b"nodejs") {
         return Some(LangId::JavaScript);
+    }
+    if (enabled_mask & LANG_CRYSTAL_MASK) != 0 && prog == b"crystal" {
+        return Some(LangId::Crystal);
     }
 
     None
@@ -4091,6 +4114,7 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::ActionScript => actionscript::parse_into(content, &mut stats.actionscript),
         LangId::Apex => apex::parse_into(content, &mut stats.apex),
         LangId::AutoHotkey => autohotkey::parse_into(content, &mut stats.autohotkey),
+        LangId::Crystal => crystal::parse_into(content, &mut stats.crystal),
     }
 }
 
@@ -4287,7 +4311,8 @@ mod tests {
                 | LangId::Hcl
                 | LangId::Meson
                 | LangId::Starlark
-                | LangId::Justfile => "#",
+                | LangId::Justfile
+                | LangId::Crystal => "#",
                 LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript => "--",
                 LangId::OCaml | LangId::Sml => "(*",
                 LangId::Fortran => "!",
@@ -4364,6 +4389,7 @@ mod tests {
                     | LangId::Meson
                     | LangId::Starlark
                     | LangId::Justfile
+                    | LangId::Crystal
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -5217,6 +5243,7 @@ mod tests {
         assert_eq!(detect_shebang(b"#!/usr/bin/awk -f\nBEGIN{}", LANG_ALL_MASK), Some(LangId::Awk));
         assert_eq!(detect_shebang(b"#!/usr/bin/tclsh\nputs 1", LANG_ALL_MASK), Some(LangId::Tcl));
         assert_eq!(detect_shebang(b"#!/usr/bin/env node\nconsole.log(1)", LANG_ALL_MASK), Some(LangId::JavaScript));
+        assert_eq!(detect_shebang(b"#!/usr/bin/crystal\nputs 1", LANG_ALL_MASK), Some(LangId::Crystal));
         assert_eq!(detect_shebang(b"hello world\n", LANG_ALL_MASK), None);
         assert_eq!(detect_shebang(b"#!", LANG_ALL_MASK), None);
         assert_eq!(detect_shebang(b"#!/bin/bash", LANG_PYTHON_MASK), None);
@@ -5263,6 +5290,7 @@ mod tests {
         assert_eq!(detect_language(b"foo.cpy", LANG_ALL_MASK), Some(LangId::Cobol));
         assert_eq!(detect_language(b"foo.vhd", LANG_ALL_MASK), Some(LangId::Vhdl));
         assert_eq!(detect_language(b"foo.vhdl", LANG_ALL_MASK), Some(LangId::Vhdl));
+        assert_eq!(detect_language(b"foo.cr", LANG_ALL_MASK), Some(LangId::Crystal));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5585,7 +5613,8 @@ mod tests {
                 | LangId::Hcl
                 | LangId::Meson
                 | LangId::Starlark
-                | LangId::Justfile => "#",
+                | LangId::Justfile
+                | LangId::Crystal => "#",
                 LangId::Lua
                 | LangId::Sql
                 | LangId::Haskell
@@ -5648,7 +5677,8 @@ mod tests {
                 | LangId::Tex
                 | LangId::Meson
                 | LangId::Starlark
-                | LangId::Justfile => "",
+                | LangId::Justfile
+                | LangId::Crystal => "",
                 _ => "/*",
             };
             let block_close = match lang {
@@ -5689,7 +5719,8 @@ mod tests {
                 | LangId::Tex
                 | LangId::Meson
                 | LangId::Starlark
-                | LangId::Justfile => "",
+                | LangId::Justfile
+                | LangId::Crystal => "",
                 _ => "*/",
             };
 
