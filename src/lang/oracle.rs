@@ -817,6 +817,13 @@ define_lang_oracle_specs! {
         prefixes: &[], sigils: &[], suffixes: &[], datum: &[], eof: &[],
         spliced: false, tmpl: false, char_life: false, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
     },
+    Vala => {
+        file: "sample.vala", caseless: false,
+        line: &["//"], line_start: &[], block: &[("/*", "*/", false)], doc_block: &[],
+        quotes: &[("\"", true), ("'", true)], raw: &[rqe("\"\"\"", "\"\"\"")],
+        prefixes: &[], sigils: &[], suffixes: &[], datum: &[], eof: &[],
+        spliced: false, tmpl: false, char_life: false, cpp_sep: false, transpose: false, tex_pct: false, perl_hash: false, ruby_def: false,
+    },
 }
 
 define_doc_oracle_specs! {
