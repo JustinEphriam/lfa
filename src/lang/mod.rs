@@ -1,6 +1,3 @@
-pub mod doc;
-#[cfg(test)]
-pub mod oracle;
 pub mod ada;
 pub mod assembly;
 pub mod awk;
@@ -94,6 +91,22 @@ pub mod thrift;
 pub mod prisma;
 pub mod kdl;
 pub mod capnp;
+pub mod cue;
+pub mod jsonnet;
+pub mod dhall;
+pub mod nickel;
+pub mod bicep;
+pub mod wit;
+pub mod move_lang;
+pub mod cairo;
+pub mod vyper;
+pub mod fennel;
+pub mod hy;
+pub mod elisp;
+pub mod raku;
+pub mod forth;
+pub mod smalltalk;
+pub mod wren;
 pub mod elm;
 pub mod just;
 pub mod meson;
@@ -105,6 +118,76 @@ pub mod starlark;
 pub mod svelte;
 pub mod systemverilog;
 pub mod vue;
+pub mod flatbuffers;
+pub mod smithy;
+pub mod janet;
+pub mod idris;
+pub mod modelica;
+pub mod stan;
+pub mod shen;
+pub mod firrtl;
+pub mod abap;
+pub mod stata;
+pub mod gdscript;
+pub mod prolog;
+pub mod agda;
+pub mod opencl;
+pub mod postscript;
+pub mod grain;
+pub mod prql;
+pub mod q;
+pub mod slang;
+pub mod autoit;
+pub mod lean;
+pub mod uiua;
+pub mod bqn;
+pub mod cypher;
+pub mod gherkin;
+pub mod eiffel;
+pub mod supercollider;
+pub mod red;
+pub mod koka;
+pub mod bluespec;
+pub mod modula2;
+pub mod rexx;
+pub mod rebol;
+pub mod factor;
+pub mod logtalk;
+pub mod sparql;
+pub mod chuck;
+pub mod io;
+pub mod pike;
+pub mod dylan;
+pub mod openscad;
+pub mod p4;
+pub mod alloy;
+pub mod applescript;
+pub mod carp;
+pub mod livescript;
+pub mod moonscript;
+pub mod modula3;
+pub mod oberon;
+pub mod clean;
+pub mod holyc;
+pub mod clarity;
+pub mod pawn;
+pub mod blitzmax;
+pub mod asymptote;
+pub mod gnuplot;
+pub mod processing;
+pub mod mlir;
+pub mod txl;
+pub mod pact;
+pub mod arduino;
+pub mod vba;
+pub mod ceylon;
+pub mod fantom;
+pub mod xtend;
+pub mod abnf;
+pub mod al;
+pub mod j_lang;
+pub mod spice;
+pub mod ats;
 
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -215,120 +298,561 @@ pub enum LangId {
     Prisma = 103,
     Kdl = 104,
     CapnProto = 105,
+    Cue = 106,
+    Jsonnet = 107,
+    Dhall = 108,
+    Nickel = 109,
+    Bicep = 110,
+    Wit = 111,
+    Move = 112,
+    Cairo = 113,
+    Vyper = 114,
+    Fennel = 115,
+    Hy = 116,
+    EmacsLisp = 117,
+    Raku = 118,
+    Forth = 119,
+    Smalltalk = 120,
+    Wren = 121,
+    FlatBuffers = 122,
+    Smithy = 123,
+    Janet = 124,
+    Idris = 125,
+    Modelica = 126,
+    Stan = 127,
+    Shen = 128,
+    Firrtl = 129,
+    Abap = 130,
+    Stata = 131,
+    GDScript = 132,
+    Prolog = 133,
+    Agda = 134,
+    OpenCL = 135,
+    PostScript = 136,
+    Grain = 137,
+    Prql = 138,
+    Q = 139,
+    Slang = 140,
+    AutoIt = 141,
+    Lean = 142,
+    Uiua = 143,
+    Bqn = 144,
+    Cypher = 145,
+    Gherkin = 146,
+    Eiffel = 147,
+    SuperCollider = 148,
+    Red = 149,
+    Koka = 150,
+    Bluespec = 151,
+    Modula2 = 152,
+    Rexx = 153,
+    Rebol = 154,
+    Factor = 155,
+    Logtalk = 156,
+    Sparql = 157,
+    Chuck = 158,
+    Io = 159,
+    Pike = 160,
+    Dylan = 161,
+    OpenSCAD = 162,
+    P4 = 163,
+    Alloy = 164,
+    AppleScript = 165,
+    Carp = 166,
+    LiveScript = 167,
+    MoonScript = 168,
+    Modula3 = 169,
+    Oberon = 170,
+    Clean = 171,
+    HolyC = 172,
+    Clarity = 173,
+    Pawn = 174,
+    BlitzMax = 175,
+    Asymptote = 176,
+    Gnuplot = 177,
+    Processing = 178,
+    Mlir = 179,
+    Txl = 180,
+    Pact = 181,
+    Arduino = 182,
+    Vba = 183,
+    Ceylon = 184,
+    Fantom = 185,
+    Xtend = 186,
+    Abnf = 187,
+    Al = 188,
+    JLang = 189,
+    Spice = 190,
+    Ats = 191,
 }
 
-pub const LANG_COUNT: usize = 106;
-pub const LANG_ELM_MASK: u128 = 1 << (LangId::Elm as u128);
-pub const LANG_PURESCRIPT_MASK: u128 = 1 << (LangId::PureScript as u128);
-pub const LANG_RACKET_MASK: u128 = 1 << (LangId::Racket as u128);
-pub const LANG_SML_MASK: u128 = 1 << (LangId::Sml as u128);
-pub const LANG_SYSTEMVERILOG_MASK: u128 = 1 << (LangId::SystemVerilog as u128);
-pub const LANG_MESON_MASK: u128 = 1 << (LangId::Meson as u128);
-pub const LANG_STARLARK_MASK: u128 = 1 << (LangId::Starlark as u128);
-pub const LANG_JUSTFILE_MASK: u128 = 1 << (LangId::Justfile as u128);
-pub const LANG_SVELTE_MASK: u128 = 1 << (LangId::Svelte as u128);
-pub const LANG_VUE_MASK: u128 = 1 << (LangId::Vue as u128);
-pub const LANG_ASTRO_MASK: u128 = 1 << (LangId::Astro as u128);
-pub const LANG_OBJECTIVECPP_MASK: u128 = 1 << (LangId::ObjectiveCpp as u128);
-pub const LANG_ACTIONSCRIPT_MASK: u128 = 1 << (LangId::ActionScript as u128);
-pub const LANG_APEX_MASK: u128 = 1 << (LangId::Apex as u128);
-pub const LANG_AUTOHOTKEY_MASK: u128 = 1 << (LangId::AutoHotkey as u128);
-pub const LANG_CRYSTAL_MASK: u128 = 1 << (LangId::Crystal as u128);
-pub const LANG_VALA_MASK: u128 = 1 << (LangId::Vala as u128);
-pub const LANG_CHAPEL_MASK: u128 = 1 << (LangId::Chapel as u128);
-pub const LANG_PONY_MASK: u128 = 1 << (LangId::Pony as u128);
-pub const LANG_BALLERINA_MASK: u128 = 1 << (LangId::Ballerina as u128);
-pub const LANG_COFFEESCRIPT_MASK: u128 = 1 << (LangId::CoffeeScript as u128);
-pub const LANG_LESS_MASK: u128 = 1 << (LangId::Less as u128);
-pub const LANG_VIMSCRIPT_MASK: u128 = 1 << (LangId::VimScript as u128);
-pub const LANG_BATCH_MASK: u128 = 1 << (LangId::Batch as u128);
-pub const LANG_HAXE_MASK: u128 = 1 << (LangId::Haxe as u128);
-pub const LANG_QML_MASK: u128 = 1 << (LangId::Qml as u128);
-pub const LANG_RON_MASK: u128 = 1 << (LangId::Ron as u128);
-pub const LANG_THRIFT_MASK: u128 = 1 << (LangId::Thrift as u128);
-pub const LANG_PRISMA_MASK: u128 = 1 << (LangId::Prisma as u128);
-pub const LANG_KDL_MASK: u128 = 1 << (LangId::Kdl as u128);
-pub const LANG_CAPNPROTO_MASK: u128 = 1 << (LangId::CapnProto as u128);
-pub const LANG_C_MASK: u128 = 1 << (LangId::C as u128);
-pub const LANG_CPP_MASK: u128 = 1 << (LangId::Cpp as u128);
-pub const LANG_RUST_MASK: u128 = 1 << (LangId::Rust as u128);
-pub const LANG_PYTHON_MASK: u128 = 1 << (LangId::Python as u128);
-pub const LANG_PERL_MASK: u128 = 1 << (LangId::Perl as u128);
-pub const LANG_GO_MASK: u128 = 1 << (LangId::Go as u128);
-pub const LANG_ZIG_MASK: u128 = 1 << (LangId::Zig as u128);
-pub const LANG_ODIN_MASK: u128 = 1 << (LangId::Odin as u128);
-pub const LANG_JAVASCRIPT_MASK: u128 = 1 << (LangId::JavaScript as u128);
-pub const LANG_TYPESCRIPT_MASK: u128 = 1 << (LangId::TypeScript as u128);
-pub const LANG_LUA_MASK: u128 = 1 << (LangId::Lua as u128);
-pub const LANG_JAVA_MASK: u128 = 1 << (LangId::Java as u128);
-pub const LANG_CSHARP_MASK: u128 = 1 << (LangId::CSharp as u128);
-pub const LANG_RUBY_MASK: u128 = 1 << (LangId::Ruby as u128);
-pub const LANG_PHP_MASK: u128 = 1 << (LangId::Php as u128);
-pub const LANG_SWIFT_MASK: u128 = 1 << (LangId::Swift as u128);
-pub const LANG_KOTLIN_MASK: u128 = 1 << (LangId::Kotlin as u128);
-pub const LANG_BASH_MASK: u128 = 1 << (LangId::Bash as u128);
-pub const LANG_SQL_MASK: u128 = 1 << (LangId::Sql as u128);
-pub const LANG_DART_MASK: u128 = 1 << (LangId::Dart as u128);
-pub const LANG_SCALA_MASK: u128 = 1 << (LangId::Scala as u128);
-pub const LANG_HASKELL_MASK: u128 = 1 << (LangId::Haskell as u128);
-pub const LANG_OCAML_MASK: u128 = 1 << (LangId::OCaml as u128);
-pub const LANG_GLEAM_MASK: u128 = 1 << (LangId::Gleam as u128);
-pub const LANG_D_MASK: u128 = 1 << (LangId::D as u128);
-pub const LANG_NIM_MASK: u128 = 1 << (LangId::Nim as u128);
-pub const LANG_FORTRAN_MASK: u128 = 1 << (LangId::Fortran as u128);
-pub const LANG_ELIXIR_MASK: u128 = 1 << (LangId::Elixir as u128);
-pub const LANG_ERLANG_MASK: u128 = 1 << (LangId::Erlang as u128);
-pub const LANG_JULIA_MASK: u128 = 1 << (LangId::Julia as u128);
-pub const LANG_R_MASK: u128 = 1 << (LangId::R as u128);
-pub const LANG_MATLAB_MASK: u128 = 1 << (LangId::Matlab as u128);
-pub const LANG_SOLIDITY_MASK: u128 = 1 << (LangId::Solidity as u128);
-pub const LANG_FSHARP_MASK: u128 = 1 << (LangId::FSharp as u128);
-pub const LANG_MOJO_MASK: u128 = 1 << (LangId::Mojo as u128);
-pub const LANG_VERILOG_MASK: u128 = 1 << (LangId::Verilog as u128);
-pub const LANG_CUDA_MASK: u128 = 1 << (LangId::Cuda as u128);
-pub const LANG_WGSL_MASK: u128 = 1 << (LangId::Wgsl as u128);
-pub const LANG_ADA_MASK: u128 = 1 << (LangId::Ada as u128);
-pub const LANG_GROOVY_MASK: u128 = 1 << (LangId::Groovy as u128);
-pub const LANG_CLOJURE_MASK: u128 = 1 << (LangId::Clojure as u128);
-pub const LANG_ASSEMBLY_MASK: u128 = 1 << (LangId::Assembly as u128);
-pub const LANG_TCL_MASK: u128 = 1 << (LangId::Tcl as u128);
-pub const LANG_SCHEME_MASK: u128 = 1 << (LangId::Scheme as u128);
-pub const LANG_JSON_MASK: u128 = 1 << (LangId::Json as u128);
-pub const LANG_TOML_MASK: u128 = 1 << (LangId::Toml as u128);
-pub const LANG_YAML_MASK: u128 = 1 << (LangId::Yaml as u128);
-pub const LANG_DOCKERFILE_MASK: u128 = 1 << (LangId::Dockerfile as u128);
-pub const LANG_MAKEFILE_MASK: u128 = 1 << (LangId::Makefile as u128);
-pub const LANG_CMAKE_MASK: u128 = 1 << (LangId::CMake as u128);
-pub const LANG_GLSL_MASK: u128 = 1 << (LangId::Glsl as u128);
-pub const LANG_HLSL_MASK: u128 = 1 << (LangId::Hlsl as u128);
-pub const LANG_OBJECTIVEC_MASK: u128 = 1 << (LangId::ObjectiveC as u128);
-pub const LANG_V_MASK: u128 = 1 << (LangId::V as u128);
-pub const LANG_COMMONLISP_MASK: u128 = 1 << (LangId::CommonLisp as u128);
-pub const LANG_PASCAL_MASK: u128 = 1 << (LangId::Pascal as u128);
-pub const LANG_POWERSHELL_MASK: u128 = 1 << (LangId::PowerShell as u128);
-pub const LANG_FISH_MASK: u128 = 1 << (LangId::Fish as u128);
-pub const LANG_AWK_MASK: u128 = 1 << (LangId::Awk as u128);
-pub const LANG_HARE_MASK: u128 = 1 << (LangId::Hare as u128);
-pub const LANG_HTML_MASK: u128 = 1 << (LangId::Html as u128);
-pub const LANG_XML_MASK: u128 = 1 << (LangId::Xml as u128);
-pub const LANG_CSS_MASK: u128 = 1 << (LangId::Css as u128);
-pub const LANG_GRAPHQL_MASK: u128 = 1 << (LangId::Graphql as u128);
-pub const LANG_PROTOBUF_MASK: u128 = 1 << (LangId::Protobuf as u128);
-pub const LANG_COBOL_MASK: u128 = 1 << (LangId::Cobol as u128);
-pub const LANG_VHDL_MASK: u128 = 1 << (LangId::Vhdl as u128);
-pub const LANG_CHEADER_MASK: u128 = 1 << (LangId::CHeader as u128);
-pub const LANG_CPPHEADER_MASK: u128 = 1 << (LangId::CppHeader as u128);
-pub const LANG_SASS_MASK: u128 = 1 << (LangId::Sass as u128);
-pub const LANG_NIX_MASK: u128 = 1 << (LangId::Nix as u128);
-pub const LANG_HCL_MASK: u128 = 1 << (LangId::Hcl as u128);
-pub const LANG_LLVM_MASK: u128 = 1 << (LangId::Llvm as u128);
-pub const LANG_WAT_MASK: u128 = 1 << (LangId::Wat as u128);
-pub const LANG_TEX_MASK: u128 = 1 << (LangId::Tex as u128);
-pub const LANG_ALL_MASK: u128 = if LANG_COUNT == 128 {
-    !0u128
-} else {
-    (1u128 << LANG_COUNT) - 1
-};
+pub const LANG_COUNT: usize = 192;
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub struct LangMask(pub [u128; 2]);
+
+impl LangMask {
+    pub const ZERO: Self = Self([0, 0]);
+    pub const ALL: Self = {
+        let mut m = [0u128; 2];
+        let mut i = 0;
+        while i < LANG_COUNT {
+            m[i / 128] |= 1u128 << (i % 128);
+            i += 1;
+        }
+        Self(m)
+    };
+
+    #[inline(always)]
+    pub const fn from_lang(lang: LangId) -> Self {
+        let idx = lang as usize;
+        let mut m = [0u128; 2];
+        m[idx / 128] = 1u128 << (idx % 128);
+        Self(m)
+    }
+
+    #[inline(always)]
+    pub const fn has(self, lang: LangId) -> bool {
+        let idx = lang as usize;
+        (self.0[idx / 128] & (1u128 << (idx % 128))) != 0
+    }
+
+    #[inline(always)]
+    pub const fn is_empty(self) -> bool {
+        self.0[0] == 0 && self.0[1] == 0
+    }
+
+    #[allow(dead_code)]
+    #[inline(always)]
+    pub const fn intersects(self, other: Self) -> bool {
+        (self.0[0] & other.0[0]) != 0 || (self.0[1] & other.0[1]) != 0
+    }
+}
+
+impl std::ops::BitOr for LangMask {
+    type Output = Self;
+    #[inline(always)]
+    fn bitor(self, rhs: Self) -> Self {
+        Self([self.0[0] | rhs.0[0], self.0[1] | rhs.0[1]])
+    }
+}
+
+impl std::ops::BitOrAssign for LangMask {
+    #[inline(always)]
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0[0] |= rhs.0[0];
+        self.0[1] |= rhs.0[1];
+    }
+}
+
+impl std::ops::BitAnd for LangMask {
+    type Output = Self;
+    #[inline(always)]
+    fn bitand(self, rhs: Self) -> Self {
+        Self([self.0[0] & rhs.0[0], self.0[1] & rhs.0[1]])
+    }
+}
+
+impl std::ops::BitAndAssign for LangMask {
+    #[inline(always)]
+    fn bitand_assign(&mut self, rhs: Self) {
+        self.0[0] &= rhs.0[0];
+        self.0[1] &= rhs.0[1];
+    }
+}
+
+impl std::ops::Not for LangMask {
+    type Output = Self;
+    #[inline(always)]
+    fn not(self) -> Self {
+        Self([!self.0[0], !self.0[1]])
+    }
+}
+
+pub const LANG_ALL_MASK: LangMask = LangMask::ALL;
+#[allow(dead_code)]
+pub const LANG_ELM_MASK: LangMask = LangMask::from_lang(LangId::Elm);
+#[allow(dead_code)]
+pub const LANG_PURESCRIPT_MASK: LangMask = LangMask::from_lang(LangId::PureScript);
+#[allow(dead_code)]
+pub const LANG_RACKET_MASK: LangMask = LangMask::from_lang(LangId::Racket);
+#[allow(dead_code)]
+pub const LANG_SML_MASK: LangMask = LangMask::from_lang(LangId::Sml);
+#[allow(dead_code)]
+pub const LANG_SYSTEMVERILOG_MASK: LangMask = LangMask::from_lang(LangId::SystemVerilog);
+#[allow(dead_code)]
+pub const LANG_MESON_MASK: LangMask = LangMask::from_lang(LangId::Meson);
+#[allow(dead_code)]
+pub const LANG_STARLARK_MASK: LangMask = LangMask::from_lang(LangId::Starlark);
+#[allow(dead_code)]
+pub const LANG_JUSTFILE_MASK: LangMask = LangMask::from_lang(LangId::Justfile);
+#[allow(dead_code)]
+pub const LANG_SVELTE_MASK: LangMask = LangMask::from_lang(LangId::Svelte);
+#[allow(dead_code)]
+pub const LANG_VUE_MASK: LangMask = LangMask::from_lang(LangId::Vue);
+#[allow(dead_code)]
+pub const LANG_ASTRO_MASK: LangMask = LangMask::from_lang(LangId::Astro);
+#[allow(dead_code)]
+pub const LANG_OBJECTIVECPP_MASK: LangMask = LangMask::from_lang(LangId::ObjectiveCpp);
+#[allow(dead_code)]
+pub const LANG_ACTIONSCRIPT_MASK: LangMask = LangMask::from_lang(LangId::ActionScript);
+#[allow(dead_code)]
+pub const LANG_APEX_MASK: LangMask = LangMask::from_lang(LangId::Apex);
+#[allow(dead_code)]
+pub const LANG_AUTOHOTKEY_MASK: LangMask = LangMask::from_lang(LangId::AutoHotkey);
+#[allow(dead_code)]
+pub const LANG_CRYSTAL_MASK: LangMask = LangMask::from_lang(LangId::Crystal);
+#[allow(dead_code)]
+pub const LANG_VALA_MASK: LangMask = LangMask::from_lang(LangId::Vala);
+#[allow(dead_code)]
+pub const LANG_CHAPEL_MASK: LangMask = LangMask::from_lang(LangId::Chapel);
+#[allow(dead_code)]
+pub const LANG_PONY_MASK: LangMask = LangMask::from_lang(LangId::Pony);
+#[allow(dead_code)]
+pub const LANG_BALLERINA_MASK: LangMask = LangMask::from_lang(LangId::Ballerina);
+#[allow(dead_code)]
+pub const LANG_COFFEESCRIPT_MASK: LangMask = LangMask::from_lang(LangId::CoffeeScript);
+#[allow(dead_code)]
+pub const LANG_LESS_MASK: LangMask = LangMask::from_lang(LangId::Less);
+#[allow(dead_code)]
+pub const LANG_VIMSCRIPT_MASK: LangMask = LangMask::from_lang(LangId::VimScript);
+#[allow(dead_code)]
+pub const LANG_BATCH_MASK: LangMask = LangMask::from_lang(LangId::Batch);
+#[allow(dead_code)]
+pub const LANG_HAXE_MASK: LangMask = LangMask::from_lang(LangId::Haxe);
+#[allow(dead_code)]
+pub const LANG_QML_MASK: LangMask = LangMask::from_lang(LangId::Qml);
+#[allow(dead_code)]
+pub const LANG_RON_MASK: LangMask = LangMask::from_lang(LangId::Ron);
+#[allow(dead_code)]
+pub const LANG_THRIFT_MASK: LangMask = LangMask::from_lang(LangId::Thrift);
+#[allow(dead_code)]
+pub const LANG_PRISMA_MASK: LangMask = LangMask::from_lang(LangId::Prisma);
+#[allow(dead_code)]
+pub const LANG_KDL_MASK: LangMask = LangMask::from_lang(LangId::Kdl);
+#[allow(dead_code)]
+pub const LANG_CAPNPROTO_MASK: LangMask = LangMask::from_lang(LangId::CapnProto);
+#[allow(dead_code)]
+pub const LANG_CUE_MASK: LangMask = LangMask::from_lang(LangId::Cue);
+#[allow(dead_code)]
+pub const LANG_JSONNET_MASK: LangMask = LangMask::from_lang(LangId::Jsonnet);
+#[allow(dead_code)]
+pub const LANG_DHALL_MASK: LangMask = LangMask::from_lang(LangId::Dhall);
+#[allow(dead_code)]
+pub const LANG_NICKEL_MASK: LangMask = LangMask::from_lang(LangId::Nickel);
+#[allow(dead_code)]
+pub const LANG_BICEP_MASK: LangMask = LangMask::from_lang(LangId::Bicep);
+#[allow(dead_code)]
+pub const LANG_WIT_MASK: LangMask = LangMask::from_lang(LangId::Wit);
+#[allow(dead_code)]
+pub const LANG_MOVE_MASK: LangMask = LangMask::from_lang(LangId::Move);
+#[allow(dead_code)]
+pub const LANG_CAIRO_MASK: LangMask = LangMask::from_lang(LangId::Cairo);
+#[allow(dead_code)]
+pub const LANG_VYPER_MASK: LangMask = LangMask::from_lang(LangId::Vyper);
+#[allow(dead_code)]
+pub const LANG_FENNEL_MASK: LangMask = LangMask::from_lang(LangId::Fennel);
+#[allow(dead_code)]
+pub const LANG_HY_MASK: LangMask = LangMask::from_lang(LangId::Hy);
+#[allow(dead_code)]
+pub const LANG_EMACSLISP_MASK: LangMask = LangMask::from_lang(LangId::EmacsLisp);
+#[allow(dead_code)]
+pub const LANG_RAKU_MASK: LangMask = LangMask::from_lang(LangId::Raku);
+#[allow(dead_code)]
+pub const LANG_FORTH_MASK: LangMask = LangMask::from_lang(LangId::Forth);
+#[allow(dead_code)]
+pub const LANG_SMALLTALK_MASK: LangMask = LangMask::from_lang(LangId::Smalltalk);
+#[allow(dead_code)]
+pub const LANG_WREN_MASK: LangMask = LangMask::from_lang(LangId::Wren);
+#[allow(dead_code)]
+pub const LANG_FLATBUFFERS_MASK: LangMask = LangMask::from_lang(LangId::FlatBuffers);
+#[allow(dead_code)]
+pub const LANG_SMITHY_MASK: LangMask = LangMask::from_lang(LangId::Smithy);
+#[allow(dead_code)]
+pub const LANG_JANET_MASK: LangMask = LangMask::from_lang(LangId::Janet);
+#[allow(dead_code)]
+pub const LANG_IDRIS_MASK: LangMask = LangMask::from_lang(LangId::Idris);
+#[allow(dead_code)]
+pub const LANG_MODELICA_MASK: LangMask = LangMask::from_lang(LangId::Modelica);
+#[allow(dead_code)]
+pub const LANG_STAN_MASK: LangMask = LangMask::from_lang(LangId::Stan);
+#[allow(dead_code)]
+pub const LANG_SHEN_MASK: LangMask = LangMask::from_lang(LangId::Shen);
+#[allow(dead_code)]
+pub const LANG_FIRRTL_MASK: LangMask = LangMask::from_lang(LangId::Firrtl);
+#[allow(dead_code)]
+pub const LANG_ABAP_MASK: LangMask = LangMask::from_lang(LangId::Abap);
+#[allow(dead_code)]
+pub const LANG_STATA_MASK: LangMask = LangMask::from_lang(LangId::Stata);
+#[allow(dead_code)]
+pub const LANG_GDSCRIPT_MASK: LangMask = LangMask::from_lang(LangId::GDScript);
+#[allow(dead_code)]
+pub const LANG_PROLOG_MASK: LangMask = LangMask::from_lang(LangId::Prolog);
+#[allow(dead_code)]
+pub const LANG_AGDA_MASK: LangMask = LangMask::from_lang(LangId::Agda);
+#[allow(dead_code)]
+pub const LANG_OPENCL_MASK: LangMask = LangMask::from_lang(LangId::OpenCL);
+#[allow(dead_code)]
+pub const LANG_POSTSCRIPT_MASK: LangMask = LangMask::from_lang(LangId::PostScript);
+#[allow(dead_code)]
+pub const LANG_GRAIN_MASK: LangMask = LangMask::from_lang(LangId::Grain);
+#[allow(dead_code)]
+pub const LANG_PRQL_MASK: LangMask = LangMask::from_lang(LangId::Prql);
+#[allow(dead_code)]
+pub const LANG_Q_MASK: LangMask = LangMask::from_lang(LangId::Q);
+#[allow(dead_code)]
+pub const LANG_SLANG_MASK: LangMask = LangMask::from_lang(LangId::Slang);
+#[allow(dead_code)]
+pub const LANG_AUTOIT_MASK: LangMask = LangMask::from_lang(LangId::AutoIt);
+#[allow(dead_code)]
+pub const LANG_LEAN_MASK: LangMask = LangMask::from_lang(LangId::Lean);
+#[allow(dead_code)]
+pub const LANG_UIUA_MASK: LangMask = LangMask::from_lang(LangId::Uiua);
+#[allow(dead_code)]
+pub const LANG_BQN_MASK: LangMask = LangMask::from_lang(LangId::Bqn);
+#[allow(dead_code)]
+pub const LANG_CYPHER_MASK: LangMask = LangMask::from_lang(LangId::Cypher);
+#[allow(dead_code)]
+pub const LANG_GHERKIN_MASK: LangMask = LangMask::from_lang(LangId::Gherkin);
+#[allow(dead_code)]
+pub const LANG_EIFFEL_MASK: LangMask = LangMask::from_lang(LangId::Eiffel);
+#[allow(dead_code)]
+pub const LANG_SUPERCOLLIDER_MASK: LangMask = LangMask::from_lang(LangId::SuperCollider);
+#[allow(dead_code)]
+pub const LANG_RED_MASK: LangMask = LangMask::from_lang(LangId::Red);
+#[allow(dead_code)]
+pub const LANG_KOKA_MASK: LangMask = LangMask::from_lang(LangId::Koka);
+#[allow(dead_code)]
+pub const LANG_BLUESPEC_MASK: LangMask = LangMask::from_lang(LangId::Bluespec);
+#[allow(dead_code)]
+pub const LANG_MODULA2_MASK: LangMask = LangMask::from_lang(LangId::Modula2);
+#[allow(dead_code)]
+pub const LANG_REXX_MASK: LangMask = LangMask::from_lang(LangId::Rexx);
+#[allow(dead_code)]
+pub const LANG_REBOL_MASK: LangMask = LangMask::from_lang(LangId::Rebol);
+#[allow(dead_code)]
+pub const LANG_FACTOR_MASK: LangMask = LangMask::from_lang(LangId::Factor);
+#[allow(dead_code)]
+pub const LANG_LOGTALK_MASK: LangMask = LangMask::from_lang(LangId::Logtalk);
+#[allow(dead_code)]
+pub const LANG_SPARQL_MASK: LangMask = LangMask::from_lang(LangId::Sparql);
+#[allow(dead_code)]
+pub const LANG_CHUCK_MASK: LangMask = LangMask::from_lang(LangId::Chuck);
+#[allow(dead_code)]
+pub const LANG_IO_MASK: LangMask = LangMask::from_lang(LangId::Io);
+#[allow(dead_code)]
+pub const LANG_PIKE_MASK: LangMask = LangMask::from_lang(LangId::Pike);
+#[allow(dead_code)]
+pub const LANG_DYLAN_MASK: LangMask = LangMask::from_lang(LangId::Dylan);
+#[allow(dead_code)]
+pub const LANG_OPENSCAD_MASK: LangMask = LangMask::from_lang(LangId::OpenSCAD);
+#[allow(dead_code)]
+pub const LANG_P4_MASK: LangMask = LangMask::from_lang(LangId::P4);
+#[allow(dead_code)]
+pub const LANG_ALLOY_MASK: LangMask = LangMask::from_lang(LangId::Alloy);
+#[allow(dead_code)]
+pub const LANG_APPLESCRIPT_MASK: LangMask = LangMask::from_lang(LangId::AppleScript);
+#[allow(dead_code)]
+pub const LANG_CARP_MASK: LangMask = LangMask::from_lang(LangId::Carp);
+#[allow(dead_code)]
+pub const LANG_LIVESCRIPT_MASK: LangMask = LangMask::from_lang(LangId::LiveScript);
+#[allow(dead_code)]
+pub const LANG_MOONSCRIPT_MASK: LangMask = LangMask::from_lang(LangId::MoonScript);
+#[allow(dead_code)]
+pub const LANG_MODULA3_MASK: LangMask = LangMask::from_lang(LangId::Modula3);
+#[allow(dead_code)]
+pub const LANG_OBERON_MASK: LangMask = LangMask::from_lang(LangId::Oberon);
+#[allow(dead_code)]
+pub const LANG_CLEAN_MASK: LangMask = LangMask::from_lang(LangId::Clean);
+#[allow(dead_code)]
+pub const LANG_HOLYC_MASK: LangMask = LangMask::from_lang(LangId::HolyC);
+#[allow(dead_code)]
+pub const LANG_CLARITY_MASK: LangMask = LangMask::from_lang(LangId::Clarity);
+#[allow(dead_code)]
+pub const LANG_PAWN_MASK: LangMask = LangMask::from_lang(LangId::Pawn);
+#[allow(dead_code)]
+pub const LANG_BLITZMAX_MASK: LangMask = LangMask::from_lang(LangId::BlitzMax);
+#[allow(dead_code)]
+pub const LANG_ASYMPTOTE_MASK: LangMask = LangMask::from_lang(LangId::Asymptote);
+#[allow(dead_code)]
+pub const LANG_GNUPLOT_MASK: LangMask = LangMask::from_lang(LangId::Gnuplot);
+#[allow(dead_code)]
+pub const LANG_PROCESSING_MASK: LangMask = LangMask::from_lang(LangId::Processing);
+#[allow(dead_code)]
+pub const LANG_MLIR_MASK: LangMask = LangMask::from_lang(LangId::Mlir);
+#[allow(dead_code)]
+pub const LANG_TXL_MASK: LangMask = LangMask::from_lang(LangId::Txl);
+#[allow(dead_code)]
+pub const LANG_PACT_MASK: LangMask = LangMask::from_lang(LangId::Pact);
+#[allow(dead_code)]
+pub const LANG_ARDUINO_MASK: LangMask = LangMask::from_lang(LangId::Arduino);
+#[allow(dead_code)]
+pub const LANG_VBA_MASK: LangMask = LangMask::from_lang(LangId::Vba);
+#[allow(dead_code)]
+pub const LANG_CEYLON_MASK: LangMask = LangMask::from_lang(LangId::Ceylon);
+#[allow(dead_code)]
+pub const LANG_FANTOM_MASK: LangMask = LangMask::from_lang(LangId::Fantom);
+#[allow(dead_code)]
+pub const LANG_XTEND_MASK: LangMask = LangMask::from_lang(LangId::Xtend);
+#[allow(dead_code)]
+pub const LANG_ABNF_MASK: LangMask = LangMask::from_lang(LangId::Abnf);
+#[allow(dead_code)]
+pub const LANG_AL_MASK: LangMask = LangMask::from_lang(LangId::Al);
+#[allow(dead_code)]
+pub const LANG_JLANG_MASK: LangMask = LangMask::from_lang(LangId::JLang);
+#[allow(dead_code)]
+pub const LANG_SPICE_MASK: LangMask = LangMask::from_lang(LangId::Spice);
+#[allow(dead_code)]
+pub const LANG_ATS_MASK: LangMask = LangMask::from_lang(LangId::Ats);
+#[allow(dead_code)]
+pub const LANG_C_MASK: LangMask = LangMask::from_lang(LangId::C);
+#[allow(dead_code)]
+pub const LANG_CPP_MASK: LangMask = LangMask::from_lang(LangId::Cpp);
+#[allow(dead_code)]
+pub const LANG_RUST_MASK: LangMask = LangMask::from_lang(LangId::Rust);
+#[allow(dead_code)]
+pub const LANG_PYTHON_MASK: LangMask = LangMask::from_lang(LangId::Python);
+#[allow(dead_code)]
+pub const LANG_PERL_MASK: LangMask = LangMask::from_lang(LangId::Perl);
+#[allow(dead_code)]
+pub const LANG_GO_MASK: LangMask = LangMask::from_lang(LangId::Go);
+#[allow(dead_code)]
+pub const LANG_ZIG_MASK: LangMask = LangMask::from_lang(LangId::Zig);
+#[allow(dead_code)]
+pub const LANG_ODIN_MASK: LangMask = LangMask::from_lang(LangId::Odin);
+#[allow(dead_code)]
+pub const LANG_JAVASCRIPT_MASK: LangMask = LangMask::from_lang(LangId::JavaScript);
+#[allow(dead_code)]
+pub const LANG_TYPESCRIPT_MASK: LangMask = LangMask::from_lang(LangId::TypeScript);
+#[allow(dead_code)]
+pub const LANG_LUA_MASK: LangMask = LangMask::from_lang(LangId::Lua);
+#[allow(dead_code)]
+pub const LANG_JAVA_MASK: LangMask = LangMask::from_lang(LangId::Java);
+#[allow(dead_code)]
+pub const LANG_CSHARP_MASK: LangMask = LangMask::from_lang(LangId::CSharp);
+#[allow(dead_code)]
+pub const LANG_RUBY_MASK: LangMask = LangMask::from_lang(LangId::Ruby);
+#[allow(dead_code)]
+pub const LANG_PHP_MASK: LangMask = LangMask::from_lang(LangId::Php);
+#[allow(dead_code)]
+pub const LANG_SWIFT_MASK: LangMask = LangMask::from_lang(LangId::Swift);
+#[allow(dead_code)]
+pub const LANG_KOTLIN_MASK: LangMask = LangMask::from_lang(LangId::Kotlin);
+#[allow(dead_code)]
+pub const LANG_BASH_MASK: LangMask = LangMask::from_lang(LangId::Bash);
+#[allow(dead_code)]
+pub const LANG_SQL_MASK: LangMask = LangMask::from_lang(LangId::Sql);
+#[allow(dead_code)]
+pub const LANG_DART_MASK: LangMask = LangMask::from_lang(LangId::Dart);
+#[allow(dead_code)]
+pub const LANG_SCALA_MASK: LangMask = LangMask::from_lang(LangId::Scala);
+#[allow(dead_code)]
+pub const LANG_HASKELL_MASK: LangMask = LangMask::from_lang(LangId::Haskell);
+#[allow(dead_code)]
+pub const LANG_OCAML_MASK: LangMask = LangMask::from_lang(LangId::OCaml);
+#[allow(dead_code)]
+pub const LANG_GLEAM_MASK: LangMask = LangMask::from_lang(LangId::Gleam);
+#[allow(dead_code)]
+pub const LANG_D_MASK: LangMask = LangMask::from_lang(LangId::D);
+#[allow(dead_code)]
+pub const LANG_NIM_MASK: LangMask = LangMask::from_lang(LangId::Nim);
+#[allow(dead_code)]
+pub const LANG_FORTRAN_MASK: LangMask = LangMask::from_lang(LangId::Fortran);
+#[allow(dead_code)]
+pub const LANG_ELIXIR_MASK: LangMask = LangMask::from_lang(LangId::Elixir);
+#[allow(dead_code)]
+pub const LANG_ERLANG_MASK: LangMask = LangMask::from_lang(LangId::Erlang);
+#[allow(dead_code)]
+pub const LANG_JULIA_MASK: LangMask = LangMask::from_lang(LangId::Julia);
+#[allow(dead_code)]
+pub const LANG_R_MASK: LangMask = LangMask::from_lang(LangId::R);
+#[allow(dead_code)]
+pub const LANG_MATLAB_MASK: LangMask = LangMask::from_lang(LangId::Matlab);
+#[allow(dead_code)]
+pub const LANG_SOLIDITY_MASK: LangMask = LangMask::from_lang(LangId::Solidity);
+#[allow(dead_code)]
+pub const LANG_FSHARP_MASK: LangMask = LangMask::from_lang(LangId::FSharp);
+#[allow(dead_code)]
+pub const LANG_MOJO_MASK: LangMask = LangMask::from_lang(LangId::Mojo);
+#[allow(dead_code)]
+pub const LANG_VERILOG_MASK: LangMask = LangMask::from_lang(LangId::Verilog);
+#[allow(dead_code)]
+pub const LANG_CUDA_MASK: LangMask = LangMask::from_lang(LangId::Cuda);
+#[allow(dead_code)]
+pub const LANG_WGSL_MASK: LangMask = LangMask::from_lang(LangId::Wgsl);
+#[allow(dead_code)]
+pub const LANG_ADA_MASK: LangMask = LangMask::from_lang(LangId::Ada);
+#[allow(dead_code)]
+pub const LANG_GROOVY_MASK: LangMask = LangMask::from_lang(LangId::Groovy);
+#[allow(dead_code)]
+pub const LANG_CLOJURE_MASK: LangMask = LangMask::from_lang(LangId::Clojure);
+#[allow(dead_code)]
+pub const LANG_ASSEMBLY_MASK: LangMask = LangMask::from_lang(LangId::Assembly);
+#[allow(dead_code)]
+pub const LANG_TCL_MASK: LangMask = LangMask::from_lang(LangId::Tcl);
+#[allow(dead_code)]
+pub const LANG_SCHEME_MASK: LangMask = LangMask::from_lang(LangId::Scheme);
+#[allow(dead_code)]
+pub const LANG_JSON_MASK: LangMask = LangMask::from_lang(LangId::Json);
+#[allow(dead_code)]
+pub const LANG_TOML_MASK: LangMask = LangMask::from_lang(LangId::Toml);
+#[allow(dead_code)]
+pub const LANG_YAML_MASK: LangMask = LangMask::from_lang(LangId::Yaml);
+#[allow(dead_code)]
+pub const LANG_DOCKERFILE_MASK: LangMask = LangMask::from_lang(LangId::Dockerfile);
+#[allow(dead_code)]
+pub const LANG_MAKEFILE_MASK: LangMask = LangMask::from_lang(LangId::Makefile);
+#[allow(dead_code)]
+pub const LANG_CMAKE_MASK: LangMask = LangMask::from_lang(LangId::CMake);
+#[allow(dead_code)]
+pub const LANG_GLSL_MASK: LangMask = LangMask::from_lang(LangId::Glsl);
+#[allow(dead_code)]
+pub const LANG_HLSL_MASK: LangMask = LangMask::from_lang(LangId::Hlsl);
+#[allow(dead_code)]
+pub const LANG_OBJECTIVEC_MASK: LangMask = LangMask::from_lang(LangId::ObjectiveC);
+#[allow(dead_code)]
+pub const LANG_V_MASK: LangMask = LangMask::from_lang(LangId::V);
+#[allow(dead_code)]
+pub const LANG_COMMONLISP_MASK: LangMask = LangMask::from_lang(LangId::CommonLisp);
+#[allow(dead_code)]
+pub const LANG_PASCAL_MASK: LangMask = LangMask::from_lang(LangId::Pascal);
+#[allow(dead_code)]
+pub const LANG_POWERSHELL_MASK: LangMask = LangMask::from_lang(LangId::PowerShell);
+#[allow(dead_code)]
+pub const LANG_FISH_MASK: LangMask = LangMask::from_lang(LangId::Fish);
+#[allow(dead_code)]
+pub const LANG_AWK_MASK: LangMask = LangMask::from_lang(LangId::Awk);
+#[allow(dead_code)]
+pub const LANG_HARE_MASK: LangMask = LangMask::from_lang(LangId::Hare);
+#[allow(dead_code)]
+pub const LANG_HTML_MASK: LangMask = LangMask::from_lang(LangId::Html);
+#[allow(dead_code)]
+pub const LANG_XML_MASK: LangMask = LangMask::from_lang(LangId::Xml);
+#[allow(dead_code)]
+pub const LANG_CSS_MASK: LangMask = LangMask::from_lang(LangId::Css);
+#[allow(dead_code)]
+pub const LANG_GRAPHQL_MASK: LangMask = LangMask::from_lang(LangId::Graphql);
+#[allow(dead_code)]
+pub const LANG_PROTOBUF_MASK: LangMask = LangMask::from_lang(LangId::Protobuf);
+#[allow(dead_code)]
+pub const LANG_COBOL_MASK: LangMask = LangMask::from_lang(LangId::Cobol);
+#[allow(dead_code)]
+pub const LANG_VHDL_MASK: LangMask = LangMask::from_lang(LangId::Vhdl);
+#[allow(dead_code)]
+pub const LANG_CHEADER_MASK: LangMask = LangMask::from_lang(LangId::CHeader);
+#[allow(dead_code)]
+pub const LANG_CPPHEADER_MASK: LangMask = LangMask::from_lang(LangId::CppHeader);
+#[allow(dead_code)]
+pub const LANG_SASS_MASK: LangMask = LangMask::from_lang(LangId::Sass);
+#[allow(dead_code)]
+pub const LANG_NIX_MASK: LangMask = LangMask::from_lang(LangId::Nix);
+#[allow(dead_code)]
+pub const LANG_HCL_MASK: LangMask = LangMask::from_lang(LangId::Hcl);
+#[allow(dead_code)]
+pub const LANG_LLVM_MASK: LangMask = LangMask::from_lang(LangId::Llvm);
+#[allow(dead_code)]
+pub const LANG_WAT_MASK: LangMask = LangMask::from_lang(LangId::Wat);
+#[allow(dead_code)]
+pub const LANG_TEX_MASK: LangMask = LangMask::from_lang(LangId::Tex);
 
 pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::C,
@@ -437,9 +961,95 @@ pub const ALL_LANGS: [LangId; LANG_COUNT] = [
     LangId::Prisma,
     LangId::Kdl,
     LangId::CapnProto,
+    LangId::Cue,
+    LangId::Jsonnet,
+    LangId::Dhall,
+    LangId::Nickel,
+    LangId::Bicep,
+    LangId::Wit,
+    LangId::Move,
+    LangId::Cairo,
+    LangId::Vyper,
+    LangId::Fennel,
+    LangId::Hy,
+    LangId::EmacsLisp,
+    LangId::Raku,
+    LangId::Forth,
+    LangId::Smalltalk,
+    LangId::Wren,
+    LangId::FlatBuffers,
+    LangId::Smithy,
+    LangId::Janet,
+    LangId::Idris,
+    LangId::Modelica,
+    LangId::Stan,
+    LangId::Shen,
+    LangId::Firrtl,
+    LangId::Abap,
+    LangId::Stata,
+    LangId::GDScript,
+    LangId::Prolog,
+    LangId::Agda,
+    LangId::OpenCL,
+    LangId::PostScript,
+    LangId::Grain,
+    LangId::Prql,
+    LangId::Q,
+    LangId::Slang,
+    LangId::AutoIt,
+    LangId::Lean,
+    LangId::Uiua,
+    LangId::Bqn,
+    LangId::Cypher,
+    LangId::Gherkin,
+    LangId::Eiffel,
+    LangId::SuperCollider,
+    LangId::Red,
+    LangId::Koka,
+    LangId::Bluespec,
+    LangId::Modula2,
+    LangId::Rexx,
+    LangId::Rebol,
+    LangId::Factor,
+    LangId::Logtalk,
+    LangId::Sparql,
+    LangId::Chuck,
+    LangId::Io,
+    LangId::Pike,
+    LangId::Dylan,
+    LangId::OpenSCAD,
+    LangId::P4,
+    LangId::Alloy,
+    LangId::AppleScript,
+    LangId::Carp,
+    LangId::LiveScript,
+    LangId::MoonScript,
+    LangId::Modula3,
+    LangId::Oberon,
+    LangId::Clean,
+    LangId::HolyC,
+    LangId::Clarity,
+    LangId::Pawn,
+    LangId::BlitzMax,
+    LangId::Asymptote,
+    LangId::Gnuplot,
+    LangId::Processing,
+    LangId::Mlir,
+    LangId::Txl,
+    LangId::Pact,
+    LangId::Arduino,
+    LangId::Vba,
+    LangId::Ceylon,
+    LangId::Fantom,
+    LangId::Xtend,
+    LangId::Abnf,
+    LangId::Al,
+    LangId::JLang,
+    LangId::Spice,
+    LangId::Ats,
 ];
 
-const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 128);
+const _: () = assert!(LANG_COUNT > 0 && LANG_COUNT <= 256);
 const _: () = assert!(ALL_LANGS.len() == LANG_COUNT);
 const _: () = {
     let mut i = 0;
@@ -559,12 +1169,98 @@ impl LangId {
             Self::Prisma => "Prisma",
             Self::Kdl => "KDL",
             Self::CapnProto => "Cap'n Proto",
+            Self::Cue => "CUE",
+            Self::Jsonnet => "Jsonnet",
+            Self::Dhall => "Dhall",
+            Self::Nickel => "Nickel",
+            Self::Bicep => "Bicep",
+            Self::Wit => "WIT",
+            Self::Move => "Move",
+            Self::Cairo => "Cairo",
+            Self::Vyper => "Vyper",
+            Self::Fennel => "Fennel",
+            Self::Hy => "Hy",
+            Self::EmacsLisp => "Emacs Lisp",
+            Self::Raku => "Raku",
+            Self::Forth => "Forth",
+            Self::Smalltalk => "Smalltalk",
+            Self::Wren => "Wren",
+            Self::FlatBuffers => "FlatBuffers",
+            Self::Smithy => "Smithy",
+            Self::Janet => "Janet",
+            Self::Idris => "Idris",
+            Self::Modelica => "Modelica",
+            Self::Stan => "Stan",
+            Self::Shen => "Shen",
+            Self::Firrtl => "FIRRTL",
+            Self::Abap => "ABAP",
+            Self::Stata => "Stata",
+            Self::GDScript => "GDScript",
+            Self::Prolog => "Prolog",
+            Self::Agda => "Agda",
+            Self::OpenCL => "OpenCL",
+            Self::PostScript => "PostScript",
+            Self::Grain => "Grain",
+            Self::Prql => "PRQL",
+            Self::Q => "Q",
+            Self::Slang => "Slang",
+            Self::AutoIt => "AutoIt",
+            Self::Lean => "Lean",
+            Self::Uiua => "Uiua",
+            Self::Bqn => "BQN",
+            Self::Cypher => "Cypher",
+            Self::Gherkin => "Gherkin",
+            Self::Eiffel => "Eiffel",
+            Self::SuperCollider => "SuperCollider",
+            Self::Red => "Red",
+            Self::Koka => "Koka",
+            Self::Bluespec => "Bluespec",
+            Self::Modula2 => "Modula-2",
+            Self::Rexx => "Rexx",
+            Self::Rebol => "Rebol",
+            Self::Factor => "Factor",
+            Self::Logtalk => "Logtalk",
+            Self::Sparql => "SPARQL",
+            Self::Chuck => "ChucK",
+            Self::Io => "Io",
+            Self::Pike => "Pike",
+            Self::Dylan => "Dylan",
+            Self::OpenSCAD => "OpenSCAD",
+            Self::P4 => "P4",
+            Self::Alloy => "Alloy",
+            Self::AppleScript => "AppleScript",
+            Self::Carp => "Carp",
+            Self::LiveScript => "LiveScript",
+            Self::MoonScript => "MoonScript",
+            Self::Modula3 => "Modula-3",
+            Self::Oberon => "Oberon",
+            Self::Clean => "Clean",
+            Self::HolyC => "HolyC",
+            Self::Clarity => "Clarity",
+            Self::Pawn => "Pawn",
+            Self::BlitzMax => "BlitzMax",
+            Self::Asymptote => "Asymptote",
+            Self::Gnuplot => "Gnuplot",
+            Self::Processing => "Processing",
+            Self::Mlir => "MLIR",
+            Self::Txl => "TXL",
+            Self::Pact => "Pact",
+            Self::Arduino => "Arduino",
+            Self::Vba => "VBA",
+            Self::Ceylon => "Ceylon",
+            Self::Fantom => "Fantom",
+            Self::Xtend => "Xtend",
+            Self::Abnf => "ABNF",
+            Self::Al => "AL",
+            Self::JLang => "J",
+            Self::Spice => "Spice",
+            Self::Ats => "ATS",
         }
     }
 
     #[inline(always)]
-    pub const fn mask(self) -> u128 {
-        1 << (self as u128)
+    pub const fn mask(self) -> LangMask {
+        LangMask::from_lang(self)
     }
 
     #[inline(always)]
@@ -676,6 +1372,92 @@ impl LangId {
             Self::Prisma => &["-prisma", "--prisma"],
             Self::Kdl => &["-kdl", "--kdl"],
             Self::CapnProto => &["-capnp", "--capnp"],
+            Self::Cue => &["-cue", "--cue"],
+            Self::Jsonnet => &["-jsonnet", "--jsonnet"],
+            Self::Dhall => &["-dhall", "--dhall"],
+            Self::Nickel => &["-nickel", "--nickel", "-ncl", "--ncl"],
+            Self::Bicep => &["-bicep", "--bicep"],
+            Self::Wit => &["-wit", "--wit"],
+            Self::Move => &["-move", "--move"],
+            Self::Cairo => &["-cairo", "--cairo"],
+            Self::Vyper => &["-vyper", "--vyper", "-vy", "--vy"],
+            Self::Fennel => &["-fennel", "--fennel", "-fnl", "--fnl"],
+            Self::Hy => &["-hy", "--hy"],
+            Self::EmacsLisp => &["-elisp", "--elisp", "-el", "--el"],
+            Self::Raku => &["-raku", "--raku"],
+            Self::Forth => &["-forth", "--forth", "-fth", "--fth"],
+            Self::Smalltalk => &["-smalltalk", "--smalltalk", "-st", "--st"],
+            Self::Wren => &["-wren", "--wren"],
+            Self::FlatBuffers => &["-flatbuffers", "--flatbuffers", "-fbs", "--fbs"],
+            Self::Smithy => &["-smithy", "--smithy"],
+            Self::Janet => &["-janet", "--janet"],
+            Self::Idris => &["-idris", "--idris", "-idr", "--idr"],
+            Self::Modelica => &["-modelica", "--modelica", "-mo", "--mo"],
+            Self::Stan => &["-stan", "--stan"],
+            Self::Shen => &["-shen", "--shen"],
+            Self::Firrtl => &["-firrtl", "--firrtl", "-fir", "--fir"],
+            Self::Abap => &["-abap", "--abap"],
+            Self::Stata => &["-stata", "--stata", "-do", "--do"],
+            Self::GDScript => &["-gdscript", "--gdscript", "-gd", "--gd"],
+            Self::Prolog => &["-prolog", "--prolog", "-pro", "--pro"],
+            Self::Agda => &["-agda", "--agda"],
+            Self::OpenCL => &["-opencl", "--opencl", "-cl", "--cl"],
+            Self::PostScript => &["-postscript", "--postscript", "-ps", "--ps"],
+            Self::Grain => &["-grain", "--grain", "-gr", "--gr"],
+            Self::Prql => &["-prql", "--prql"],
+            Self::Q => &["-q", "--q", "-kdb", "--kdb"],
+            Self::Slang => &["-slang", "--slang"],
+            Self::AutoIt => &["-autoit", "--autoit", "-au3", "--au3"],
+            Self::Lean => &["-lean", "--lean"],
+            Self::Uiua => &["-uiua", "--uiua", "-ua", "--ua"],
+            Self::Bqn => &["-bqn", "--bqn"],
+            Self::Cypher => &["-cypher", "--cypher", "-cyp", "--cyp"],
+            Self::Gherkin => &["-gherkin", "--gherkin", "-feature", "--feature"],
+            Self::Eiffel => &["-eiffel", "--eiffel", "-e", "--e"],
+            Self::SuperCollider => &["-scd", "--scd", "-supercollider", "--supercollider"],
+            Self::Red => &["-red", "--red"],
+            Self::Koka => &["-koka", "--koka", "-kk", "--kk"],
+            Self::Bluespec => &["-bsv", "--bsv", "-bluespec", "--bluespec"],
+            Self::Modula2 => &["-m2", "--m2", "-modula2", "--modula2"],
+            Self::Rexx => &["-rexx", "--rexx", "-rex", "--rex"],
+            Self::Rebol => &["-rebol", "--rebol", "-reb", "--reb"],
+            Self::Factor => &["-factor", "--factor"],
+            Self::Logtalk => &["-logtalk", "--logtalk", "-lgt", "--lgt"],
+            Self::Sparql => &["-sparql", "--sparql", "-rq", "--rq"],
+            Self::Chuck => &["-chuck", "--chuck", "-ck", "--ck"],
+            Self::Io => &["-io", "--io"],
+            Self::Pike => &["-pike", "--pike"],
+            Self::Dylan => &["-dylan", "--dylan", "-dyl", "--dyl"],
+            Self::OpenSCAD => &["-scad", "--scad", "-openscad", "--openscad"],
+            Self::P4 => &["-p4", "--p4"],
+            Self::Alloy => &["-als", "--als", "-alloy", "--alloy"],
+            Self::AppleScript => &["-applescript", "--applescript", "-scpt", "--scpt"],
+            Self::Carp => &["-carp", "--carp"],
+            Self::LiveScript => &["-ls", "--ls", "-livescript", "--livescript"],
+            Self::MoonScript => &["-moon", "--moon", "-moonscript", "--moonscript"],
+            Self::Modula3 => &["-m3", "--m3", "-modula3", "--modula3"],
+            Self::Oberon => &["-obn", "--obn", "-oberon", "--oberon"],
+            Self::Clean => &["-clean", "--clean", "-icl", "--icl"],
+            Self::HolyC => &["-holyc", "--holyc", "-hc", "--hc"],
+            Self::Clarity => &["-clarity", "--clarity", "-clar", "--clar"],
+            Self::Pawn => &["-pawn", "--pawn", "-pwn", "--pwn"],
+            Self::BlitzMax => &["-blitzmax", "--blitzmax", "-bmx", "--bmx", "-bb", "--bb"],
+            Self::Asymptote => &["-asymptote", "--asymptote", "-asy", "--asy"],
+            Self::Gnuplot => &["-gnuplot", "--gnuplot", "-gp", "--gp"],
+            Self::Processing => &["-processing", "--processing", "-pde", "--pde"],
+            Self::Mlir => &["-mlir", "--mlir"],
+            Self::Txl => &["-txl", "--txl"],
+            Self::Pact => &["-pact", "--pact"],
+            Self::Arduino => &["-arduino", "--arduino", "-ino", "--ino"],
+            Self::Vba => &["-vba", "--vba", "-bas", "--bas"],
+            Self::Ceylon => &["-ceylon", "--ceylon"],
+            Self::Fantom => &["-fantom", "--fantom", "-fan", "--fan"],
+            Self::Xtend => &["-xtend", "--xtend"],
+            Self::Abnf => &["-abnf", "--abnf"],
+            Self::Al => &["-al", "--al"],
+            Self::JLang => &["-j", "--j", "-jlang", "--jlang", "-ijs", "--ijs"],
+            Self::Spice => &["-spice", "--spice", "-cir", "--cir", "-sp", "--sp"],
+            Self::Ats => &["-ats", "--ats", "-dats", "--dats"],
         }
     }
 
@@ -899,6 +1681,92 @@ impl LangId {
             b"-prisma" | b"--prisma" | b"-PRISMA" | b"--PRISMA" => Some(Self::Prisma),
             b"-kdl" | b"--kdl" | b"-KDL" | b"--KDL" => Some(Self::Kdl),
             b"-capnp" | b"--capnp" | b"-CAPNP" | b"--CAPNP" => Some(Self::CapnProto),
+            b"-cue" | b"--cue" | b"-CUE" | b"--CUE" => Some(Self::Cue),
+            b"-jsonnet" | b"--jsonnet" | b"-JSONNET" | b"--JSONNET" => Some(Self::Jsonnet),
+            b"-dhall" | b"--dhall" | b"-DHALL" | b"--DHALL" => Some(Self::Dhall),
+            b"-nickel" | b"--nickel" | b"-NICKEL" | b"--NICKEL" | b"-ncl" | b"--ncl" | b"-NCL" | b"--NCL" => Some(Self::Nickel),
+            b"-bicep" | b"--bicep" | b"-BICEP" | b"--BICEP" => Some(Self::Bicep),
+            b"-wit" | b"--wit" | b"-WIT" | b"--WIT" => Some(Self::Wit),
+            b"-move" | b"--move" | b"-MOVE" | b"--MOVE" => Some(Self::Move),
+            b"-cairo" | b"--cairo" | b"-CAIRO" | b"--CAIRO" => Some(Self::Cairo),
+            b"-vyper" | b"--vyper" | b"-VYPER" | b"--VYPER" | b"-vy" | b"--vy" | b"-VY" | b"--VY" => Some(Self::Vyper),
+            b"-fennel" | b"--fennel" | b"-FENNEL" | b"--FENNEL" | b"-fnl" | b"--fnl" | b"-FNL" | b"--FNL" => Some(Self::Fennel),
+            b"-hy" | b"--hy" | b"-HY" | b"--HY" => Some(Self::Hy),
+            b"-elisp" | b"--elisp" | b"-ELISP" | b"--ELISP" | b"-el" | b"--el" | b"-EL" | b"--EL" => Some(Self::EmacsLisp),
+            b"-raku" | b"--raku" | b"-RAKU" | b"--RAKU" => Some(Self::Raku),
+            b"-forth" | b"--forth" | b"-FORTH" | b"--FORTH" | b"-fth" | b"--fth" | b"-FTH" | b"--FTH" => Some(Self::Forth),
+            b"-smalltalk" | b"--smalltalk" | b"-SMALLTALK" | b"--SMALLTALK" | b"-st" | b"--st" | b"-ST" | b"--ST" => Some(Self::Smalltalk),
+            b"-wren" | b"--wren" | b"-WREN" | b"--WREN" => Some(Self::Wren),
+            b"-flatbuffers" | b"--flatbuffers" | b"-FLATBUFFERS" | b"--FLATBUFFERS" | b"-fbs" | b"--fbs" | b"-FBS" | b"--FBS" => Some(Self::FlatBuffers),
+            b"-smithy" | b"--smithy" | b"-SMITHY" | b"--SMITHY" => Some(Self::Smithy),
+            b"-janet" | b"--janet" | b"-JANET" | b"--JANET" => Some(Self::Janet),
+            b"-idris" | b"--idris" | b"-IDRIS" | b"--IDRIS" | b"-idr" | b"--idr" | b"-IDR" | b"--IDR" => Some(Self::Idris),
+            b"-modelica" | b"--modelica" | b"-MODELICA" | b"--MODELICA" | b"-mo" | b"--mo" | b"-MO" | b"--MO" => Some(Self::Modelica),
+            b"-stan" | b"--stan" | b"-STAN" | b"--STAN" => Some(Self::Stan),
+            b"-shen" | b"--shen" | b"-SHEN" | b"--SHEN" => Some(Self::Shen),
+            b"-firrtl" | b"--firrtl" | b"-FIRRTL" | b"--FIRRTL" | b"-fir" | b"--fir" | b"-FIR" | b"--FIR" => Some(Self::Firrtl),
+            b"-abap" | b"--abap" | b"-ABAP" | b"--ABAP" => Some(Self::Abap),
+            b"-stata" | b"--stata" | b"-STATA" | b"--STATA" | b"-do" | b"--do" | b"-DO" | b"--DO" => Some(Self::Stata),
+            b"-gdscript" | b"--gdscript" | b"-GDSCRIPT" | b"--GDSCRIPT" | b"-gd" | b"--gd" | b"-GD" | b"--GD" => Some(Self::GDScript),
+            b"-prolog" | b"--prolog" | b"-PROLOG" | b"--PROLOG" | b"-pro" | b"--pro" | b"-PRO" | b"--PRO" => Some(Self::Prolog),
+            b"-agda" | b"--agda" | b"-AGDA" | b"--AGDA" => Some(Self::Agda),
+            b"-opencl" | b"--opencl" | b"-OPENCL" | b"--OPENCL" | b"-cl" | b"--cl" | b"-CL" | b"--CL" => Some(Self::OpenCL),
+            b"-postscript" | b"--postscript" | b"-POSTSCRIPT" | b"--POSTSCRIPT" | b"-ps" | b"--ps" | b"-PS" | b"--PS" => Some(Self::PostScript),
+            b"-grain" | b"--grain" | b"-GRAIN" | b"--GRAIN" | b"-gr" | b"--gr" | b"-GR" | b"--GR" => Some(Self::Grain),
+            b"-prql" | b"--prql" | b"-PRQL" | b"--PRQL" => Some(Self::Prql),
+            b"-q" | b"--q" | b"-Q" | b"--Q" | b"-kdb" | b"--kdb" | b"-KDB" | b"--KDB" => Some(Self::Q),
+            b"-slang" | b"--slang" | b"-SLANG" | b"--SLANG" => Some(Self::Slang),
+            b"-autoit" | b"--autoit" | b"-AUTOIT" | b"--AUTOIT" | b"-au3" | b"--au3" | b"-AU3" | b"--AU3" => Some(Self::AutoIt),
+            b"-lean" | b"--lean" | b"-LEAN" | b"--LEAN" => Some(Self::Lean),
+            b"-uiua" | b"--uiua" | b"-UIUA" | b"--UIUA" | b"-ua" | b"--ua" | b"-UA" | b"--UA" => Some(Self::Uiua),
+            b"-bqn" | b"--bqn" | b"-BQN" | b"--BQN" => Some(Self::Bqn),
+            b"-cypher" | b"--cypher" | b"-CYPHER" | b"--CYPHER" | b"-cyp" | b"--cyp" | b"-CYP" | b"--CYP" => Some(Self::Cypher),
+            b"-gherkin" | b"--gherkin" | b"-GHERKIN" | b"--GHERKIN" | b"-feature" | b"--feature" | b"-FEATURE" | b"--FEATURE" => Some(Self::Gherkin),
+            b"-eiffel" | b"--eiffel" | b"-EIFFEL" | b"--EIFFEL" | b"-e" | b"--e" | b"-E" | b"--E" => Some(Self::Eiffel),
+            b"-scd" | b"--scd" | b"-SCD" | b"--SCD" | b"-supercollider" | b"--supercollider" | b"-SUPERCOLLIDER" | b"--SUPERCOLLIDER" => Some(Self::SuperCollider),
+            b"-red" | b"--red" | b"-RED" | b"--RED" => Some(Self::Red),
+            b"-koka" | b"--koka" | b"-KOKA" | b"--KOKA" | b"-kk" | b"--kk" | b"-KK" | b"--KK" => Some(Self::Koka),
+            b"-bsv" | b"--bsv" | b"-BSV" | b"--BSV" | b"-bluespec" | b"--bluespec" | b"-BLUESPEC" | b"--BLUESPEC" => Some(Self::Bluespec),
+            b"-m2" | b"--m2" | b"-M2" | b"--M2" | b"-modula2" | b"--modula2" | b"-MODULA2" | b"--MODULA2" => Some(Self::Modula2),
+            b"-rexx" | b"--rexx" | b"-REXX" | b"--REXX" | b"-rex" | b"--rex" | b"-REX" | b"--REX" => Some(Self::Rexx),
+            b"-rebol" | b"--rebol" | b"-REBOL" | b"--REBOL" | b"-reb" | b"--reb" | b"-REB" | b"--REB" => Some(Self::Rebol),
+            b"-factor" | b"--factor" | b"-FACTOR" | b"--FACTOR" => Some(Self::Factor),
+            b"-logtalk" | b"--logtalk" | b"-LOGTALK" | b"--LOGTALK" | b"-lgt" | b"--lgt" | b"-LGT" | b"--LGT" => Some(Self::Logtalk),
+            b"-sparql" | b"--sparql" | b"-SPARQL" | b"--SPARQL" | b"-rq" | b"--rq" | b"-RQ" | b"--RQ" => Some(Self::Sparql),
+            b"-chuck" | b"--chuck" | b"-CHUCK" | b"--CHUCK" | b"-ck" | b"--ck" | b"-CK" | b"--CK" => Some(Self::Chuck),
+            b"-io" | b"--io" | b"-IO" | b"--IO" => Some(Self::Io),
+            b"-pike" | b"--pike" | b"-PIKE" | b"--PIKE" => Some(Self::Pike),
+            b"-dylan" | b"--dylan" | b"-DYLAN" | b"--DYLAN" | b"-dyl" | b"--dyl" | b"-DYL" | b"--DYL" => Some(Self::Dylan),
+            b"-scad" | b"--scad" | b"-SCAD" | b"--SCAD" | b"-openscad" | b"--openscad" | b"-OPENSCAD" | b"--OPENSCAD" => Some(Self::OpenSCAD),
+            b"-p4" | b"--p4" | b"-P4" | b"--P4" => Some(Self::P4),
+            b"-als" | b"--als" | b"-ALS" | b"--ALS" | b"-alloy" | b"--alloy" | b"-ALLOY" | b"--ALLOY" => Some(Self::Alloy),
+            b"-applescript" | b"--applescript" | b"-APPLESCRIPT" | b"--APPLESCRIPT" | b"-scpt" | b"--scpt" | b"-SCPT" | b"--SCPT" => Some(Self::AppleScript),
+            b"-carp" | b"--carp" | b"-CARP" | b"--CARP" => Some(Self::Carp),
+            b"-ls" | b"--ls" | b"-LS" | b"--LS" | b"-livescript" | b"--livescript" | b"-LIVESCRIPT" | b"--LIVESCRIPT" => Some(Self::LiveScript),
+            b"-moon" | b"--moon" | b"-MOON" | b"--MOON" | b"-moonscript" | b"--moonscript" | b"-MOONSCRIPT" | b"--MOONSCRIPT" => Some(Self::MoonScript),
+            b"-m3" | b"--m3" | b"-M3" | b"--M3" | b"-modula3" | b"--modula3" | b"-MODULA3" | b"--MODULA3" => Some(Self::Modula3),
+            b"-obn" | b"--obn" | b"-OBN" | b"--OBN" | b"-oberon" | b"--oberon" | b"-OBERON" | b"--OBERON" => Some(Self::Oberon),
+            b"-clean" | b"--clean" | b"-CLEAN" | b"--CLEAN" | b"-icl" | b"--icl" | b"-ICL" | b"--ICL" => Some(Self::Clean),
+            b"-holyc" | b"--holyc" | b"-HOLYC" | b"--HOLYC" | b"-hc" | b"--hc" | b"-HC" | b"--HC" => Some(Self::HolyC),
+            b"-clarity" | b"--clarity" | b"-CLARITY" | b"--CLARITY" | b"-clar" | b"--clar" | b"-CLAR" | b"--CLAR" => Some(Self::Clarity),
+            b"-pawn" | b"--pawn" | b"-PAWN" | b"--PAWN" | b"-pwn" | b"--pwn" | b"-PWN" | b"--PWN" => Some(Self::Pawn),
+            b"-blitzmax" | b"--blitzmax" | b"-BLITZMAX" | b"--BLITZMAX" | b"-bmx" | b"--bmx" | b"-BMX" | b"--BMX" | b"-bb" | b"--bb" | b"-BB" | b"--BB" => Some(Self::BlitzMax),
+            b"-asymptote" | b"--asymptote" | b"-ASYMPTOTE" | b"--ASYMPTOTE" | b"-asy" | b"--asy" | b"-ASY" | b"--ASY" => Some(Self::Asymptote),
+            b"-gnuplot" | b"--gnuplot" | b"-GNUPLOT" | b"--GNUPLOT" | b"-gp" | b"--gp" | b"-GP" | b"--GP" => Some(Self::Gnuplot),
+            b"-processing" | b"--processing" | b"-PROCESSING" | b"--PROCESSING" | b"-pde" | b"--pde" | b"-PDE" | b"--PDE" => Some(Self::Processing),
+            b"-mlir" | b"--mlir" | b"-MLIR" | b"--MLIR" => Some(Self::Mlir),
+            b"-txl" | b"--txl" | b"-TXL" | b"--TXL" => Some(Self::Txl),
+            b"-pact" | b"--pact" | b"-PACT" | b"--PACT" => Some(Self::Pact),
+            b"-arduino" | b"--arduino" | b"-ARDUINO" | b"--ARDUINO" | b"-ino" | b"--ino" | b"-INO" | b"--INO" => Some(Self::Arduino),
+            b"-vba" | b"--vba" | b"-VBA" | b"--VBA" | b"-bas" | b"--bas" | b"-BAS" | b"--BAS" => Some(Self::Vba),
+            b"-ceylon" | b"--ceylon" | b"-CEYLON" | b"--CEYLON" => Some(Self::Ceylon),
+            b"-fantom" | b"--fantom" | b"-FANTOM" | b"--FANTOM" | b"-fan" | b"--fan" | b"-FAN" | b"--FAN" => Some(Self::Fantom),
+            b"-xtend" | b"--xtend" | b"-XTEND" | b"--XTEND" => Some(Self::Xtend),
+            b"-abnf" | b"--abnf" | b"-ABNF" | b"--ABNF" => Some(Self::Abnf),
+            b"-al" | b"--al" | b"-AL" | b"--AL" => Some(Self::Al),
+            b"-j" | b"--j" | b"-J" | b"--J" | b"-jlang" | b"--jlang" | b"-JLANG" | b"--JLANG" | b"-ijs" | b"--ijs" | b"-IJS" | b"--IJS" => Some(Self::JLang),
+            b"-spice" | b"--spice" | b"-SPICE" | b"--SPICE" | b"-cir" | b"--cir" | b"-CIR" | b"--CIR" | b"-sp" | b"--sp" | b"-SP" | b"--SP" => Some(Self::Spice),
+            b"-ats" | b"--ats" | b"-ATS" | b"--ATS" | b"-dats" | b"--dats" | b"-DATS" | b"--DATS" => Some(Self::Ats),
             _ => None,
         }
     }
@@ -1049,6 +1917,92 @@ pub struct LangStats {
     pub prisma: ParseResult<{ prisma::KEYWORD_COUNT }>,
     pub kdl: ParseResult<{ kdl::KEYWORD_COUNT }>,
     pub capnp: ParseResult<{ capnp::KEYWORD_COUNT }>,
+    pub cue: ParseResult<{ cue::KEYWORD_COUNT }>,
+    pub jsonnet: ParseResult<{ jsonnet::KEYWORD_COUNT }>,
+    pub dhall: ParseResult<{ dhall::KEYWORD_COUNT }>,
+    pub nickel: ParseResult<{ nickel::KEYWORD_COUNT }>,
+    pub bicep: ParseResult<{ bicep::KEYWORD_COUNT }>,
+    pub wit: ParseResult<{ wit::KEYWORD_COUNT }>,
+    pub move_lang: ParseResult<{ move_lang::KEYWORD_COUNT }>,
+    pub cairo: ParseResult<{ cairo::KEYWORD_COUNT }>,
+    pub vyper: ParseResult<{ vyper::KEYWORD_COUNT }>,
+    pub fennel: ParseResult<{ fennel::KEYWORD_COUNT }>,
+    pub hy: ParseResult<{ hy::KEYWORD_COUNT }>,
+    pub elisp: ParseResult<{ elisp::KEYWORD_COUNT }>,
+    pub raku: ParseResult<{ raku::KEYWORD_COUNT }>,
+    pub forth: ParseResult<{ forth::KEYWORD_COUNT }>,
+    pub smalltalk: ParseResult<{ smalltalk::KEYWORD_COUNT }>,
+    pub wren: ParseResult<{ wren::KEYWORD_COUNT }>,
+    pub flatbuffers: ParseResult<{ flatbuffers::KEYWORD_COUNT }>,
+    pub smithy: ParseResult<{ smithy::KEYWORD_COUNT }>,
+    pub janet: ParseResult<{ janet::KEYWORD_COUNT }>,
+    pub idris: ParseResult<{ idris::KEYWORD_COUNT }>,
+    pub modelica: ParseResult<{ modelica::KEYWORD_COUNT }>,
+    pub stan: ParseResult<{ stan::KEYWORD_COUNT }>,
+    pub shen: ParseResult<{ shen::KEYWORD_COUNT }>,
+    pub firrtl: ParseResult<{ firrtl::KEYWORD_COUNT }>,
+    pub abap: ParseResult<{ abap::KEYWORD_COUNT }>,
+    pub stata: ParseResult<{ stata::KEYWORD_COUNT }>,
+    pub gdscript: ParseResult<{ gdscript::KEYWORD_COUNT }>,
+    pub prolog: ParseResult<{ prolog::KEYWORD_COUNT }>,
+    pub agda: ParseResult<{ agda::KEYWORD_COUNT }>,
+    pub opencl: ParseResult<{ opencl::KEYWORD_COUNT }>,
+    pub postscript: ParseResult<{ postscript::KEYWORD_COUNT }>,
+    pub grain: ParseResult<{ grain::KEYWORD_COUNT }>,
+    pub prql: ParseResult<{ prql::KEYWORD_COUNT }>,
+    pub q: ParseResult<{ q::KEYWORD_COUNT }>,
+    pub slang: ParseResult<{ slang::KEYWORD_COUNT }>,
+    pub autoit: ParseResult<{ autoit::KEYWORD_COUNT }>,
+    pub lean: ParseResult<{ lean::KEYWORD_COUNT }>,
+    pub uiua: ParseResult<{ uiua::KEYWORD_COUNT }>,
+    pub bqn: ParseResult<{ bqn::KEYWORD_COUNT }>,
+    pub cypher: ParseResult<{ cypher::KEYWORD_COUNT }>,
+    pub gherkin: ParseResult<{ gherkin::KEYWORD_COUNT }>,
+    pub eiffel: ParseResult<{ eiffel::KEYWORD_COUNT }>,
+    pub supercollider: ParseResult<{ supercollider::KEYWORD_COUNT }>,
+    pub red: ParseResult<{ red::KEYWORD_COUNT }>,
+    pub koka: ParseResult<{ koka::KEYWORD_COUNT }>,
+    pub bluespec: ParseResult<{ bluespec::KEYWORD_COUNT }>,
+    pub modula2: ParseResult<{ modula2::KEYWORD_COUNT }>,
+    pub rexx: ParseResult<{ rexx::KEYWORD_COUNT }>,
+    pub rebol: ParseResult<{ rebol::KEYWORD_COUNT }>,
+    pub factor: ParseResult<{ factor::KEYWORD_COUNT }>,
+    pub logtalk: ParseResult<{ logtalk::KEYWORD_COUNT }>,
+    pub sparql: ParseResult<{ sparql::KEYWORD_COUNT }>,
+    pub chuck: ParseResult<{ chuck::KEYWORD_COUNT }>,
+    pub io: ParseResult<{ io::KEYWORD_COUNT }>,
+    pub pike: ParseResult<{ pike::KEYWORD_COUNT }>,
+    pub dylan: ParseResult<{ dylan::KEYWORD_COUNT }>,
+    pub openscad: ParseResult<{ openscad::KEYWORD_COUNT }>,
+    pub p4: ParseResult<{ p4::KEYWORD_COUNT }>,
+    pub alloy: ParseResult<{ alloy::KEYWORD_COUNT }>,
+    pub applescript: ParseResult<{ applescript::KEYWORD_COUNT }>,
+    pub carp: ParseResult<{ carp::KEYWORD_COUNT }>,
+    pub livescript: ParseResult<{ livescript::KEYWORD_COUNT }>,
+    pub moonscript: ParseResult<{ moonscript::KEYWORD_COUNT }>,
+    pub modula3: ParseResult<{ modula3::KEYWORD_COUNT }>,
+    pub oberon: ParseResult<{ oberon::KEYWORD_COUNT }>,
+    pub clean: ParseResult<{ clean::KEYWORD_COUNT }>,
+    pub holyc: ParseResult<{ holyc::KEYWORD_COUNT }>,
+    pub clarity: ParseResult<{ clarity::KEYWORD_COUNT }>,
+    pub pawn: ParseResult<{ pawn::KEYWORD_COUNT }>,
+    pub blitzmax: ParseResult<{ blitzmax::KEYWORD_COUNT }>,
+    pub asymptote: ParseResult<{ asymptote::KEYWORD_COUNT }>,
+    pub gnuplot: ParseResult<{ gnuplot::KEYWORD_COUNT }>,
+    pub processing: ParseResult<{ processing::KEYWORD_COUNT }>,
+    pub mlir: ParseResult<{ mlir::KEYWORD_COUNT }>,
+    pub txl: ParseResult<{ txl::KEYWORD_COUNT }>,
+    pub pact: ParseResult<{ pact::KEYWORD_COUNT }>,
+    pub arduino: ParseResult<{ arduino::KEYWORD_COUNT }>,
+    pub vba: ParseResult<{ vba::KEYWORD_COUNT }>,
+    pub ceylon: ParseResult<{ ceylon::KEYWORD_COUNT }>,
+    pub fantom: ParseResult<{ fantom::KEYWORD_COUNT }>,
+    pub xtend: ParseResult<{ xtend::KEYWORD_COUNT }>,
+    pub abnf: ParseResult<{ abnf::KEYWORD_COUNT }>,
+    pub al: ParseResult<{ al::KEYWORD_COUNT }>,
+    pub j_lang: ParseResult<{ j_lang::KEYWORD_COUNT }>,
+    pub spice: ParseResult<{ spice::KEYWORD_COUNT }>,
+    pub ats: ParseResult<{ ats::KEYWORD_COUNT }>,
 }
 
 impl LangStats {
@@ -1160,6 +2114,92 @@ impl LangStats {
         self.prisma.add(&other.prisma);
         self.kdl.add(&other.kdl);
         self.capnp.add(&other.capnp);
+        self.cue.add(&other.cue);
+        self.jsonnet.add(&other.jsonnet);
+        self.dhall.add(&other.dhall);
+        self.nickel.add(&other.nickel);
+        self.bicep.add(&other.bicep);
+        self.wit.add(&other.wit);
+        self.move_lang.add(&other.move_lang);
+        self.cairo.add(&other.cairo);
+        self.vyper.add(&other.vyper);
+        self.fennel.add(&other.fennel);
+        self.hy.add(&other.hy);
+        self.elisp.add(&other.elisp);
+        self.raku.add(&other.raku);
+        self.forth.add(&other.forth);
+        self.smalltalk.add(&other.smalltalk);
+        self.wren.add(&other.wren);
+        self.flatbuffers.add(&other.flatbuffers);
+        self.smithy.add(&other.smithy);
+        self.janet.add(&other.janet);
+        self.idris.add(&other.idris);
+        self.modelica.add(&other.modelica);
+        self.stan.add(&other.stan);
+        self.shen.add(&other.shen);
+        self.firrtl.add(&other.firrtl);
+        self.abap.add(&other.abap);
+        self.stata.add(&other.stata);
+        self.gdscript.add(&other.gdscript);
+        self.prolog.add(&other.prolog);
+        self.agda.add(&other.agda);
+        self.opencl.add(&other.opencl);
+        self.postscript.add(&other.postscript);
+        self.grain.add(&other.grain);
+        self.prql.add(&other.prql);
+        self.q.add(&other.q);
+        self.slang.add(&other.slang);
+        self.autoit.add(&other.autoit);
+        self.lean.add(&other.lean);
+        self.uiua.add(&other.uiua);
+        self.bqn.add(&other.bqn);
+        self.cypher.add(&other.cypher);
+        self.gherkin.add(&other.gherkin);
+        self.eiffel.add(&other.eiffel);
+        self.supercollider.add(&other.supercollider);
+        self.red.add(&other.red);
+        self.koka.add(&other.koka);
+        self.bluespec.add(&other.bluespec);
+        self.modula2.add(&other.modula2);
+        self.rexx.add(&other.rexx);
+        self.rebol.add(&other.rebol);
+        self.factor.add(&other.factor);
+        self.logtalk.add(&other.logtalk);
+        self.sparql.add(&other.sparql);
+        self.chuck.add(&other.chuck);
+        self.io.add(&other.io);
+        self.pike.add(&other.pike);
+        self.dylan.add(&other.dylan);
+        self.openscad.add(&other.openscad);
+        self.p4.add(&other.p4);
+        self.alloy.add(&other.alloy);
+        self.applescript.add(&other.applescript);
+        self.carp.add(&other.carp);
+        self.livescript.add(&other.livescript);
+        self.moonscript.add(&other.moonscript);
+        self.modula3.add(&other.modula3);
+        self.oberon.add(&other.oberon);
+        self.clean.add(&other.clean);
+        self.holyc.add(&other.holyc);
+        self.clarity.add(&other.clarity);
+        self.pawn.add(&other.pawn);
+        self.blitzmax.add(&other.blitzmax);
+        self.asymptote.add(&other.asymptote);
+        self.gnuplot.add(&other.gnuplot);
+        self.processing.add(&other.processing);
+        self.mlir.add(&other.mlir);
+        self.txl.add(&other.txl);
+        self.pact.add(&other.pact);
+        self.arduino.add(&other.arduino);
+        self.vba.add(&other.vba);
+        self.ceylon.add(&other.ceylon);
+        self.fantom.add(&other.fantom);
+        self.xtend.add(&other.xtend);
+        self.abnf.add(&other.abnf);
+        self.al.add(&other.al);
+        self.j_lang.add(&other.j_lang);
+        self.spice.add(&other.spice);
+        self.ats.add(&other.ats);
     }
 
     #[inline(always)]
@@ -1271,6 +2311,92 @@ impl LangStats {
             LangId::Prisma => self.prisma.lines_processed,
             LangId::Kdl => self.kdl.lines_processed,
             LangId::CapnProto => self.capnp.lines_processed,
+            LangId::Cue => self.cue.lines_processed,
+            LangId::Jsonnet => self.jsonnet.lines_processed,
+            LangId::Dhall => self.dhall.lines_processed,
+            LangId::Nickel => self.nickel.lines_processed,
+            LangId::Bicep => self.bicep.lines_processed,
+            LangId::Wit => self.wit.lines_processed,
+            LangId::Move => self.move_lang.lines_processed,
+            LangId::Cairo => self.cairo.lines_processed,
+            LangId::Vyper => self.vyper.lines_processed,
+            LangId::Fennel => self.fennel.lines_processed,
+            LangId::Hy => self.hy.lines_processed,
+            LangId::EmacsLisp => self.elisp.lines_processed,
+            LangId::Raku => self.raku.lines_processed,
+            LangId::Forth => self.forth.lines_processed,
+            LangId::Smalltalk => self.smalltalk.lines_processed,
+            LangId::Wren => self.wren.lines_processed,
+            LangId::FlatBuffers => self.flatbuffers.lines_processed,
+            LangId::Smithy => self.smithy.lines_processed,
+            LangId::Janet => self.janet.lines_processed,
+            LangId::Idris => self.idris.lines_processed,
+            LangId::Modelica => self.modelica.lines_processed,
+            LangId::Stan => self.stan.lines_processed,
+            LangId::Shen => self.shen.lines_processed,
+            LangId::Firrtl => self.firrtl.lines_processed,
+            LangId::Abap => self.abap.lines_processed,
+            LangId::Stata => self.stata.lines_processed,
+            LangId::GDScript => self.gdscript.lines_processed,
+            LangId::Prolog => self.prolog.lines_processed,
+            LangId::Agda => self.agda.lines_processed,
+            LangId::OpenCL => self.opencl.lines_processed,
+            LangId::PostScript => self.postscript.lines_processed,
+            LangId::Grain => self.grain.lines_processed,
+            LangId::Prql => self.prql.lines_processed,
+            LangId::Q => self.q.lines_processed,
+            LangId::Slang => self.slang.lines_processed,
+            LangId::AutoIt => self.autoit.lines_processed,
+            LangId::Lean => self.lean.lines_processed,
+            LangId::Uiua => self.uiua.lines_processed,
+            LangId::Bqn => self.bqn.lines_processed,
+            LangId::Cypher => self.cypher.lines_processed,
+            LangId::Gherkin => self.gherkin.lines_processed,
+            LangId::Eiffel => self.eiffel.lines_processed,
+            LangId::SuperCollider => self.supercollider.lines_processed,
+            LangId::Red => self.red.lines_processed,
+            LangId::Koka => self.koka.lines_processed,
+            LangId::Bluespec => self.bluespec.lines_processed,
+            LangId::Modula2 => self.modula2.lines_processed,
+            LangId::Rexx => self.rexx.lines_processed,
+            LangId::Rebol => self.rebol.lines_processed,
+            LangId::Factor => self.factor.lines_processed,
+            LangId::Logtalk => self.logtalk.lines_processed,
+            LangId::Sparql => self.sparql.lines_processed,
+            LangId::Chuck => self.chuck.lines_processed,
+            LangId::Io => self.io.lines_processed,
+            LangId::Pike => self.pike.lines_processed,
+            LangId::Dylan => self.dylan.lines_processed,
+            LangId::OpenSCAD => self.openscad.lines_processed,
+            LangId::P4 => self.p4.lines_processed,
+            LangId::Alloy => self.alloy.lines_processed,
+            LangId::AppleScript => self.applescript.lines_processed,
+            LangId::Carp => self.carp.lines_processed,
+            LangId::LiveScript => self.livescript.lines_processed,
+            LangId::MoonScript => self.moonscript.lines_processed,
+            LangId::Modula3 => self.modula3.lines_processed,
+            LangId::Oberon => self.oberon.lines_processed,
+            LangId::Clean => self.clean.lines_processed,
+            LangId::HolyC => self.holyc.lines_processed,
+            LangId::Clarity => self.clarity.lines_processed,
+            LangId::Pawn => self.pawn.lines_processed,
+            LangId::BlitzMax => self.blitzmax.lines_processed,
+            LangId::Asymptote => self.asymptote.lines_processed,
+            LangId::Gnuplot => self.gnuplot.lines_processed,
+            LangId::Processing => self.processing.lines_processed,
+            LangId::Mlir => self.mlir.lines_processed,
+            LangId::Txl => self.txl.lines_processed,
+            LangId::Pact => self.pact.lines_processed,
+            LangId::Arduino => self.arduino.lines_processed,
+            LangId::Vba => self.vba.lines_processed,
+            LangId::Ceylon => self.ceylon.lines_processed,
+            LangId::Fantom => self.fantom.lines_processed,
+            LangId::Xtend => self.xtend.lines_processed,
+            LangId::Abnf => self.abnf.lines_processed,
+            LangId::Al => self.al.lines_processed,
+            LangId::JLang => self.j_lang.lines_processed,
+            LangId::Spice => self.spice.lines_processed,
+            LangId::Ats => self.ats.lines_processed,
         }
     }
 
@@ -1383,6 +2509,92 @@ impl LangStats {
             LangId::Prisma => self.prisma.code_lines,
             LangId::Kdl => self.kdl.code_lines,
             LangId::CapnProto => self.capnp.code_lines,
+            LangId::Cue => self.cue.code_lines,
+            LangId::Jsonnet => self.jsonnet.code_lines,
+            LangId::Dhall => self.dhall.code_lines,
+            LangId::Nickel => self.nickel.code_lines,
+            LangId::Bicep => self.bicep.code_lines,
+            LangId::Wit => self.wit.code_lines,
+            LangId::Move => self.move_lang.code_lines,
+            LangId::Cairo => self.cairo.code_lines,
+            LangId::Vyper => self.vyper.code_lines,
+            LangId::Fennel => self.fennel.code_lines,
+            LangId::Hy => self.hy.code_lines,
+            LangId::EmacsLisp => self.elisp.code_lines,
+            LangId::Raku => self.raku.code_lines,
+            LangId::Forth => self.forth.code_lines,
+            LangId::Smalltalk => self.smalltalk.code_lines,
+            LangId::Wren => self.wren.code_lines,
+            LangId::FlatBuffers => self.flatbuffers.code_lines,
+            LangId::Smithy => self.smithy.code_lines,
+            LangId::Janet => self.janet.code_lines,
+            LangId::Idris => self.idris.code_lines,
+            LangId::Modelica => self.modelica.code_lines,
+            LangId::Stan => self.stan.code_lines,
+            LangId::Shen => self.shen.code_lines,
+            LangId::Firrtl => self.firrtl.code_lines,
+            LangId::Abap => self.abap.code_lines,
+            LangId::Stata => self.stata.code_lines,
+            LangId::GDScript => self.gdscript.code_lines,
+            LangId::Prolog => self.prolog.code_lines,
+            LangId::Agda => self.agda.code_lines,
+            LangId::OpenCL => self.opencl.code_lines,
+            LangId::PostScript => self.postscript.code_lines,
+            LangId::Grain => self.grain.code_lines,
+            LangId::Prql => self.prql.code_lines,
+            LangId::Q => self.q.code_lines,
+            LangId::Slang => self.slang.code_lines,
+            LangId::AutoIt => self.autoit.code_lines,
+            LangId::Lean => self.lean.code_lines,
+            LangId::Uiua => self.uiua.code_lines,
+            LangId::Bqn => self.bqn.code_lines,
+            LangId::Cypher => self.cypher.code_lines,
+            LangId::Gherkin => self.gherkin.code_lines,
+            LangId::Eiffel => self.eiffel.code_lines,
+            LangId::SuperCollider => self.supercollider.code_lines,
+            LangId::Red => self.red.code_lines,
+            LangId::Koka => self.koka.code_lines,
+            LangId::Bluespec => self.bluespec.code_lines,
+            LangId::Modula2 => self.modula2.code_lines,
+            LangId::Rexx => self.rexx.code_lines,
+            LangId::Rebol => self.rebol.code_lines,
+            LangId::Factor => self.factor.code_lines,
+            LangId::Logtalk => self.logtalk.code_lines,
+            LangId::Sparql => self.sparql.code_lines,
+            LangId::Chuck => self.chuck.code_lines,
+            LangId::Io => self.io.code_lines,
+            LangId::Pike => self.pike.code_lines,
+            LangId::Dylan => self.dylan.code_lines,
+            LangId::OpenSCAD => self.openscad.code_lines,
+            LangId::P4 => self.p4.code_lines,
+            LangId::Alloy => self.alloy.code_lines,
+            LangId::AppleScript => self.applescript.code_lines,
+            LangId::Carp => self.carp.code_lines,
+            LangId::LiveScript => self.livescript.code_lines,
+            LangId::MoonScript => self.moonscript.code_lines,
+            LangId::Modula3 => self.modula3.code_lines,
+            LangId::Oberon => self.oberon.code_lines,
+            LangId::Clean => self.clean.code_lines,
+            LangId::HolyC => self.holyc.code_lines,
+            LangId::Clarity => self.clarity.code_lines,
+            LangId::Pawn => self.pawn.code_lines,
+            LangId::BlitzMax => self.blitzmax.code_lines,
+            LangId::Asymptote => self.asymptote.code_lines,
+            LangId::Gnuplot => self.gnuplot.code_lines,
+            LangId::Processing => self.processing.code_lines,
+            LangId::Mlir => self.mlir.code_lines,
+            LangId::Txl => self.txl.code_lines,
+            LangId::Pact => self.pact.code_lines,
+            LangId::Arduino => self.arduino.code_lines,
+            LangId::Vba => self.vba.code_lines,
+            LangId::Ceylon => self.ceylon.code_lines,
+            LangId::Fantom => self.fantom.code_lines,
+            LangId::Xtend => self.xtend.code_lines,
+            LangId::Abnf => self.abnf.code_lines,
+            LangId::Al => self.al.code_lines,
+            LangId::JLang => self.j_lang.code_lines,
+            LangId::Spice => self.spice.code_lines,
+            LangId::Ats => self.ats.code_lines,
         }
     }
 
@@ -1495,6 +2707,92 @@ impl LangStats {
             LangId::Prisma => self.prisma.comment_lines,
             LangId::Kdl => self.kdl.comment_lines,
             LangId::CapnProto => self.capnp.comment_lines,
+            LangId::Cue => self.cue.comment_lines,
+            LangId::Jsonnet => self.jsonnet.comment_lines,
+            LangId::Dhall => self.dhall.comment_lines,
+            LangId::Nickel => self.nickel.comment_lines,
+            LangId::Bicep => self.bicep.comment_lines,
+            LangId::Wit => self.wit.comment_lines,
+            LangId::Move => self.move_lang.comment_lines,
+            LangId::Cairo => self.cairo.comment_lines,
+            LangId::Vyper => self.vyper.comment_lines,
+            LangId::Fennel => self.fennel.comment_lines,
+            LangId::Hy => self.hy.comment_lines,
+            LangId::EmacsLisp => self.elisp.comment_lines,
+            LangId::Raku => self.raku.comment_lines,
+            LangId::Forth => self.forth.comment_lines,
+            LangId::Smalltalk => self.smalltalk.comment_lines,
+            LangId::Wren => self.wren.comment_lines,
+            LangId::FlatBuffers => self.flatbuffers.comment_lines,
+            LangId::Smithy => self.smithy.comment_lines,
+            LangId::Janet => self.janet.comment_lines,
+            LangId::Idris => self.idris.comment_lines,
+            LangId::Modelica => self.modelica.comment_lines,
+            LangId::Stan => self.stan.comment_lines,
+            LangId::Shen => self.shen.comment_lines,
+            LangId::Firrtl => self.firrtl.comment_lines,
+            LangId::Abap => self.abap.comment_lines,
+            LangId::Stata => self.stata.comment_lines,
+            LangId::GDScript => self.gdscript.comment_lines,
+            LangId::Prolog => self.prolog.comment_lines,
+            LangId::Agda => self.agda.comment_lines,
+            LangId::OpenCL => self.opencl.comment_lines,
+            LangId::PostScript => self.postscript.comment_lines,
+            LangId::Grain => self.grain.comment_lines,
+            LangId::Prql => self.prql.comment_lines,
+            LangId::Q => self.q.comment_lines,
+            LangId::Slang => self.slang.comment_lines,
+            LangId::AutoIt => self.autoit.comment_lines,
+            LangId::Lean => self.lean.comment_lines,
+            LangId::Uiua => self.uiua.comment_lines,
+            LangId::Bqn => self.bqn.comment_lines,
+            LangId::Cypher => self.cypher.comment_lines,
+            LangId::Gherkin => self.gherkin.comment_lines,
+            LangId::Eiffel => self.eiffel.comment_lines,
+            LangId::SuperCollider => self.supercollider.comment_lines,
+            LangId::Red => self.red.comment_lines,
+            LangId::Koka => self.koka.comment_lines,
+            LangId::Bluespec => self.bluespec.comment_lines,
+            LangId::Modula2 => self.modula2.comment_lines,
+            LangId::Rexx => self.rexx.comment_lines,
+            LangId::Rebol => self.rebol.comment_lines,
+            LangId::Factor => self.factor.comment_lines,
+            LangId::Logtalk => self.logtalk.comment_lines,
+            LangId::Sparql => self.sparql.comment_lines,
+            LangId::Chuck => self.chuck.comment_lines,
+            LangId::Io => self.io.comment_lines,
+            LangId::Pike => self.pike.comment_lines,
+            LangId::Dylan => self.dylan.comment_lines,
+            LangId::OpenSCAD => self.openscad.comment_lines,
+            LangId::P4 => self.p4.comment_lines,
+            LangId::Alloy => self.alloy.comment_lines,
+            LangId::AppleScript => self.applescript.comment_lines,
+            LangId::Carp => self.carp.comment_lines,
+            LangId::LiveScript => self.livescript.comment_lines,
+            LangId::MoonScript => self.moonscript.comment_lines,
+            LangId::Modula3 => self.modula3.comment_lines,
+            LangId::Oberon => self.oberon.comment_lines,
+            LangId::Clean => self.clean.comment_lines,
+            LangId::HolyC => self.holyc.comment_lines,
+            LangId::Clarity => self.clarity.comment_lines,
+            LangId::Pawn => self.pawn.comment_lines,
+            LangId::BlitzMax => self.blitzmax.comment_lines,
+            LangId::Asymptote => self.asymptote.comment_lines,
+            LangId::Gnuplot => self.gnuplot.comment_lines,
+            LangId::Processing => self.processing.comment_lines,
+            LangId::Mlir => self.mlir.comment_lines,
+            LangId::Txl => self.txl.comment_lines,
+            LangId::Pact => self.pact.comment_lines,
+            LangId::Arduino => self.arduino.comment_lines,
+            LangId::Vba => self.vba.comment_lines,
+            LangId::Ceylon => self.ceylon.comment_lines,
+            LangId::Fantom => self.fantom.comment_lines,
+            LangId::Xtend => self.xtend.comment_lines,
+            LangId::Abnf => self.abnf.comment_lines,
+            LangId::Al => self.al.comment_lines,
+            LangId::JLang => self.j_lang.comment_lines,
+            LangId::Spice => self.spice.comment_lines,
+            LangId::Ats => self.ats.comment_lines,
         }
     }
 
@@ -1607,6 +2905,92 @@ impl LangStats {
             LangId::Prisma => self.prisma.blank_lines,
             LangId::Kdl => self.kdl.blank_lines,
             LangId::CapnProto => self.capnp.blank_lines,
+            LangId::Cue => self.cue.blank_lines,
+            LangId::Jsonnet => self.jsonnet.blank_lines,
+            LangId::Dhall => self.dhall.blank_lines,
+            LangId::Nickel => self.nickel.blank_lines,
+            LangId::Bicep => self.bicep.blank_lines,
+            LangId::Wit => self.wit.blank_lines,
+            LangId::Move => self.move_lang.blank_lines,
+            LangId::Cairo => self.cairo.blank_lines,
+            LangId::Vyper => self.vyper.blank_lines,
+            LangId::Fennel => self.fennel.blank_lines,
+            LangId::Hy => self.hy.blank_lines,
+            LangId::EmacsLisp => self.elisp.blank_lines,
+            LangId::Raku => self.raku.blank_lines,
+            LangId::Forth => self.forth.blank_lines,
+            LangId::Smalltalk => self.smalltalk.blank_lines,
+            LangId::Wren => self.wren.blank_lines,
+            LangId::FlatBuffers => self.flatbuffers.blank_lines,
+            LangId::Smithy => self.smithy.blank_lines,
+            LangId::Janet => self.janet.blank_lines,
+            LangId::Idris => self.idris.blank_lines,
+            LangId::Modelica => self.modelica.blank_lines,
+            LangId::Stan => self.stan.blank_lines,
+            LangId::Shen => self.shen.blank_lines,
+            LangId::Firrtl => self.firrtl.blank_lines,
+            LangId::Abap => self.abap.blank_lines,
+            LangId::Stata => self.stata.blank_lines,
+            LangId::GDScript => self.gdscript.blank_lines,
+            LangId::Prolog => self.prolog.blank_lines,
+            LangId::Agda => self.agda.blank_lines,
+            LangId::OpenCL => self.opencl.blank_lines,
+            LangId::PostScript => self.postscript.blank_lines,
+            LangId::Grain => self.grain.blank_lines,
+            LangId::Prql => self.prql.blank_lines,
+            LangId::Q => self.q.blank_lines,
+            LangId::Slang => self.slang.blank_lines,
+            LangId::AutoIt => self.autoit.blank_lines,
+            LangId::Lean => self.lean.blank_lines,
+            LangId::Uiua => self.uiua.blank_lines,
+            LangId::Bqn => self.bqn.blank_lines,
+            LangId::Cypher => self.cypher.blank_lines,
+            LangId::Gherkin => self.gherkin.blank_lines,
+            LangId::Eiffel => self.eiffel.blank_lines,
+            LangId::SuperCollider => self.supercollider.blank_lines,
+            LangId::Red => self.red.blank_lines,
+            LangId::Koka => self.koka.blank_lines,
+            LangId::Bluespec => self.bluespec.blank_lines,
+            LangId::Modula2 => self.modula2.blank_lines,
+            LangId::Rexx => self.rexx.blank_lines,
+            LangId::Rebol => self.rebol.blank_lines,
+            LangId::Factor => self.factor.blank_lines,
+            LangId::Logtalk => self.logtalk.blank_lines,
+            LangId::Sparql => self.sparql.blank_lines,
+            LangId::Chuck => self.chuck.blank_lines,
+            LangId::Io => self.io.blank_lines,
+            LangId::Pike => self.pike.blank_lines,
+            LangId::Dylan => self.dylan.blank_lines,
+            LangId::OpenSCAD => self.openscad.blank_lines,
+            LangId::P4 => self.p4.blank_lines,
+            LangId::Alloy => self.alloy.blank_lines,
+            LangId::AppleScript => self.applescript.blank_lines,
+            LangId::Carp => self.carp.blank_lines,
+            LangId::LiveScript => self.livescript.blank_lines,
+            LangId::MoonScript => self.moonscript.blank_lines,
+            LangId::Modula3 => self.modula3.blank_lines,
+            LangId::Oberon => self.oberon.blank_lines,
+            LangId::Clean => self.clean.blank_lines,
+            LangId::HolyC => self.holyc.blank_lines,
+            LangId::Clarity => self.clarity.blank_lines,
+            LangId::Pawn => self.pawn.blank_lines,
+            LangId::BlitzMax => self.blitzmax.blank_lines,
+            LangId::Asymptote => self.asymptote.blank_lines,
+            LangId::Gnuplot => self.gnuplot.blank_lines,
+            LangId::Processing => self.processing.blank_lines,
+            LangId::Mlir => self.mlir.blank_lines,
+            LangId::Txl => self.txl.blank_lines,
+            LangId::Pact => self.pact.blank_lines,
+            LangId::Arduino => self.arduino.blank_lines,
+            LangId::Vba => self.vba.blank_lines,
+            LangId::Ceylon => self.ceylon.blank_lines,
+            LangId::Fantom => self.fantom.blank_lines,
+            LangId::Xtend => self.xtend.blank_lines,
+            LangId::Abnf => self.abnf.blank_lines,
+            LangId::Al => self.al.blank_lines,
+            LangId::JLang => self.j_lang.blank_lines,
+            LangId::Spice => self.spice.blank_lines,
+            LangId::Ats => self.ats.blank_lines,
         }
     }
 
@@ -1719,6 +3103,92 @@ impl LangStats {
             LangId::Prisma => self.prisma.total_keywords,
             LangId::Kdl => self.kdl.total_keywords,
             LangId::CapnProto => self.capnp.total_keywords,
+            LangId::Cue => self.cue.total_keywords,
+            LangId::Jsonnet => self.jsonnet.total_keywords,
+            LangId::Dhall => self.dhall.total_keywords,
+            LangId::Nickel => self.nickel.total_keywords,
+            LangId::Bicep => self.bicep.total_keywords,
+            LangId::Wit => self.wit.total_keywords,
+            LangId::Move => self.move_lang.total_keywords,
+            LangId::Cairo => self.cairo.total_keywords,
+            LangId::Vyper => self.vyper.total_keywords,
+            LangId::Fennel => self.fennel.total_keywords,
+            LangId::Hy => self.hy.total_keywords,
+            LangId::EmacsLisp => self.elisp.total_keywords,
+            LangId::Raku => self.raku.total_keywords,
+            LangId::Forth => self.forth.total_keywords,
+            LangId::Smalltalk => self.smalltalk.total_keywords,
+            LangId::Wren => self.wren.total_keywords,
+            LangId::FlatBuffers => self.flatbuffers.total_keywords,
+            LangId::Smithy => self.smithy.total_keywords,
+            LangId::Janet => self.janet.total_keywords,
+            LangId::Idris => self.idris.total_keywords,
+            LangId::Modelica => self.modelica.total_keywords,
+            LangId::Stan => self.stan.total_keywords,
+            LangId::Shen => self.shen.total_keywords,
+            LangId::Firrtl => self.firrtl.total_keywords,
+            LangId::Abap => self.abap.total_keywords,
+            LangId::Stata => self.stata.total_keywords,
+            LangId::GDScript => self.gdscript.total_keywords,
+            LangId::Prolog => self.prolog.total_keywords,
+            LangId::Agda => self.agda.total_keywords,
+            LangId::OpenCL => self.opencl.total_keywords,
+            LangId::PostScript => self.postscript.total_keywords,
+            LangId::Grain => self.grain.total_keywords,
+            LangId::Prql => self.prql.total_keywords,
+            LangId::Q => self.q.total_keywords,
+            LangId::Slang => self.slang.total_keywords,
+            LangId::AutoIt => self.autoit.total_keywords,
+            LangId::Lean => self.lean.total_keywords,
+            LangId::Uiua => self.uiua.total_keywords,
+            LangId::Bqn => self.bqn.total_keywords,
+            LangId::Cypher => self.cypher.total_keywords,
+            LangId::Gherkin => self.gherkin.total_keywords,
+            LangId::Eiffel => self.eiffel.total_keywords,
+            LangId::SuperCollider => self.supercollider.total_keywords,
+            LangId::Red => self.red.total_keywords,
+            LangId::Koka => self.koka.total_keywords,
+            LangId::Bluespec => self.bluespec.total_keywords,
+            LangId::Modula2 => self.modula2.total_keywords,
+            LangId::Rexx => self.rexx.total_keywords,
+            LangId::Rebol => self.rebol.total_keywords,
+            LangId::Factor => self.factor.total_keywords,
+            LangId::Logtalk => self.logtalk.total_keywords,
+            LangId::Sparql => self.sparql.total_keywords,
+            LangId::Chuck => self.chuck.total_keywords,
+            LangId::Io => self.io.total_keywords,
+            LangId::Pike => self.pike.total_keywords,
+            LangId::Dylan => self.dylan.total_keywords,
+            LangId::OpenSCAD => self.openscad.total_keywords,
+            LangId::P4 => self.p4.total_keywords,
+            LangId::Alloy => self.alloy.total_keywords,
+            LangId::AppleScript => self.applescript.total_keywords,
+            LangId::Carp => self.carp.total_keywords,
+            LangId::LiveScript => self.livescript.total_keywords,
+            LangId::MoonScript => self.moonscript.total_keywords,
+            LangId::Modula3 => self.modula3.total_keywords,
+            LangId::Oberon => self.oberon.total_keywords,
+            LangId::Clean => self.clean.total_keywords,
+            LangId::HolyC => self.holyc.total_keywords,
+            LangId::Clarity => self.clarity.total_keywords,
+            LangId::Pawn => self.pawn.total_keywords,
+            LangId::BlitzMax => self.blitzmax.total_keywords,
+            LangId::Asymptote => self.asymptote.total_keywords,
+            LangId::Gnuplot => self.gnuplot.total_keywords,
+            LangId::Processing => self.processing.total_keywords,
+            LangId::Mlir => self.mlir.total_keywords,
+            LangId::Txl => self.txl.total_keywords,
+            LangId::Pact => self.pact.total_keywords,
+            LangId::Arduino => self.arduino.total_keywords,
+            LangId::Vba => self.vba.total_keywords,
+            LangId::Ceylon => self.ceylon.total_keywords,
+            LangId::Fantom => self.fantom.total_keywords,
+            LangId::Xtend => self.xtend.total_keywords,
+            LangId::Abnf => self.abnf.total_keywords,
+            LangId::Al => self.al.total_keywords,
+            LangId::JLang => self.j_lang.total_keywords,
+            LangId::Spice => self.spice.total_keywords,
+            LangId::Ats => self.ats.total_keywords,
         }
     }
 
@@ -1831,6 +3301,92 @@ impl LangStats {
             LangId::Prisma => &prisma::KEYWORD_NAMES,
             LangId::Kdl => &kdl::KEYWORD_NAMES,
             LangId::CapnProto => &capnp::KEYWORD_NAMES,
+            LangId::Cue => &cue::KEYWORD_NAMES,
+            LangId::Jsonnet => &jsonnet::KEYWORD_NAMES,
+            LangId::Dhall => &dhall::KEYWORD_NAMES,
+            LangId::Nickel => &nickel::KEYWORD_NAMES,
+            LangId::Bicep => &bicep::KEYWORD_NAMES,
+            LangId::Wit => &wit::KEYWORD_NAMES,
+            LangId::Move => &move_lang::KEYWORD_NAMES,
+            LangId::Cairo => &cairo::KEYWORD_NAMES,
+            LangId::Vyper => &vyper::KEYWORD_NAMES,
+            LangId::Fennel => &fennel::KEYWORD_NAMES,
+            LangId::Hy => &hy::KEYWORD_NAMES,
+            LangId::EmacsLisp => &elisp::KEYWORD_NAMES,
+            LangId::Raku => &raku::KEYWORD_NAMES,
+            LangId::Forth => &forth::KEYWORD_NAMES,
+            LangId::Smalltalk => &smalltalk::KEYWORD_NAMES,
+            LangId::Wren => &wren::KEYWORD_NAMES,
+            LangId::FlatBuffers => &flatbuffers::KEYWORD_NAMES,
+            LangId::Smithy => &smithy::KEYWORD_NAMES,
+            LangId::Janet => &janet::KEYWORD_NAMES,
+            LangId::Idris => &idris::KEYWORD_NAMES,
+            LangId::Modelica => &modelica::KEYWORD_NAMES,
+            LangId::Stan => &stan::KEYWORD_NAMES,
+            LangId::Shen => &shen::KEYWORD_NAMES,
+            LangId::Firrtl => &firrtl::KEYWORD_NAMES,
+            LangId::Abap => &abap::KEYWORD_NAMES,
+            LangId::Stata => &stata::KEYWORD_NAMES,
+            LangId::GDScript => &gdscript::KEYWORD_NAMES,
+            LangId::Prolog => &prolog::KEYWORD_NAMES,
+            LangId::Agda => &agda::KEYWORD_NAMES,
+            LangId::OpenCL => &opencl::KEYWORD_NAMES,
+            LangId::PostScript => &postscript::KEYWORD_NAMES,
+            LangId::Grain => &grain::KEYWORD_NAMES,
+            LangId::Prql => &prql::KEYWORD_NAMES,
+            LangId::Q => &q::KEYWORD_NAMES,
+            LangId::Slang => &slang::KEYWORD_NAMES,
+            LangId::AutoIt => &autoit::KEYWORD_NAMES,
+            LangId::Lean => &lean::KEYWORD_NAMES,
+            LangId::Uiua => &uiua::KEYWORD_NAMES,
+            LangId::Bqn => &bqn::KEYWORD_NAMES,
+            LangId::Cypher => &cypher::KEYWORD_NAMES,
+            LangId::Gherkin => &gherkin::KEYWORD_NAMES,
+            LangId::Eiffel => &eiffel::KEYWORD_NAMES,
+            LangId::SuperCollider => &supercollider::KEYWORD_NAMES,
+            LangId::Red => &red::KEYWORD_NAMES,
+            LangId::Koka => &koka::KEYWORD_NAMES,
+            LangId::Bluespec => &bluespec::KEYWORD_NAMES,
+            LangId::Modula2 => &modula2::KEYWORD_NAMES,
+            LangId::Rexx => &rexx::KEYWORD_NAMES,
+            LangId::Rebol => &rebol::KEYWORD_NAMES,
+            LangId::Factor => &factor::KEYWORD_NAMES,
+            LangId::Logtalk => &logtalk::KEYWORD_NAMES,
+            LangId::Sparql => &sparql::KEYWORD_NAMES,
+            LangId::Chuck => &chuck::KEYWORD_NAMES,
+            LangId::Io => &io::KEYWORD_NAMES,
+            LangId::Pike => &pike::KEYWORD_NAMES,
+            LangId::Dylan => &dylan::KEYWORD_NAMES,
+            LangId::OpenSCAD => &openscad::KEYWORD_NAMES,
+            LangId::P4 => &p4::KEYWORD_NAMES,
+            LangId::Alloy => &alloy::KEYWORD_NAMES,
+            LangId::AppleScript => &applescript::KEYWORD_NAMES,
+            LangId::Carp => &carp::KEYWORD_NAMES,
+            LangId::LiveScript => &livescript::KEYWORD_NAMES,
+            LangId::MoonScript => &moonscript::KEYWORD_NAMES,
+            LangId::Modula3 => &modula3::KEYWORD_NAMES,
+            LangId::Oberon => &oberon::KEYWORD_NAMES,
+            LangId::Clean => &clean::KEYWORD_NAMES,
+            LangId::HolyC => &holyc::KEYWORD_NAMES,
+            LangId::Clarity => &clarity::KEYWORD_NAMES,
+            LangId::Pawn => &pawn::KEYWORD_NAMES,
+            LangId::BlitzMax => &blitzmax::KEYWORD_NAMES,
+            LangId::Asymptote => &asymptote::KEYWORD_NAMES,
+            LangId::Gnuplot => &gnuplot::KEYWORD_NAMES,
+            LangId::Processing => &processing::KEYWORD_NAMES,
+            LangId::Mlir => &mlir::KEYWORD_NAMES,
+            LangId::Txl => &txl::KEYWORD_NAMES,
+            LangId::Pact => &pact::KEYWORD_NAMES,
+            LangId::Arduino => &arduino::KEYWORD_NAMES,
+            LangId::Vba => &vba::KEYWORD_NAMES,
+            LangId::Ceylon => &ceylon::KEYWORD_NAMES,
+            LangId::Fantom => &fantom::KEYWORD_NAMES,
+            LangId::Xtend => &xtend::KEYWORD_NAMES,
+            LangId::Abnf => &abnf::KEYWORD_NAMES,
+            LangId::Al => &al::KEYWORD_NAMES,
+            LangId::JLang => &j_lang::KEYWORD_NAMES,
+            LangId::Spice => &spice::KEYWORD_NAMES,
+            LangId::Ats => &ats::KEYWORD_NAMES,
         }
     }
 
@@ -1943,6 +3499,92 @@ impl LangStats {
             LangId::Prisma => &self.prisma.keyword_counts,
             LangId::Kdl => &self.kdl.keyword_counts,
             LangId::CapnProto => &self.capnp.keyword_counts,
+            LangId::Cue => &self.cue.keyword_counts,
+            LangId::Jsonnet => &self.jsonnet.keyword_counts,
+            LangId::Dhall => &self.dhall.keyword_counts,
+            LangId::Nickel => &self.nickel.keyword_counts,
+            LangId::Bicep => &self.bicep.keyword_counts,
+            LangId::Wit => &self.wit.keyword_counts,
+            LangId::Move => &self.move_lang.keyword_counts,
+            LangId::Cairo => &self.cairo.keyword_counts,
+            LangId::Vyper => &self.vyper.keyword_counts,
+            LangId::Fennel => &self.fennel.keyword_counts,
+            LangId::Hy => &self.hy.keyword_counts,
+            LangId::EmacsLisp => &self.elisp.keyword_counts,
+            LangId::Raku => &self.raku.keyword_counts,
+            LangId::Forth => &self.forth.keyword_counts,
+            LangId::Smalltalk => &self.smalltalk.keyword_counts,
+            LangId::Wren => &self.wren.keyword_counts,
+            LangId::FlatBuffers => &self.flatbuffers.keyword_counts,
+            LangId::Smithy => &self.smithy.keyword_counts,
+            LangId::Janet => &self.janet.keyword_counts,
+            LangId::Idris => &self.idris.keyword_counts,
+            LangId::Modelica => &self.modelica.keyword_counts,
+            LangId::Stan => &self.stan.keyword_counts,
+            LangId::Shen => &self.shen.keyword_counts,
+            LangId::Firrtl => &self.firrtl.keyword_counts,
+            LangId::Abap => &self.abap.keyword_counts,
+            LangId::Stata => &self.stata.keyword_counts,
+            LangId::GDScript => &self.gdscript.keyword_counts,
+            LangId::Prolog => &self.prolog.keyword_counts,
+            LangId::Agda => &self.agda.keyword_counts,
+            LangId::OpenCL => &self.opencl.keyword_counts,
+            LangId::PostScript => &self.postscript.keyword_counts,
+            LangId::Grain => &self.grain.keyword_counts,
+            LangId::Prql => &self.prql.keyword_counts,
+            LangId::Q => &self.q.keyword_counts,
+            LangId::Slang => &self.slang.keyword_counts,
+            LangId::AutoIt => &self.autoit.keyword_counts,
+            LangId::Lean => &self.lean.keyword_counts,
+            LangId::Uiua => &self.uiua.keyword_counts,
+            LangId::Bqn => &self.bqn.keyword_counts,
+            LangId::Cypher => &self.cypher.keyword_counts,
+            LangId::Gherkin => &self.gherkin.keyword_counts,
+            LangId::Eiffel => &self.eiffel.keyword_counts,
+            LangId::SuperCollider => &self.supercollider.keyword_counts,
+            LangId::Red => &self.red.keyword_counts,
+            LangId::Koka => &self.koka.keyword_counts,
+            LangId::Bluespec => &self.bluespec.keyword_counts,
+            LangId::Modula2 => &self.modula2.keyword_counts,
+            LangId::Rexx => &self.rexx.keyword_counts,
+            LangId::Rebol => &self.rebol.keyword_counts,
+            LangId::Factor => &self.factor.keyword_counts,
+            LangId::Logtalk => &self.logtalk.keyword_counts,
+            LangId::Sparql => &self.sparql.keyword_counts,
+            LangId::Chuck => &self.chuck.keyword_counts,
+            LangId::Io => &self.io.keyword_counts,
+            LangId::Pike => &self.pike.keyword_counts,
+            LangId::Dylan => &self.dylan.keyword_counts,
+            LangId::OpenSCAD => &self.openscad.keyword_counts,
+            LangId::P4 => &self.p4.keyword_counts,
+            LangId::Alloy => &self.alloy.keyword_counts,
+            LangId::AppleScript => &self.applescript.keyword_counts,
+            LangId::Carp => &self.carp.keyword_counts,
+            LangId::LiveScript => &self.livescript.keyword_counts,
+            LangId::MoonScript => &self.moonscript.keyword_counts,
+            LangId::Modula3 => &self.modula3.keyword_counts,
+            LangId::Oberon => &self.oberon.keyword_counts,
+            LangId::Clean => &self.clean.keyword_counts,
+            LangId::HolyC => &self.holyc.keyword_counts,
+            LangId::Clarity => &self.clarity.keyword_counts,
+            LangId::Pawn => &self.pawn.keyword_counts,
+            LangId::BlitzMax => &self.blitzmax.keyword_counts,
+            LangId::Asymptote => &self.asymptote.keyword_counts,
+            LangId::Gnuplot => &self.gnuplot.keyword_counts,
+            LangId::Processing => &self.processing.keyword_counts,
+            LangId::Mlir => &self.mlir.keyword_counts,
+            LangId::Txl => &self.txl.keyword_counts,
+            LangId::Pact => &self.pact.keyword_counts,
+            LangId::Arduino => &self.arduino.keyword_counts,
+            LangId::Vba => &self.vba.keyword_counts,
+            LangId::Ceylon => &self.ceylon.keyword_counts,
+            LangId::Fantom => &self.fantom.keyword_counts,
+            LangId::Xtend => &self.xtend.keyword_counts,
+            LangId::Abnf => &self.abnf.keyword_counts,
+            LangId::Al => &self.al.keyword_counts,
+            LangId::JLang => &self.j_lang.keyword_counts,
+            LangId::Spice => &self.spice.keyword_counts,
+            LangId::Ats => &self.ats.keyword_counts,
         }
     }
 
@@ -2055,6 +3697,92 @@ impl LangStats {
             LangId::Prisma => &prisma::KEYWORD_LENS,
             LangId::Kdl => &kdl::KEYWORD_LENS,
             LangId::CapnProto => &capnp::KEYWORD_LENS,
+            LangId::Cue => &cue::KEYWORD_LENS,
+            LangId::Jsonnet => &jsonnet::KEYWORD_LENS,
+            LangId::Dhall => &dhall::KEYWORD_LENS,
+            LangId::Nickel => &nickel::KEYWORD_LENS,
+            LangId::Bicep => &bicep::KEYWORD_LENS,
+            LangId::Wit => &wit::KEYWORD_LENS,
+            LangId::Move => &move_lang::KEYWORD_LENS,
+            LangId::Cairo => &cairo::KEYWORD_LENS,
+            LangId::Vyper => &vyper::KEYWORD_LENS,
+            LangId::Fennel => &fennel::KEYWORD_LENS,
+            LangId::Hy => &hy::KEYWORD_LENS,
+            LangId::EmacsLisp => &elisp::KEYWORD_LENS,
+            LangId::Raku => &raku::KEYWORD_LENS,
+            LangId::Forth => &forth::KEYWORD_LENS,
+            LangId::Smalltalk => &smalltalk::KEYWORD_LENS,
+            LangId::Wren => &wren::KEYWORD_LENS,
+            LangId::FlatBuffers => &flatbuffers::KEYWORD_LENS,
+            LangId::Smithy => &smithy::KEYWORD_LENS,
+            LangId::Janet => &janet::KEYWORD_LENS,
+            LangId::Idris => &idris::KEYWORD_LENS,
+            LangId::Modelica => &modelica::KEYWORD_LENS,
+            LangId::Stan => &stan::KEYWORD_LENS,
+            LangId::Shen => &shen::KEYWORD_LENS,
+            LangId::Firrtl => &firrtl::KEYWORD_LENS,
+            LangId::Abap => &abap::KEYWORD_LENS,
+            LangId::Stata => &stata::KEYWORD_LENS,
+            LangId::GDScript => &gdscript::KEYWORD_LENS,
+            LangId::Prolog => &prolog::KEYWORD_LENS,
+            LangId::Agda => &agda::KEYWORD_LENS,
+            LangId::OpenCL => &opencl::KEYWORD_LENS,
+            LangId::PostScript => &postscript::KEYWORD_LENS,
+            LangId::Grain => &grain::KEYWORD_LENS,
+            LangId::Prql => &prql::KEYWORD_LENS,
+            LangId::Q => &q::KEYWORD_LENS,
+            LangId::Slang => &slang::KEYWORD_LENS,
+            LangId::AutoIt => &autoit::KEYWORD_LENS,
+            LangId::Lean => &lean::KEYWORD_LENS,
+            LangId::Uiua => &uiua::KEYWORD_LENS,
+            LangId::Bqn => &bqn::KEYWORD_LENS,
+            LangId::Cypher => &cypher::KEYWORD_LENS,
+            LangId::Gherkin => &gherkin::KEYWORD_LENS,
+            LangId::Eiffel => &eiffel::KEYWORD_LENS,
+            LangId::SuperCollider => &supercollider::KEYWORD_LENS,
+            LangId::Red => &red::KEYWORD_LENS,
+            LangId::Koka => &koka::KEYWORD_LENS,
+            LangId::Bluespec => &bluespec::KEYWORD_LENS,
+            LangId::Modula2 => &modula2::KEYWORD_LENS,
+            LangId::Rexx => &rexx::KEYWORD_LENS,
+            LangId::Rebol => &rebol::KEYWORD_LENS,
+            LangId::Factor => &factor::KEYWORD_LENS,
+            LangId::Logtalk => &logtalk::KEYWORD_LENS,
+            LangId::Sparql => &sparql::KEYWORD_LENS,
+            LangId::Chuck => &chuck::KEYWORD_LENS,
+            LangId::Io => &io::KEYWORD_LENS,
+            LangId::Pike => &pike::KEYWORD_LENS,
+            LangId::Dylan => &dylan::KEYWORD_LENS,
+            LangId::OpenSCAD => &openscad::KEYWORD_LENS,
+            LangId::P4 => &p4::KEYWORD_LENS,
+            LangId::Alloy => &alloy::KEYWORD_LENS,
+            LangId::AppleScript => &applescript::KEYWORD_LENS,
+            LangId::Carp => &carp::KEYWORD_LENS,
+            LangId::LiveScript => &livescript::KEYWORD_LENS,
+            LangId::MoonScript => &moonscript::KEYWORD_LENS,
+            LangId::Modula3 => &modula3::KEYWORD_LENS,
+            LangId::Oberon => &oberon::KEYWORD_LENS,
+            LangId::Clean => &clean::KEYWORD_LENS,
+            LangId::HolyC => &holyc::KEYWORD_LENS,
+            LangId::Clarity => &clarity::KEYWORD_LENS,
+            LangId::Pawn => &pawn::KEYWORD_LENS,
+            LangId::BlitzMax => &blitzmax::KEYWORD_LENS,
+            LangId::Asymptote => &asymptote::KEYWORD_LENS,
+            LangId::Gnuplot => &gnuplot::KEYWORD_LENS,
+            LangId::Processing => &processing::KEYWORD_LENS,
+            LangId::Mlir => &mlir::KEYWORD_LENS,
+            LangId::Txl => &txl::KEYWORD_LENS,
+            LangId::Pact => &pact::KEYWORD_LENS,
+            LangId::Arduino => &arduino::KEYWORD_LENS,
+            LangId::Vba => &vba::KEYWORD_LENS,
+            LangId::Ceylon => &ceylon::KEYWORD_LENS,
+            LangId::Fantom => &fantom::KEYWORD_LENS,
+            LangId::Xtend => &xtend::KEYWORD_LENS,
+            LangId::Abnf => &abnf::KEYWORD_LENS,
+            LangId::Al => &al::KEYWORD_LENS,
+            LangId::JLang => &j_lang::KEYWORD_LENS,
+            LangId::Spice => &spice::KEYWORD_LENS,
+            LangId::Ats => &ats::KEYWORD_LENS,
         }
     }
 
@@ -2167,6 +3895,92 @@ impl LangStats {
             LangId::Prisma => (prisma::KW_MIN_LEN, prisma::KW_MAX_LEN),
             LangId::Kdl => (kdl::KW_MIN_LEN, kdl::KW_MAX_LEN),
             LangId::CapnProto => (capnp::KW_MIN_LEN, capnp::KW_MAX_LEN),
+            LangId::Cue => (cue::KW_MIN_LEN, cue::KW_MAX_LEN),
+            LangId::Jsonnet => (jsonnet::KW_MIN_LEN, jsonnet::KW_MAX_LEN),
+            LangId::Dhall => (dhall::KW_MIN_LEN, dhall::KW_MAX_LEN),
+            LangId::Nickel => (nickel::KW_MIN_LEN, nickel::KW_MAX_LEN),
+            LangId::Bicep => (bicep::KW_MIN_LEN, bicep::KW_MAX_LEN),
+            LangId::Wit => (wit::KW_MIN_LEN, wit::KW_MAX_LEN),
+            LangId::Move => (move_lang::KW_MIN_LEN, move_lang::KW_MAX_LEN),
+            LangId::Cairo => (cairo::KW_MIN_LEN, cairo::KW_MAX_LEN),
+            LangId::Vyper => (vyper::KW_MIN_LEN, vyper::KW_MAX_LEN),
+            LangId::Fennel => (fennel::KW_MIN_LEN, fennel::KW_MAX_LEN),
+            LangId::Hy => (hy::KW_MIN_LEN, hy::KW_MAX_LEN),
+            LangId::EmacsLisp => (elisp::KW_MIN_LEN, elisp::KW_MAX_LEN),
+            LangId::Raku => (raku::KW_MIN_LEN, raku::KW_MAX_LEN),
+            LangId::Forth => (forth::KW_MIN_LEN, forth::KW_MAX_LEN),
+            LangId::Smalltalk => (smalltalk::KW_MIN_LEN, smalltalk::KW_MAX_LEN),
+            LangId::Wren => (wren::KW_MIN_LEN, wren::KW_MAX_LEN),
+            LangId::FlatBuffers => (flatbuffers::KW_MIN_LEN, flatbuffers::KW_MAX_LEN),
+            LangId::Smithy => (smithy::KW_MIN_LEN, smithy::KW_MAX_LEN),
+            LangId::Janet => (janet::KW_MIN_LEN, janet::KW_MAX_LEN),
+            LangId::Idris => (idris::KW_MIN_LEN, idris::KW_MAX_LEN),
+            LangId::Modelica => (modelica::KW_MIN_LEN, modelica::KW_MAX_LEN),
+            LangId::Stan => (stan::KW_MIN_LEN, stan::KW_MAX_LEN),
+            LangId::Shen => (shen::KW_MIN_LEN, shen::KW_MAX_LEN),
+            LangId::Firrtl => (firrtl::KW_MIN_LEN, firrtl::KW_MAX_LEN),
+            LangId::Abap => (abap::KW_MIN_LEN, abap::KW_MAX_LEN),
+            LangId::Stata => (stata::KW_MIN_LEN, stata::KW_MAX_LEN),
+            LangId::GDScript => (gdscript::KW_MIN_LEN, gdscript::KW_MAX_LEN),
+            LangId::Prolog => (prolog::KW_MIN_LEN, prolog::KW_MAX_LEN),
+            LangId::Agda => (agda::KW_MIN_LEN, agda::KW_MAX_LEN),
+            LangId::OpenCL => (opencl::KW_MIN_LEN, opencl::KW_MAX_LEN),
+            LangId::PostScript => (postscript::KW_MIN_LEN, postscript::KW_MAX_LEN),
+            LangId::Grain => (grain::KW_MIN_LEN, grain::KW_MAX_LEN),
+            LangId::Prql => (prql::KW_MIN_LEN, prql::KW_MAX_LEN),
+            LangId::Q => (q::KW_MIN_LEN, q::KW_MAX_LEN),
+            LangId::Slang => (slang::KW_MIN_LEN, slang::KW_MAX_LEN),
+            LangId::AutoIt => (autoit::KW_MIN_LEN, autoit::KW_MAX_LEN),
+            LangId::Lean => (lean::KW_MIN_LEN, lean::KW_MAX_LEN),
+            LangId::Uiua => (uiua::KW_MIN_LEN, uiua::KW_MAX_LEN),
+            LangId::Bqn => (bqn::KW_MIN_LEN, bqn::KW_MAX_LEN),
+            LangId::Cypher => (cypher::KW_MIN_LEN, cypher::KW_MAX_LEN),
+            LangId::Gherkin => (gherkin::KW_MIN_LEN, gherkin::KW_MAX_LEN),
+            LangId::Eiffel => (eiffel::KW_MIN_LEN, eiffel::KW_MAX_LEN),
+            LangId::SuperCollider => (supercollider::KW_MIN_LEN, supercollider::KW_MAX_LEN),
+            LangId::Red => (red::KW_MIN_LEN, red::KW_MAX_LEN),
+            LangId::Koka => (koka::KW_MIN_LEN, koka::KW_MAX_LEN),
+            LangId::Bluespec => (bluespec::KW_MIN_LEN, bluespec::KW_MAX_LEN),
+            LangId::Modula2 => (modula2::KW_MIN_LEN, modula2::KW_MAX_LEN),
+            LangId::Rexx => (rexx::KW_MIN_LEN, rexx::KW_MAX_LEN),
+            LangId::Rebol => (rebol::KW_MIN_LEN, rebol::KW_MAX_LEN),
+            LangId::Factor => (factor::KW_MIN_LEN, factor::KW_MAX_LEN),
+            LangId::Logtalk => (logtalk::KW_MIN_LEN, logtalk::KW_MAX_LEN),
+            LangId::Sparql => (sparql::KW_MIN_LEN, sparql::KW_MAX_LEN),
+            LangId::Chuck => (chuck::KW_MIN_LEN, chuck::KW_MAX_LEN),
+            LangId::Io => (io::KW_MIN_LEN, io::KW_MAX_LEN),
+            LangId::Pike => (pike::KW_MIN_LEN, pike::KW_MAX_LEN),
+            LangId::Dylan => (dylan::KW_MIN_LEN, dylan::KW_MAX_LEN),
+            LangId::OpenSCAD => (openscad::KW_MIN_LEN, openscad::KW_MAX_LEN),
+            LangId::P4 => (p4::KW_MIN_LEN, p4::KW_MAX_LEN),
+            LangId::Alloy => (alloy::KW_MIN_LEN, alloy::KW_MAX_LEN),
+            LangId::AppleScript => (applescript::KW_MIN_LEN, applescript::KW_MAX_LEN),
+            LangId::Carp => (carp::KW_MIN_LEN, carp::KW_MAX_LEN),
+            LangId::LiveScript => (livescript::KW_MIN_LEN, livescript::KW_MAX_LEN),
+            LangId::MoonScript => (moonscript::KW_MIN_LEN, moonscript::KW_MAX_LEN),
+            LangId::Modula3 => (modula3::KW_MIN_LEN, modula3::KW_MAX_LEN),
+            LangId::Oberon => (oberon::KW_MIN_LEN, oberon::KW_MAX_LEN),
+            LangId::Clean => (clean::KW_MIN_LEN, clean::KW_MAX_LEN),
+            LangId::HolyC => (holyc::KW_MIN_LEN, holyc::KW_MAX_LEN),
+            LangId::Clarity => (clarity::KW_MIN_LEN, clarity::KW_MAX_LEN),
+            LangId::Pawn => (pawn::KW_MIN_LEN, pawn::KW_MAX_LEN),
+            LangId::BlitzMax => (blitzmax::KW_MIN_LEN, blitzmax::KW_MAX_LEN),
+            LangId::Asymptote => (asymptote::KW_MIN_LEN, asymptote::KW_MAX_LEN),
+            LangId::Gnuplot => (gnuplot::KW_MIN_LEN, gnuplot::KW_MAX_LEN),
+            LangId::Processing => (processing::KW_MIN_LEN, processing::KW_MAX_LEN),
+            LangId::Mlir => (mlir::KW_MIN_LEN, mlir::KW_MAX_LEN),
+            LangId::Txl => (txl::KW_MIN_LEN, txl::KW_MAX_LEN),
+            LangId::Pact => (pact::KW_MIN_LEN, pact::KW_MAX_LEN),
+            LangId::Arduino => (arduino::KW_MIN_LEN, arduino::KW_MAX_LEN),
+            LangId::Vba => (vba::KW_MIN_LEN, vba::KW_MAX_LEN),
+            LangId::Ceylon => (ceylon::KW_MIN_LEN, ceylon::KW_MAX_LEN),
+            LangId::Fantom => (fantom::KW_MIN_LEN, fantom::KW_MAX_LEN),
+            LangId::Xtend => (xtend::KW_MIN_LEN, xtend::KW_MAX_LEN),
+            LangId::Abnf => (abnf::KW_MIN_LEN, abnf::KW_MAX_LEN),
+            LangId::Al => (al::KW_MIN_LEN, al::KW_MAX_LEN),
+            LangId::JLang => (j_lang::KW_MIN_LEN, j_lang::KW_MAX_LEN),
+            LangId::Spice => (spice::KW_MIN_LEN, spice::KW_MAX_LEN),
+            LangId::Ats => (ats::KW_MIN_LEN, ats::KW_MAX_LEN),
         }
     }
 
@@ -2279,6 +4093,92 @@ impl LangStats {
             LangId::Prisma => (&prisma::TOKEN_KIND, &prisma::TOKEN_LUT_LO),
             LangId::Kdl => (&kdl::TOKEN_KIND, &kdl::TOKEN_LUT_LO),
             LangId::CapnProto => (&capnp::TOKEN_KIND, &capnp::TOKEN_LUT_LO),
+            LangId::Cue => (&cue::TOKEN_KIND, &cue::TOKEN_LUT_LO),
+            LangId::Jsonnet => (&jsonnet::TOKEN_KIND, &jsonnet::TOKEN_LUT_LO),
+            LangId::Dhall => (&dhall::TOKEN_KIND, &dhall::TOKEN_LUT_LO),
+            LangId::Nickel => (&nickel::TOKEN_KIND, &nickel::TOKEN_LUT_LO),
+            LangId::Bicep => (&bicep::TOKEN_KIND, &bicep::TOKEN_LUT_LO),
+            LangId::Wit => (&wit::TOKEN_KIND, &wit::TOKEN_LUT_LO),
+            LangId::Move => (&move_lang::TOKEN_KIND, &move_lang::TOKEN_LUT_LO),
+            LangId::Cairo => (&cairo::TOKEN_KIND, &cairo::TOKEN_LUT_LO),
+            LangId::Vyper => (&vyper::TOKEN_KIND, &vyper::TOKEN_LUT_LO),
+            LangId::Fennel => (&fennel::TOKEN_KIND, &fennel::TOKEN_LUT_LO),
+            LangId::Hy => (&hy::TOKEN_KIND, &hy::TOKEN_LUT_LO),
+            LangId::EmacsLisp => (&elisp::TOKEN_KIND, &elisp::TOKEN_LUT_LO),
+            LangId::Raku => (&raku::TOKEN_KIND, &raku::TOKEN_LUT_LO),
+            LangId::Forth => (&forth::TOKEN_KIND, &forth::TOKEN_LUT_LO),
+            LangId::Smalltalk => (&smalltalk::TOKEN_KIND, &smalltalk::TOKEN_LUT_LO),
+            LangId::Wren => (&wren::TOKEN_KIND, &wren::TOKEN_LUT_LO),
+            LangId::FlatBuffers => (&flatbuffers::TOKEN_KIND, &flatbuffers::TOKEN_LUT_LO),
+            LangId::Smithy => (&smithy::TOKEN_KIND, &smithy::TOKEN_LUT_LO),
+            LangId::Janet => (&janet::TOKEN_KIND, &janet::TOKEN_LUT_LO),
+            LangId::Idris => (&idris::TOKEN_KIND, &idris::TOKEN_LUT_LO),
+            LangId::Modelica => (&modelica::TOKEN_KIND, &modelica::TOKEN_LUT_LO),
+            LangId::Stan => (&stan::TOKEN_KIND, &stan::TOKEN_LUT_LO),
+            LangId::Shen => (&shen::TOKEN_KIND, &shen::TOKEN_LUT_LO),
+            LangId::Firrtl => (&firrtl::TOKEN_KIND, &firrtl::TOKEN_LUT_LO),
+            LangId::Abap => (&abap::TOKEN_KIND, &abap::TOKEN_LUT_LO),
+            LangId::Stata => (&stata::TOKEN_KIND, &stata::TOKEN_LUT_LO),
+            LangId::GDScript => (&gdscript::TOKEN_KIND, &gdscript::TOKEN_LUT_LO),
+            LangId::Prolog => (&prolog::TOKEN_KIND, &prolog::TOKEN_LUT_LO),
+            LangId::Agda => (&agda::TOKEN_KIND, &agda::TOKEN_LUT_LO),
+            LangId::OpenCL => (&opencl::TOKEN_KIND, &opencl::TOKEN_LUT_LO),
+            LangId::PostScript => (&postscript::TOKEN_KIND, &postscript::TOKEN_LUT_LO),
+            LangId::Grain => (&grain::TOKEN_KIND, &grain::TOKEN_LUT_LO),
+            LangId::Prql => (&prql::TOKEN_KIND, &prql::TOKEN_LUT_LO),
+            LangId::Q => (&q::TOKEN_KIND, &q::TOKEN_LUT_LO),
+            LangId::Slang => (&slang::TOKEN_KIND, &slang::TOKEN_LUT_LO),
+            LangId::AutoIt => (&autoit::TOKEN_KIND, &autoit::TOKEN_LUT_LO),
+            LangId::Lean => (&lean::TOKEN_KIND, &lean::TOKEN_LUT_LO),
+            LangId::Uiua => (&uiua::TOKEN_KIND, &uiua::TOKEN_LUT_LO),
+            LangId::Bqn => (&bqn::TOKEN_KIND, &bqn::TOKEN_LUT_LO),
+            LangId::Cypher => (&cypher::TOKEN_KIND, &cypher::TOKEN_LUT_LO),
+            LangId::Gherkin => (&gherkin::TOKEN_KIND, &gherkin::TOKEN_LUT_LO),
+            LangId::Eiffel => (&eiffel::TOKEN_KIND, &eiffel::TOKEN_LUT_LO),
+            LangId::SuperCollider => (&supercollider::TOKEN_KIND, &supercollider::TOKEN_LUT_LO),
+            LangId::Red => (&red::TOKEN_KIND, &red::TOKEN_LUT_LO),
+            LangId::Koka => (&koka::TOKEN_KIND, &koka::TOKEN_LUT_LO),
+            LangId::Bluespec => (&bluespec::TOKEN_KIND, &bluespec::TOKEN_LUT_LO),
+            LangId::Modula2 => (&modula2::TOKEN_KIND, &modula2::TOKEN_LUT_LO),
+            LangId::Rexx => (&rexx::TOKEN_KIND, &rexx::TOKEN_LUT_LO),
+            LangId::Rebol => (&rebol::TOKEN_KIND, &rebol::TOKEN_LUT_LO),
+            LangId::Factor => (&factor::TOKEN_KIND, &factor::TOKEN_LUT_LO),
+            LangId::Logtalk => (&logtalk::TOKEN_KIND, &logtalk::TOKEN_LUT_LO),
+            LangId::Sparql => (&sparql::TOKEN_KIND, &sparql::TOKEN_LUT_LO),
+            LangId::Chuck => (&chuck::TOKEN_KIND, &chuck::TOKEN_LUT_LO),
+            LangId::Io => (&io::TOKEN_KIND, &io::TOKEN_LUT_LO),
+            LangId::Pike => (&pike::TOKEN_KIND, &pike::TOKEN_LUT_LO),
+            LangId::Dylan => (&dylan::TOKEN_KIND, &dylan::TOKEN_LUT_LO),
+            LangId::OpenSCAD => (&openscad::TOKEN_KIND, &openscad::TOKEN_LUT_LO),
+            LangId::P4 => (&p4::TOKEN_KIND, &p4::TOKEN_LUT_LO),
+            LangId::Alloy => (&alloy::TOKEN_KIND, &alloy::TOKEN_LUT_LO),
+            LangId::AppleScript => (&applescript::TOKEN_KIND, &applescript::TOKEN_LUT_LO),
+            LangId::Carp => (&carp::TOKEN_KIND, &carp::TOKEN_LUT_LO),
+            LangId::LiveScript => (&livescript::TOKEN_KIND, &livescript::TOKEN_LUT_LO),
+            LangId::MoonScript => (&moonscript::TOKEN_KIND, &moonscript::TOKEN_LUT_LO),
+            LangId::Modula3 => (&modula3::TOKEN_KIND, &modula3::TOKEN_LUT_LO),
+            LangId::Oberon => (&oberon::TOKEN_KIND, &oberon::TOKEN_LUT_LO),
+            LangId::Clean => (&clean::TOKEN_KIND, &clean::TOKEN_LUT_LO),
+            LangId::HolyC => (&holyc::TOKEN_KIND, &holyc::TOKEN_LUT_LO),
+            LangId::Clarity => (&clarity::TOKEN_KIND, &clarity::TOKEN_LUT_LO),
+            LangId::Pawn => (&pawn::TOKEN_KIND, &pawn::TOKEN_LUT_LO),
+            LangId::BlitzMax => (&blitzmax::TOKEN_KIND, &blitzmax::TOKEN_LUT_LO),
+            LangId::Asymptote => (&asymptote::TOKEN_KIND, &asymptote::TOKEN_LUT_LO),
+            LangId::Gnuplot => (&gnuplot::TOKEN_KIND, &gnuplot::TOKEN_LUT_LO),
+            LangId::Processing => (&processing::TOKEN_KIND, &processing::TOKEN_LUT_LO),
+            LangId::Mlir => (&mlir::TOKEN_KIND, &mlir::TOKEN_LUT_LO),
+            LangId::Txl => (&txl::TOKEN_KIND, &txl::TOKEN_LUT_LO),
+            LangId::Pact => (&pact::TOKEN_KIND, &pact::TOKEN_LUT_LO),
+            LangId::Arduino => (&arduino::TOKEN_KIND, &arduino::TOKEN_LUT_LO),
+            LangId::Vba => (&vba::TOKEN_KIND, &vba::TOKEN_LUT_LO),
+            LangId::Ceylon => (&ceylon::TOKEN_KIND, &ceylon::TOKEN_LUT_LO),
+            LangId::Fantom => (&fantom::TOKEN_KIND, &fantom::TOKEN_LUT_LO),
+            LangId::Xtend => (&xtend::TOKEN_KIND, &xtend::TOKEN_LUT_LO),
+            LangId::Abnf => (&abnf::TOKEN_KIND, &abnf::TOKEN_LUT_LO),
+            LangId::Al => (&al::TOKEN_KIND, &al::TOKEN_LUT_LO),
+            LangId::JLang => (&j_lang::TOKEN_KIND, &j_lang::TOKEN_LUT_LO),
+            LangId::Spice => (&spice::TOKEN_KIND, &spice::TOKEN_LUT_LO),
+            LangId::Ats => (&ats::TOKEN_KIND, &ats::TOKEN_LUT_LO),
         }
     }
 }
@@ -2288,24 +4188,24 @@ fn has_stem(name: &[u8], dot_idx: usize) -> bool {
     dot_idx > 0 && name[dot_idx - 1] != b'/' && name[dot_idx - 1] != b'\\'
 }
 
-#[inline(always)]
-pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
-    if (enabled_mask & LANG_MAKEFILE_MASK) != 0 && (name == b"Makefile" || name == b"makefile" || name == b"GNUmakefile") {
+#[inline]
+pub fn detect_language(name: &[u8], enabled_mask: LangMask) -> Option<LangId> {
+    if enabled_mask.has(LangId::Makefile) && (name == b"Makefile" || name == b"makefile" || name == b"GNUmakefile") {
         return Some(LangId::Makefile);
     }
-    if (enabled_mask & LANG_DOCKERFILE_MASK) != 0 && (name == b"Dockerfile" || name == b"dockerfile" || name.starts_with(b"Dockerfile.") || name.starts_with(b"dockerfile.")) {
+    if enabled_mask.has(LangId::Dockerfile) && (name == b"Dockerfile" || name == b"dockerfile" || name.starts_with(b"Dockerfile.") || name.starts_with(b"dockerfile.")) {
         return Some(LangId::Dockerfile);
     }
-    if (enabled_mask & LANG_CMAKE_MASK) != 0 && (name == b"CMakeLists.txt" || name == b"cmakelists.txt") {
+    if enabled_mask.has(LangId::CMake) && (name == b"CMakeLists.txt" || name == b"cmakelists.txt") {
         return Some(LangId::CMake);
     }
-    if (enabled_mask & LANG_MESON_MASK) != 0 && (name == b"meson.build" || name == b"meson_options.txt") {
+    if enabled_mask.has(LangId::Meson) && (name == b"meson.build" || name == b"meson_options.txt") {
         return Some(LangId::Meson);
     }
-    if (enabled_mask & LANG_STARLARK_MASK) != 0 && (name == b"BUILD" || name == b"BUILD.bazel" || name == b"WORKSPACE" || name == b"WORKSPACE.bazel") {
+    if enabled_mask.has(LangId::Starlark) && (name == b"BUILD" || name == b"BUILD.bazel" || name == b"WORKSPACE" || name == b"WORKSPACE.bazel") {
         return Some(LangId::Starlark);
     }
-    if (enabled_mask & LANG_JUSTFILE_MASK) != 0 && (name == b"justfile" || name == b"Justfile" || name == b".justfile") {
+    if enabled_mask.has(LangId::Justfile) && (name == b"justfile" || name == b"Justfile" || name == b".justfile") {
         return Some(LangId::Justfile);
     }
     let len = name.len();
@@ -2317,36 +4217,39 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             return None;
         }
         match name[len - 1] | 0x20 {
-            b'c' if (enabled_mask & LANG_C_MASK) != 0 => return Some(LangId::C),
-            b'd' if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
-            b'f' if (enabled_mask & LANG_FORTRAN_MASK) != 0 => return Some(LangId::Fortran),
+            b'c' if enabled_mask.has(LangId::C) => return Some(LangId::C),
+            b'd' if enabled_mask.has(LangId::D) => return Some(LangId::D),
+            b'f' if enabled_mask.has(LangId::Fortran) => return Some(LangId::Fortran),
             b'h' => {
-                if (enabled_mask & LANG_CHEADER_MASK) != 0 {
+                if enabled_mask.has(LangId::CHeader) {
                     return Some(LangId::CHeader);
                 }
-                if (enabled_mask & LANG_CPPHEADER_MASK) != 0 {
+                if enabled_mask.has(LangId::CppHeader) {
                     return Some(LangId::CppHeader);
                 }
             }
-            b't' if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
-            b'r' if (enabled_mask & LANG_R_MASK) != 0 => return Some(LangId::R),
+            b't' if enabled_mask.has(LangId::Perl) => return Some(LangId::Perl),
+            b'r' if enabled_mask.has(LangId::R) => return Some(LangId::R),
             b'm' => {
-                if (enabled_mask & LANG_MATLAB_MASK) != 0 {
+                if enabled_mask.has(LangId::Matlab) {
                     return Some(LangId::Matlab);
                 }
-                if (enabled_mask & LANG_OBJECTIVEC_MASK) != 0 {
+                if enabled_mask.has(LangId::ObjectiveC) {
                     return Some(LangId::ObjectiveC);
                 }
             }
             b'v' => {
-                if (enabled_mask & LANG_VERILOG_MASK) != 0 {
+                if enabled_mask.has(LangId::Verilog) {
                     return Some(LangId::Verilog);
                 }
-                if (enabled_mask & LANG_V_MASK) != 0 {
+                if enabled_mask.has(LangId::V) {
                     return Some(LangId::V);
                 }
             }
-            b's' if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
+            b's' if enabled_mask.has(LangId::Assembly) => return Some(LangId::Assembly),
+            b'q' if enabled_mask.has(LangId::Q) => return Some(LangId::Q),
+            b'p' if enabled_mask.has(LangId::Prolog) => return Some(LangId::Prolog),
+            b'e' if enabled_mask.has(LangId::Eiffel) => return Some(LangId::Eiffel),
             _ => {}
         }
         return None;
@@ -2357,43 +4260,73 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
         let ext = [name[len - 2] | 0x20, name[len - 1] | 0x20];
         match &ext {
-            b"rs" if (enabled_mask & LANG_RUST_MASK) != 0 => return Some(LangId::Rust),
-            b"hs" if (enabled_mask & LANG_HASKELL_MASK) != 0 => return Some(LangId::Haskell),
-            b"cc" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
-            b"hh" if (enabled_mask & LANG_CPPHEADER_MASK) != 0 => return Some(LangId::CppHeader),
-            b"py" if (enabled_mask & LANG_PYTHON_MASK) != 0 => return Some(LangId::Python),
-            b"pl" | b"pm" if (enabled_mask & LANG_PERL_MASK) != 0 => return Some(LangId::Perl),
-            b"go" if (enabled_mask & LANG_GO_MASK) != 0 => return Some(LangId::Go),
-            b"js" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
+            b"rs" if enabled_mask.has(LangId::Rust) => return Some(LangId::Rust),
+            b"hs" if enabled_mask.has(LangId::Haskell) => return Some(LangId::Haskell),
+            b"cc" if enabled_mask.has(LangId::Cpp) => return Some(LangId::Cpp),
+            b"hh" if enabled_mask.has(LangId::CppHeader) => return Some(LangId::CppHeader),
+            b"py" if enabled_mask.has(LangId::Python) => return Some(LangId::Python),
+            b"pl" | b"pm" if enabled_mask.has(LangId::Perl) => return Some(LangId::Perl),
+            b"go" if enabled_mask.has(LangId::Go) => return Some(LangId::Go),
+            b"js" if enabled_mask.has(LangId::JavaScript) => {
                 return Some(LangId::JavaScript);
             }
-            b"ts" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
+            b"ts" if enabled_mask.has(LangId::TypeScript) => {
                 return Some(LangId::TypeScript);
             }
-            b"cs" if (enabled_mask & LANG_CSHARP_MASK) != 0 => return Some(LangId::CSharp),
-            b"rb" if (enabled_mask & LANG_RUBY_MASK) != 0 => return Some(LangId::Ruby),
-            b"kt" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
-            b"sh" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
-            b"sc" if (enabled_mask & LANG_SCALA_MASK) != 0 => return Some(LangId::Scala),
-            b"ml" if (enabled_mask & LANG_OCAML_MASK) != 0 => return Some(LangId::OCaml),
-            b"di" if (enabled_mask & LANG_D_MASK) != 0 => return Some(LangId::D),
-            b"ex" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
-            b"jl" if (enabled_mask & LANG_JULIA_MASK) != 0 => return Some(LangId::Julia),
-            b"fs" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
-            b"vh" if (enabled_mask & LANG_VERILOG_MASK) != 0 => return Some(LangId::Verilog),
-            b"sv" if (enabled_mask & LANG_SYSTEMVERILOG_MASK) != 0 => return Some(LangId::SystemVerilog),
-            b"cu" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
-            b"ss" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
-            b"mk" if (enabled_mask & LANG_MAKEFILE_MASK) != 0 => return Some(LangId::Makefile),
-            b"mm" if (enabled_mask & LANG_OBJECTIVECPP_MASK) != 0 => return Some(LangId::ObjectiveCpp),
-            b"ha" if (enabled_mask & LANG_HARE_MASK) != 0 => return Some(LangId::Hare),
-            b"cl" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
-            b"pp" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
-            b"tf" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
-            b"ll" if (enabled_mask & LANG_LLVM_MASK) != 0 => return Some(LangId::Llvm),
-            b"as" if (enabled_mask & LANG_ACTIONSCRIPT_MASK) != 0 => return Some(LangId::ActionScript),
-            b"cr" if (enabled_mask & LANG_CRYSTAL_MASK) != 0 => return Some(LangId::Crystal),
-            b"hx" if (enabled_mask & LANG_HAXE_MASK) != 0 => return Some(LangId::Haxe),
+            b"cs" if enabled_mask.has(LangId::CSharp) => return Some(LangId::CSharp),
+            b"rb" if enabled_mask.has(LangId::Ruby) => return Some(LangId::Ruby),
+            b"kt" if enabled_mask.has(LangId::Kotlin) => return Some(LangId::Kotlin),
+            b"sh" if enabled_mask.has(LangId::Bash) => return Some(LangId::Bash),
+            b"sc" if enabled_mask.has(LangId::Scala) => return Some(LangId::Scala),
+            b"ml" if enabled_mask.has(LangId::OCaml) => return Some(LangId::OCaml),
+            b"di" if enabled_mask.has(LangId::D) => return Some(LangId::D),
+            b"ex" if enabled_mask.has(LangId::Elixir) => return Some(LangId::Elixir),
+            b"jl" if enabled_mask.has(LangId::Julia) => return Some(LangId::Julia),
+            b"fs" if enabled_mask.has(LangId::FSharp) => return Some(LangId::FSharp),
+            b"vh" if enabled_mask.has(LangId::Verilog) => return Some(LangId::Verilog),
+            b"sv" if enabled_mask.has(LangId::SystemVerilog) => return Some(LangId::SystemVerilog),
+            b"cu" if enabled_mask.has(LangId::Cuda) => return Some(LangId::Cuda),
+            b"ss" if enabled_mask.has(LangId::Scheme) => return Some(LangId::Scheme),
+            b"mk" if enabled_mask.has(LangId::Makefile) => return Some(LangId::Makefile),
+            b"mm" if enabled_mask.has(LangId::ObjectiveCpp) => return Some(LangId::ObjectiveCpp),
+            b"ha" if enabled_mask.has(LangId::Hare) => return Some(LangId::Hare),
+            b"cl" => {
+                if enabled_mask.has(LangId::CommonLisp) {
+                    return Some(LangId::CommonLisp);
+                }
+                if enabled_mask.has(LangId::OpenCL) {
+                    return Some(LangId::OpenCL);
+                }
+            }
+            b"pp" if enabled_mask.has(LangId::Pascal) => return Some(LangId::Pascal),
+            b"tf" if enabled_mask.has(LangId::Hcl) => return Some(LangId::Hcl),
+            b"ll" if enabled_mask.has(LangId::Llvm) => return Some(LangId::Llvm),
+            b"as" if enabled_mask.has(LangId::ActionScript) => return Some(LangId::ActionScript),
+            b"cr" if enabled_mask.has(LangId::Crystal) => return Some(LangId::Crystal),
+            b"hx" if enabled_mask.has(LangId::Haxe) => return Some(LangId::Haxe),
+            b"vy" if enabled_mask.has(LangId::Vyper) => return Some(LangId::Vyper),
+            b"hy" if enabled_mask.has(LangId::Hy) => return Some(LangId::Hy),
+            b"el" if enabled_mask.has(LangId::EmacsLisp) => return Some(LangId::EmacsLisp),
+            b"st" if enabled_mask.has(LangId::Smalltalk) => return Some(LangId::Smalltalk),
+            b"mo" if enabled_mask.has(LangId::Modelica) => return Some(LangId::Modelica),
+            b"do" if enabled_mask.has(LangId::Stata) => return Some(LangId::Stata),
+            b"gd" if enabled_mask.has(LangId::GDScript) => return Some(LangId::GDScript),
+            b"ps" if enabled_mask.has(LangId::PostScript) => return Some(LangId::PostScript),
+            b"gr" if enabled_mask.has(LangId::Grain) => return Some(LangId::Grain),
+            b"ua" if enabled_mask.has(LangId::Uiua) => return Some(LangId::Uiua),
+            b"kk" if enabled_mask.has(LangId::Koka) => return Some(LangId::Koka),
+            b"m2" if enabled_mask.has(LangId::Modula2) => return Some(LangId::Modula2),
+            b"rq" if enabled_mask.has(LangId::Sparql) => return Some(LangId::Sparql),
+            b"ck" if enabled_mask.has(LangId::Chuck) => return Some(LangId::Chuck),
+            b"io" if enabled_mask.has(LangId::Io) => return Some(LangId::Io),
+            b"p4" if enabled_mask.has(LangId::P4) => return Some(LangId::P4),
+            b"hc" if enabled_mask.has(LangId::HolyC) => return Some(LangId::HolyC),
+            b"bb" if enabled_mask.has(LangId::BlitzMax) => return Some(LangId::BlitzMax),
+            b"gp" if enabled_mask.has(LangId::Gnuplot) => return Some(LangId::Gnuplot),
+            b"ls" if enabled_mask.has(LangId::LiveScript) => return Some(LangId::LiveScript),
+            b"m3" | b"i3" if enabled_mask.has(LangId::Modula3) => return Some(LangId::Modula3),
+            b"al" if enabled_mask.has(LangId::Al) => return Some(LangId::Al),
+            b"sp" if enabled_mask.has(LangId::Spice) => return Some(LangId::Spice),
             _ => {}
         }
         return None;
@@ -2408,86 +4341,125 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 1] | 0x20,
         ];
         match &ext {
-            b"cpp" | b"cxx" | b"c++" if (enabled_mask & LANG_CPP_MASK) != 0 => {
+            b"cpp" | b"cxx" | b"c++" if enabled_mask.has(LangId::Cpp) => {
                 return Some(LangId::Cpp);
             }
             b"hpp" | b"hxx" | b"h++" | b"ipp" | b"inl" | b"ixx"
-                if (enabled_mask & LANG_CPPHEADER_MASK) != 0 =>
+                if enabled_mask.has(LangId::CppHeader) =>
             {
                 return Some(LangId::CppHeader);
             }
-            b"pyi" | b"pyw" if (enabled_mask & LANG_PYTHON_MASK) != 0 => {
+            b"pyi" | b"pyw" if enabled_mask.has(LangId::Python) => {
                 return Some(LangId::Python);
             }
-            b"lua" if (enabled_mask & LANG_LUA_MASK) != 0 => return Some(LangId::Lua),
-            b"lhs" if (enabled_mask & LANG_HASKELL_MASK) != 0 => return Some(LangId::Haskell),
-            b"mli" if (enabled_mask & LANG_OCAML_MASK) != 0 => return Some(LangId::OCaml),
-            b"zig" | b"zon" if (enabled_mask & LANG_ZIG_MASK) != 0 => return Some(LangId::Zig),
-            b"mjs" | b"cjs" | b"jsx" if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 => {
+            b"lua" if enabled_mask.has(LangId::Lua) => return Some(LangId::Lua),
+            b"lhs" if enabled_mask.has(LangId::Haskell) => return Some(LangId::Haskell),
+            b"mli" if enabled_mask.has(LangId::OCaml) => return Some(LangId::OCaml),
+            b"zig" | b"zon" if enabled_mask.has(LangId::Zig) => return Some(LangId::Zig),
+            b"mjs" | b"cjs" | b"jsx" if enabled_mask.has(LangId::JavaScript) => {
                 return Some(LangId::JavaScript);
             }
-            b"mts" | b"cts" | b"tsx" if (enabled_mask & LANG_TYPESCRIPT_MASK) != 0 => {
+            b"mts" | b"cts" | b"tsx" if enabled_mask.has(LangId::TypeScript) => {
                 return Some(LangId::TypeScript);
             }
-            b"php" if (enabled_mask & LANG_PHP_MASK) != 0 => return Some(LangId::Php),
-            b"kts" if (enabled_mask & LANG_KOTLIN_MASK) != 0 => return Some(LangId::Kotlin),
-            b"sql" if (enabled_mask & LANG_SQL_MASK) != 0 => return Some(LangId::Sql),
-            b"nim" if (enabled_mask & LANG_NIM_MASK) != 0 => return Some(LangId::Nim),
+            b"php" if enabled_mask.has(LangId::Php) => return Some(LangId::Php),
+            b"kts" if enabled_mask.has(LangId::Kotlin) => return Some(LangId::Kotlin),
+            b"sql" if enabled_mask.has(LangId::Sql) => return Some(LangId::Sql),
+            b"nim" if enabled_mask.has(LangId::Nim) => return Some(LangId::Nim),
             b"for" | b"f90" | b"f95" | b"f03" | b"f08"
-                if (enabled_mask & LANG_FORTRAN_MASK) != 0 =>
+                if enabled_mask.has(LangId::Fortran) =>
             {
                 return Some(LangId::Fortran);
             }
-            b"exs" if (enabled_mask & LANG_ELIXIR_MASK) != 0 => return Some(LangId::Elixir),
-            b"erl" | b"hrl" if (enabled_mask & LANG_ERLANG_MASK) != 0 => {
+            b"exs" if enabled_mask.has(LangId::Elixir) => return Some(LangId::Elixir),
+            b"erl" | b"hrl" if enabled_mask.has(LangId::Erlang) => {
                 return Some(LangId::Erlang);
             }
-            b"sol" if (enabled_mask & LANG_SOLIDITY_MASK) != 0 => return Some(LangId::Solidity),
-            b"fsi" | b"fsx" if (enabled_mask & LANG_FSHARP_MASK) != 0 => return Some(LangId::FSharp),
-            b"svh" if (enabled_mask & LANG_SYSTEMVERILOG_MASK) != 0 => return Some(LangId::SystemVerilog),
-            b"cuh" if (enabled_mask & LANG_CUDA_MASK) != 0 => return Some(LangId::Cuda),
-            b"adb" | b"ads" if (enabled_mask & LANG_ADA_MASK) != 0 => return Some(LangId::Ada),
-            b"gvy" if (enabled_mask & LANG_GROOVY_MASK) != 0 => return Some(LangId::Groovy),
-            b"clj" | b"edn" if (enabled_mask & LANG_CLOJURE_MASK) != 0 => return Some(LangId::Clojure),
-            b"asm" if (enabled_mask & LANG_ASSEMBLY_MASK) != 0 => return Some(LangId::Assembly),
-            b"tcl" if (enabled_mask & LANG_TCL_MASK) != 0 => return Some(LangId::Tcl),
-            b"scm" if (enabled_mask & LANG_SCHEME_MASK) != 0 => return Some(LangId::Scheme),
-            b"rkt" if (enabled_mask & LANG_RACKET_MASK) != 0 => return Some(LangId::Racket),
-            b"yml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
-            b"vsh" if (enabled_mask & LANG_V_MASK) != 0 => return Some(LangId::V),
-            b"lsp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
-            b"pas" if (enabled_mask & LANG_PASCAL_MASK) != 0 => return Some(LangId::Pascal),
-            b"ps1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
-            b"awk" if (enabled_mask & LANG_AWK_MASK) != 0 => return Some(LangId::Awk),
-            b"htm" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
-            b"xml" if (enabled_mask & LANG_XML_MASK) != 0 => return Some(LangId::Xml),
-            b"css" if (enabled_mask & LANG_CSS_MASK) != 0 => return Some(LangId::Css),
-            b"gql" if (enabled_mask & LANG_GRAPHQL_MASK) != 0 => return Some(LangId::Graphql),
-            b"cbl" | b"cob" | b"cpy" if (enabled_mask & LANG_COBOL_MASK) != 0 => return Some(LangId::Cobol),
-            b"vhd" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
-            b"nix" if (enabled_mask & LANG_NIX_MASK) != 0 => return Some(LangId::Nix),
-            b"hcl" if (enabled_mask & LANG_HCL_MASK) != 0 => return Some(LangId::Hcl),
-            b"wat" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
-            b"tex" | b"sty" if (enabled_mask & LANG_TEX_MASK) != 0 => return Some(LangId::Tex),
+            b"sol" if enabled_mask.has(LangId::Solidity) => return Some(LangId::Solidity),
+            b"fsi" | b"fsx" if enabled_mask.has(LangId::FSharp) => return Some(LangId::FSharp),
+            b"svh" if enabled_mask.has(LangId::SystemVerilog) => return Some(LangId::SystemVerilog),
+            b"cuh" if enabled_mask.has(LangId::Cuda) => return Some(LangId::Cuda),
+            b"adb" | b"ads" if enabled_mask.has(LangId::Ada) => return Some(LangId::Ada),
+            b"gvy" if enabled_mask.has(LangId::Groovy) => return Some(LangId::Groovy),
+            b"clj" | b"edn" if enabled_mask.has(LangId::Clojure) => return Some(LangId::Clojure),
+            b"asm" if enabled_mask.has(LangId::Assembly) => return Some(LangId::Assembly),
+            b"tcl" if enabled_mask.has(LangId::Tcl) => return Some(LangId::Tcl),
+            b"scm" if enabled_mask.has(LangId::Scheme) => return Some(LangId::Scheme),
+            b"rkt" if enabled_mask.has(LangId::Racket) => return Some(LangId::Racket),
+            b"yml" if enabled_mask.has(LangId::Yaml) => return Some(LangId::Yaml),
+            b"vsh" if enabled_mask.has(LangId::V) => return Some(LangId::V),
+            b"lsp" if enabled_mask.has(LangId::CommonLisp) => return Some(LangId::CommonLisp),
+            b"pas" if enabled_mask.has(LangId::Pascal) => return Some(LangId::Pascal),
+            b"ps1" if enabled_mask.has(LangId::PowerShell) => return Some(LangId::PowerShell),
+            b"awk" if enabled_mask.has(LangId::Awk) => return Some(LangId::Awk),
+            b"htm" if enabled_mask.has(LangId::Html) => return Some(LangId::Html),
+            b"xml" if enabled_mask.has(LangId::Xml) => return Some(LangId::Xml),
+            b"css" if enabled_mask.has(LangId::Css) => return Some(LangId::Css),
+            b"gql" if enabled_mask.has(LangId::Graphql) => return Some(LangId::Graphql),
+            b"cbl" | b"cob" | b"cpy" if enabled_mask.has(LangId::Cobol) => return Some(LangId::Cobol),
+            b"vhd" if enabled_mask.has(LangId::Vhdl) => return Some(LangId::Vhdl),
+            b"nix" if enabled_mask.has(LangId::Nix) => return Some(LangId::Nix),
+            b"hcl" if enabled_mask.has(LangId::Hcl) => return Some(LangId::Hcl),
+            b"wat" if enabled_mask.has(LangId::Wat) => return Some(LangId::Wat),
+            b"tex" | b"sty" if enabled_mask.has(LangId::Tex) => return Some(LangId::Tex),
             b"cls" => {
-                if (enabled_mask & LANG_TEX_MASK) != 0 {
+                if enabled_mask.has(LangId::Tex) {
                     return Some(LangId::Tex);
                 }
-                if (enabled_mask & LANG_APEX_MASK) != 0 {
+                if enabled_mask.has(LangId::Apex) {
                     return Some(LangId::Apex);
                 }
+                if enabled_mask.has(LangId::Vba) {
+                    return Some(LangId::Vba);
+                }
             }
-            b"elm" if (enabled_mask & LANG_ELM_MASK) != 0 => return Some(LangId::Elm),
-            b"sml" | b"sig" if (enabled_mask & LANG_SML_MASK) != 0 => return Some(LangId::Sml),
-            b"bzl" if (enabled_mask & LANG_STARLARK_MASK) != 0 => return Some(LangId::Starlark),
-            b"vue" if (enabled_mask & LANG_VUE_MASK) != 0 => return Some(LangId::Vue),
-            b"ahk" if (enabled_mask & LANG_AUTOHOTKEY_MASK) != 0 => return Some(LangId::AutoHotkey),
-            b"bal" if (enabled_mask & LANG_BALLERINA_MASK) != 0 => return Some(LangId::Ballerina),
-            b"vim" if (enabled_mask & LANG_VIMSCRIPT_MASK) != 0 => return Some(LangId::VimScript),
-            b"bat" | b"cmd" if (enabled_mask & LANG_BATCH_MASK) != 0 => return Some(LangId::Batch),
-            b"qml" if (enabled_mask & LANG_QML_MASK) != 0 => return Some(LangId::Qml),
-            b"ron" if (enabled_mask & LANG_RON_MASK) != 0 => return Some(LangId::Ron),
-            b"kdl" if (enabled_mask & LANG_KDL_MASK) != 0 => return Some(LangId::Kdl),
+            b"elm" if enabled_mask.has(LangId::Elm) => return Some(LangId::Elm),
+            b"sml" | b"sig" if enabled_mask.has(LangId::Sml) => return Some(LangId::Sml),
+            b"bzl" if enabled_mask.has(LangId::Starlark) => return Some(LangId::Starlark),
+            b"vue" if enabled_mask.has(LangId::Vue) => return Some(LangId::Vue),
+            b"ahk" if enabled_mask.has(LangId::AutoHotkey) => return Some(LangId::AutoHotkey),
+            b"bal" if enabled_mask.has(LangId::Ballerina) => return Some(LangId::Ballerina),
+            b"vim" if enabled_mask.has(LangId::VimScript) => return Some(LangId::VimScript),
+            b"bat" | b"cmd" if enabled_mask.has(LangId::Batch) => return Some(LangId::Batch),
+            b"qml" if enabled_mask.has(LangId::Qml) => return Some(LangId::Qml),
+            b"ron" if enabled_mask.has(LangId::Ron) => return Some(LangId::Ron),
+            b"kdl" if enabled_mask.has(LangId::Kdl) => return Some(LangId::Kdl),
+            b"cue" if enabled_mask.has(LangId::Cue) => return Some(LangId::Cue),
+            b"ncl" if enabled_mask.has(LangId::Nickel) => return Some(LangId::Nickel),
+            b"wit" if enabled_mask.has(LangId::Wit) => return Some(LangId::Wit),
+            b"fnl" if enabled_mask.has(LangId::Fennel) => return Some(LangId::Fennel),
+            b"fth" | b"4th" if enabled_mask.has(LangId::Forth) => return Some(LangId::Forth),
+            b"fbs" if enabled_mask.has(LangId::FlatBuffers) => return Some(LangId::FlatBuffers),
+            b"idr" if enabled_mask.has(LangId::Idris) => return Some(LangId::Idris),
+            b"fir" if enabled_mask.has(LangId::Firrtl) => return Some(LangId::Firrtl),
+            b"ado" if enabled_mask.has(LangId::Stata) => return Some(LangId::Stata),
+            b"pro" if enabled_mask.has(LangId::Prolog) => return Some(LangId::Prolog),
+            b"eps" if enabled_mask.has(LangId::PostScript) => return Some(LangId::PostScript),
+            b"au3" if enabled_mask.has(LangId::AutoIt) => return Some(LangId::AutoIt),
+            b"ocl" if enabled_mask.has(LangId::OpenCL) => return Some(LangId::OpenCL),
+            b"bqn" if enabled_mask.has(LangId::Bqn) => return Some(LangId::Bqn),
+            b"cyp" if enabled_mask.has(LangId::Cypher) => return Some(LangId::Cypher),
+            b"scd" if enabled_mask.has(LangId::SuperCollider) => return Some(LangId::SuperCollider),
+            b"red" if enabled_mask.has(LangId::Red) => return Some(LangId::Red),
+            b"bsv" if enabled_mask.has(LangId::Bluespec) => return Some(LangId::Bluespec),
+            b"mod" if enabled_mask.has(LangId::Modula2) => return Some(LangId::Modula2),
+            b"rex" if enabled_mask.has(LangId::Rexx) => return Some(LangId::Rexx),
+            b"reb" if enabled_mask.has(LangId::Rebol) => return Some(LangId::Rebol),
+            b"lgt" if enabled_mask.has(LangId::Logtalk) => return Some(LangId::Logtalk),
+            b"dyl" if enabled_mask.has(LangId::Dylan) => return Some(LangId::Dylan),
+            b"als" if enabled_mask.has(LangId::Alloy) => return Some(LangId::Alloy),
+            b"obn" if enabled_mask.has(LangId::Oberon) => return Some(LangId::Oberon),
+            b"icl" | b"dcl" if enabled_mask.has(LangId::Clean) => return Some(LangId::Clean),
+            b"pwn" if enabled_mask.has(LangId::Pawn) => return Some(LangId::Pawn),
+            b"bmx" if enabled_mask.has(LangId::BlitzMax) => return Some(LangId::BlitzMax),
+            b"asy" if enabled_mask.has(LangId::Asymptote) => return Some(LangId::Asymptote),
+            b"pde" if enabled_mask.has(LangId::Processing) => return Some(LangId::Processing),
+            b"txl" if enabled_mask.has(LangId::Txl) => return Some(LangId::Txl),
+            b"ino" if enabled_mask.has(LangId::Arduino) => return Some(LangId::Arduino),
+            b"vba" | b"bas" | b"frm" if enabled_mask.has(LangId::Vba) => return Some(LangId::Vba),
+            b"fan" if enabled_mask.has(LangId::Fantom) => return Some(LangId::Fantom),
+            b"cir" if enabled_mask.has(LangId::Spice) => return Some(LangId::Spice),
+            b"ijs" if enabled_mask.has(LangId::JLang) => return Some(LangId::JLang),
             _ => {}
         }
         return None;
@@ -2503,40 +4475,63 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 1] | 0x20,
         ];
         match &ext {
-            b"odin" if (enabled_mask & LANG_ODIN_MASK) != 0 => return Some(LangId::Odin),
-            b"cppm" if (enabled_mask & LANG_CPP_MASK) != 0 => return Some(LangId::Cpp),
-            b"java" if (enabled_mask & LANG_JAVA_MASK) != 0 => return Some(LangId::Java),
-            b"bash" if (enabled_mask & LANG_BASH_MASK) != 0 => return Some(LangId::Bash),
-            b"dart" if (enabled_mask & LANG_DART_MASK) != 0 => return Some(LangId::Dart),
-            b"nims" if (enabled_mask & LANG_NIM_MASK) != 0 => return Some(LangId::Nim),
-            b"mojo" if (enabled_mask & LANG_MOJO_MASK) != 0 => return Some(LangId::Mojo),
-            b"wgsl" if (enabled_mask & LANG_WGSL_MASK) != 0 => return Some(LangId::Wgsl),
-            b"cljs" | b"cljc" if (enabled_mask & LANG_CLOJURE_MASK) != 0 => return Some(LangId::Clojure),
-            b"json" if (enabled_mask & LANG_JSON_MASK) != 0 => return Some(LangId::Json),
-            b"toml" if (enabled_mask & LANG_TOML_MASK) != 0 => return Some(LangId::Toml),
-            b"yaml" if (enabled_mask & LANG_YAML_MASK) != 0 => return Some(LangId::Yaml),
-            b"glsl" | b"vert" | b"frag" | b"geom" | b"comp" if (enabled_mask & LANG_GLSL_MASK) != 0 => return Some(LangId::Glsl),
-            b"hlsl" if (enabled_mask & LANG_HLSL_MASK) != 0 => return Some(LangId::Hlsl),
-            b"lisp" if (enabled_mask & LANG_COMMONLISP_MASK) != 0 => return Some(LangId::CommonLisp),
-            b"psm1" | b"psd1" if (enabled_mask & LANG_POWERSHELL_MASK) != 0 => return Some(LangId::PowerShell),
-            b"fish" if (enabled_mask & LANG_FISH_MASK) != 0 => return Some(LangId::Fish),
-            b"html" if (enabled_mask & LANG_HTML_MASK) != 0 => return Some(LangId::Html),
+            b"odin" if enabled_mask.has(LangId::Odin) => return Some(LangId::Odin),
+            b"cppm" if enabled_mask.has(LangId::Cpp) => return Some(LangId::Cpp),
+            b"java" if enabled_mask.has(LangId::Java) => return Some(LangId::Java),
+            b"bash" if enabled_mask.has(LangId::Bash) => return Some(LangId::Bash),
+            b"dart" if enabled_mask.has(LangId::Dart) => return Some(LangId::Dart),
+            b"nims" if enabled_mask.has(LangId::Nim) => return Some(LangId::Nim),
+            b"mojo" if enabled_mask.has(LangId::Mojo) => return Some(LangId::Mojo),
+            b"wgsl" if enabled_mask.has(LangId::Wgsl) => return Some(LangId::Wgsl),
+            b"cljs" | b"cljc" if enabled_mask.has(LangId::Clojure) => return Some(LangId::Clojure),
+            b"json" if enabled_mask.has(LangId::Json) => return Some(LangId::Json),
+            b"toml" if enabled_mask.has(LangId::Toml) => return Some(LangId::Toml),
+            b"yaml" if enabled_mask.has(LangId::Yaml) => return Some(LangId::Yaml),
+            b"glsl" | b"vert" | b"frag" | b"geom" | b"comp" if enabled_mask.has(LangId::Glsl) => return Some(LangId::Glsl),
+            b"hlsl" if enabled_mask.has(LangId::Hlsl) => return Some(LangId::Hlsl),
+            b"lisp" if enabled_mask.has(LangId::CommonLisp) => return Some(LangId::CommonLisp),
+            b"psm1" | b"psd1" if enabled_mask.has(LangId::PowerShell) => return Some(LangId::PowerShell),
+            b"fish" if enabled_mask.has(LangId::Fish) => return Some(LangId::Fish),
+            b"html" if enabled_mask.has(LangId::Html) => return Some(LangId::Html),
             b"less" => {
-                if (enabled_mask & LANG_LESS_MASK) != 0 {
+                if enabled_mask.has(LangId::Less) {
                     return Some(LangId::Less);
                 }
-                if (enabled_mask & LANG_CSS_MASK) != 0 {
+                if enabled_mask.has(LangId::Css) {
                     return Some(LangId::Css);
                 }
             }
-            b"scss" | b"sass" if (enabled_mask & LANG_SASS_MASK) != 0 => return Some(LangId::Sass),
-            b"wast" if (enabled_mask & LANG_WAT_MASK) != 0 => return Some(LangId::Wat),
-            b"vhdl" if (enabled_mask & LANG_VHDL_MASK) != 0 => return Some(LangId::Vhdl),
-            b"purs" if (enabled_mask & LANG_PURESCRIPT_MASK) != 0 => return Some(LangId::PureScript),
-            b"vala" | b"vapi" if (enabled_mask & LANG_VALA_MASK) != 0 => return Some(LangId::Vala),
-            b"chpl" if (enabled_mask & LANG_CHAPEL_MASK) != 0 => return Some(LangId::Chapel),
-            b"pony" if (enabled_mask & LANG_PONY_MASK) != 0 => return Some(LangId::Pony),
-            b"cson" if (enabled_mask & LANG_COFFEESCRIPT_MASK) != 0 => return Some(LangId::CoffeeScript),
+            b"scss" | b"sass" if enabled_mask.has(LangId::Sass) => return Some(LangId::Sass),
+            b"wast" if enabled_mask.has(LangId::Wat) => return Some(LangId::Wat),
+            b"vhdl" if enabled_mask.has(LangId::Vhdl) => return Some(LangId::Vhdl),
+            b"purs" if enabled_mask.has(LangId::PureScript) => return Some(LangId::PureScript),
+            b"vala" | b"vapi" if enabled_mask.has(LangId::Vala) => return Some(LangId::Vala),
+            b"chpl" if enabled_mask.has(LangId::Chapel) => return Some(LangId::Chapel),
+            b"pony" if enabled_mask.has(LangId::Pony) => return Some(LangId::Pony),
+            b"cson" if enabled_mask.has(LangId::CoffeeScript) => return Some(LangId::CoffeeScript),
+            b"move" if enabled_mask.has(LangId::Move) => return Some(LangId::Move),
+            b"raku" if enabled_mask.has(LangId::Raku) => return Some(LangId::Raku),
+            b"wren" if enabled_mask.has(LangId::Wren) => return Some(LangId::Wren),
+            b"stan" if enabled_mask.has(LangId::Stan) => return Some(LangId::Stan),
+            b"shen" if enabled_mask.has(LangId::Shen) => return Some(LangId::Shen),
+            b"abap" if enabled_mask.has(LangId::Abap) => return Some(LangId::Abap),
+            b"agda" if enabled_mask.has(LangId::Agda) => return Some(LangId::Agda),
+            b"prql" if enabled_mask.has(LangId::Prql) => return Some(LangId::Prql),
+            b"lean" if enabled_mask.has(LangId::Lean) => return Some(LangId::Lean),
+            b"reds" if enabled_mask.has(LangId::Red) => return Some(LangId::Red),
+            b"koka" if enabled_mask.has(LangId::Koka) => return Some(LangId::Koka),
+            b"rexx" if enabled_mask.has(LangId::Rexx) => return Some(LangId::Rexx),
+            b"pmod" | b"pike" if enabled_mask.has(LangId::Pike) => return Some(LangId::Pike),
+            b"scad" if enabled_mask.has(LangId::OpenSCAD) => return Some(LangId::OpenSCAD),
+            b"carp" if enabled_mask.has(LangId::Carp) => return Some(LangId::Carp),
+            b"moon" if enabled_mask.has(LangId::MoonScript) => return Some(LangId::MoonScript),
+            b"clar" if enabled_mask.has(LangId::Clarity) => return Some(LangId::Clarity),
+            b"mlir" if enabled_mask.has(LangId::Mlir) => return Some(LangId::Mlir),
+            b"pact" if enabled_mask.has(LangId::Pact) => return Some(LangId::Pact),
+            b"abnf" if enabled_mask.has(LangId::Abnf) => return Some(LangId::Abnf),
+            b"dats" | b"sats" | b"hats" if enabled_mask.has(LangId::Ats) => return Some(LangId::Ats),
+            b"plot" if enabled_mask.has(LangId::Gnuplot) => return Some(LangId::Gnuplot),
+            b"scpt" if enabled_mask.has(LangId::AppleScript) => return Some(LangId::AppleScript),
             _ => {}
         }
         return None;
@@ -2552,29 +4547,56 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 2] | 0x20,
             name[len - 1] | 0x20,
         ];
-        if &ext == b"phtml" && (enabled_mask & LANG_PHP_MASK) != 0 {
+        if &ext == b"phtml" && enabled_mask.has(LangId::Php) {
             return Some(LangId::Php);
         }
-        if &ext == b"swift" && (enabled_mask & LANG_SWIFT_MASK) != 0 {
+        if &ext == b"swift" && enabled_mask.has(LangId::Swift) {
             return Some(LangId::Swift);
         }
-        if &ext == b"scala" && (enabled_mask & LANG_SCALA_MASK) != 0 {
+        if &ext == b"scala" && enabled_mask.has(LangId::Scala) {
             return Some(LangId::Scala);
         }
-        if &ext == b"gleam" && (enabled_mask & LANG_GLEAM_MASK) != 0 {
+        if &ext == b"gleam" && enabled_mask.has(LangId::Gleam) {
             return Some(LangId::Gleam);
         }
-        if &ext == b"xhtml" && (enabled_mask & LANG_HTML_MASK) != 0 {
+        if &ext == b"xhtml" && enabled_mask.has(LangId::Html) {
             return Some(LangId::Html);
         }
-        if &ext == b"astro" && (enabled_mask & LANG_ASTRO_MASK) != 0 {
+        if &ext == b"astro" && enabled_mask.has(LangId::Astro) {
             return Some(LangId::Astro);
         }
-        if &ext == b"proto" && (enabled_mask & LANG_PROTOBUF_MASK) != 0 {
+        if &ext == b"proto" && enabled_mask.has(LangId::Protobuf) {
             return Some(LangId::Protobuf);
         }
-        if &ext == b"capnp" && (enabled_mask & LANG_CAPNPROTO_MASK) != 0 {
+        if &ext == b"capnp" && enabled_mask.has(LangId::CapnProto) {
             return Some(LangId::CapnProto);
+        }
+        if &ext == b"dhall" && enabled_mask.has(LangId::Dhall) {
+            return Some(LangId::Dhall);
+        }
+        if &ext == b"bicep" && enabled_mask.has(LangId::Bicep) {
+            return Some(LangId::Bicep);
+        }
+        if &ext == b"cairo" && enabled_mask.has(LangId::Cairo) {
+            return Some(LangId::Cairo);
+        }
+        if &ext == b"janet" && enabled_mask.has(LangId::Janet) {
+            return Some(LangId::Janet);
+        }
+        if &ext == b"slang" && enabled_mask.has(LangId::Slang) {
+            return Some(LangId::Slang);
+        }
+        if &ext == b"lagda" && enabled_mask.has(LangId::Agda) {
+            return Some(LangId::Agda);
+        }
+        if &ext == b"dylan" && enabled_mask.has(LangId::Dylan) {
+            return Some(LangId::Dylan);
+        }
+        if &ext == b"xtend" && enabled_mask.has(LangId::Xtend) {
+            return Some(LangId::Xtend);
+        }
+        if &ext == b"spice" && enabled_mask.has(LangId::Spice) {
+            return Some(LangId::Spice);
         }
     }
     if len >= 8 && name[len - 7] == b'.' {
@@ -2589,29 +4611,53 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 2] | 0x20,
             name[len - 1] | 0x20,
         ];
-        if &ext == b"nimble" && (enabled_mask & LANG_NIM_MASK) != 0 {
+        if &ext == b"nimble" && enabled_mask.has(LangId::Nim) {
             return Some(LangId::Nim);
         }
-        if &ext == b"groovy" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
+        if &ext == b"groovy" && enabled_mask.has(LangId::Groovy) {
             return Some(LangId::Groovy);
         }
-        if &ext == b"gradle" && (enabled_mask & LANG_GROOVY_MASK) != 0 {
+        if &ext == b"gradle" && enabled_mask.has(LangId::Groovy) {
             return Some(LangId::Groovy);
         }
-        if &ext == b"svelte" && (enabled_mask & LANG_SVELTE_MASK) != 0 {
+        if &ext == b"svelte" && enabled_mask.has(LangId::Svelte) {
             return Some(LangId::Svelte);
         }
-        if &ext == b"tfvars" && (enabled_mask & LANG_HCL_MASK) != 0 {
+        if &ext == b"tfvars" && enabled_mask.has(LangId::Hcl) {
             return Some(LangId::Hcl);
         }
-        if &ext == b"coffee" && (enabled_mask & LANG_COFFEESCRIPT_MASK) != 0 {
+        if &ext == b"coffee" && enabled_mask.has(LangId::CoffeeScript) {
             return Some(LangId::CoffeeScript);
         }
-        if &ext == b"thrift" && (enabled_mask & LANG_THRIFT_MASK) != 0 {
+        if &ext == b"thrift" && enabled_mask.has(LangId::Thrift) {
             return Some(LangId::Thrift);
         }
-        if &ext == b"prisma" && (enabled_mask & LANG_PRISMA_MASK) != 0 {
+        if &ext == b"prisma" && enabled_mask.has(LangId::Prisma) {
             return Some(LangId::Prisma);
+        }
+        if &ext == b"smithy" && enabled_mask.has(LangId::Smithy) {
+            return Some(LangId::Smithy);
+        }
+        if &ext == b"ceylon" && enabled_mask.has(LangId::Ceylon) {
+            return Some(LangId::Ceylon);
+        }
+        if &ext == b"prolog" && enabled_mask.has(LangId::Prolog) {
+            return Some(LangId::Prolog);
+        }
+        if &ext == b"opencl" && enabled_mask.has(LangId::OpenCL) {
+            return Some(LangId::OpenCL);
+        }
+        if &ext == b"cypher" && enabled_mask.has(LangId::Cypher) {
+            return Some(LangId::Cypher);
+        }
+        if &ext == b"factor" && enabled_mask.has(LangId::Factor) {
+            return Some(LangId::Factor);
+        }
+        if &ext == b"sparql" && enabled_mask.has(LangId::Sparql) {
+            return Some(LangId::Sparql);
+        }
+        if &ext == b"oberon" && enabled_mask.has(LangId::Oberon) {
+            return Some(LangId::Oberon);
         }
     }
     if len >= 9 && name[len - 8] == b'.' {
@@ -2627,11 +4673,66 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 2] | 0x20,
             name[len - 1] | 0x20,
         ];
-        if &ext == b"graphql" && (enabled_mask & LANG_GRAPHQL_MASK) != 0 {
+        if &ext == b"graphql" && enabled_mask.has(LangId::Graphql) {
             return Some(LangId::Graphql);
         }
-        if &ext == b"trigger" && (enabled_mask & LANG_APEX_MASK) != 0 {
+        if &ext == b"trigger" && enabled_mask.has(LangId::Apex) {
             return Some(LangId::Apex);
+        }
+        if &ext == b"jsonnet" && enabled_mask.has(LangId::Jsonnet) {
+            return Some(LangId::Jsonnet);
+        }
+        if &ext == b"rakumod" && enabled_mask.has(LangId::Raku) {
+            return Some(LangId::Raku);
+        }
+        if &ext == b"feature" && enabled_mask.has(LangId::Gherkin) {
+            return Some(LangId::Gherkin);
+        }
+        if &ext == b"logtalk" && enabled_mask.has(LangId::Logtalk) {
+            return Some(LangId::Logtalk);
+        }
+        if &ext == b"gnuplot" && enabled_mask.has(LangId::Gnuplot) {
+            return Some(LangId::Gnuplot);
+        }
+    }
+    if len >= 13 && name[len - 12] == b'.' {
+        if !has_stem(name, len - 12) {
+            return None;
+        }
+        let ext = [
+            name[len - 11] | 0x20,
+            name[len - 10] | 0x20,
+            name[len - 9] | 0x20,
+            name[len - 8] | 0x20,
+            name[len - 7] | 0x20,
+            name[len - 6] | 0x20,
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"applescript" && enabled_mask.has(LangId::AppleScript) {
+            return Some(LangId::AppleScript);
+        }
+    }
+    if len >= 11 && name[len - 10] == b'.' {
+        if !has_stem(name, len - 10) {
+            return None;
+        }
+        let ext = [
+            name[len - 9] | 0x20,
+            name[len - 8] | 0x20,
+            name[len - 7] | 0x20,
+            name[len - 6] | 0x20,
+            name[len - 5] | 0x20,
+            name[len - 4] | 0x20,
+            name[len - 3] | 0x20,
+            name[len - 2] | 0x20,
+            name[len - 1] | 0x20,
+        ];
+        if &ext == b"libsonnet" && enabled_mask.has(LangId::Jsonnet) {
+            return Some(LangId::Jsonnet);
         }
     }
     if len >= 7 && name[len - 6] == b'.' {
@@ -2642,7 +4743,7 @@ pub fn detect_language(name: &[u8], enabled_mask: u128) -> Option<LangId> {
             name[len - 2] | 0x20,
             name[len - 1] | 0x20,
         ];
-        if &ext == b"cmake" && (enabled_mask & LANG_CMAKE_MASK) != 0 {
+        if &ext == b"cmake" && enabled_mask.has(LangId::CMake) {
             return Some(LangId::CMake);
         }
     }
@@ -2662,7 +4763,7 @@ fn get_basename(w: &[u8]) -> &[u8] {
 }
 
 #[inline(always)]
-pub fn detect_shebang(content: &[u8], enabled_mask: u128) -> Option<LangId> {
+pub fn detect_shebang(content: &[u8], enabled_mask: LangMask) -> Option<LangId> {
     if content.len() < 3 || content[0] != b'#' || content[1] != b'!' {
         return None;
     }
@@ -2716,33 +4817,33 @@ pub fn detect_shebang(content: &[u8], enabled_mask: u128) -> Option<LangId> {
         }
     }
 
-    if (enabled_mask & LANG_BASH_MASK) != 0
+    if enabled_mask.has(LangId::Bash)
         && (prog == b"bash" || prog == b"sh" || prog == b"zsh" || prog == b"dash" || prog == b"ash")
     {
         return Some(LangId::Bash);
     }
-    if (enabled_mask & LANG_PYTHON_MASK) != 0 && prog.starts_with(b"python") {
+    if enabled_mask.has(LangId::Python) && prog.starts_with(b"python") {
         return Some(LangId::Python);
     }
-    if (enabled_mask & LANG_PERL_MASK) != 0 && prog.starts_with(b"perl") {
+    if enabled_mask.has(LangId::Perl) && prog.starts_with(b"perl") {
         return Some(LangId::Perl);
     }
-    if (enabled_mask & LANG_RUBY_MASK) != 0 && prog == b"ruby" {
+    if enabled_mask.has(LangId::Ruby) && prog == b"ruby" {
         return Some(LangId::Ruby);
     }
-    if (enabled_mask & LANG_FISH_MASK) != 0 && prog == b"fish" {
+    if enabled_mask.has(LangId::Fish) && prog == b"fish" {
         return Some(LangId::Fish);
     }
-    if (enabled_mask & LANG_AWK_MASK) != 0 && (prog == b"awk" || prog == b"gawk" || prog == b"mawk" || prog == b"nawk") {
+    if enabled_mask.has(LangId::Awk) && (prog == b"awk" || prog == b"gawk" || prog == b"mawk" || prog == b"nawk") {
         return Some(LangId::Awk);
     }
-    if (enabled_mask & LANG_TCL_MASK) != 0 && (prog == b"tclsh" || prog == b"wish") {
+    if enabled_mask.has(LangId::Tcl) && (prog == b"tclsh" || prog == b"wish") {
         return Some(LangId::Tcl);
     }
-    if (enabled_mask & LANG_JAVASCRIPT_MASK) != 0 && (prog == b"node" || prog == b"nodejs") {
+    if enabled_mask.has(LangId::JavaScript) && (prog == b"node" || prog == b"nodejs") {
         return Some(LangId::JavaScript);
     }
-    if (enabled_mask & LANG_CRYSTAL_MASK) != 0 && prog == b"crystal" {
+    if enabled_mask.has(LangId::Crystal) && prog == b"crystal" {
         return Some(LangId::Crystal);
     }
 
@@ -4445,6 +6546,92 @@ pub fn parse_into(lang: LangId, content: &[u8], stats: &mut LangStats) {
         LangId::Prisma => prisma::parse_into(content, &mut stats.prisma),
         LangId::Kdl => kdl::parse_into(content, &mut stats.kdl),
         LangId::CapnProto => capnp::parse_into(content, &mut stats.capnp),
+        LangId::Cue => cue::parse_into(content, &mut stats.cue),
+        LangId::Jsonnet => jsonnet::parse_into(content, &mut stats.jsonnet),
+        LangId::Dhall => dhall::parse_into(content, &mut stats.dhall),
+        LangId::Nickel => nickel::parse_into(content, &mut stats.nickel),
+        LangId::Bicep => bicep::parse_into(content, &mut stats.bicep),
+        LangId::Wit => wit::parse_into(content, &mut stats.wit),
+        LangId::Move => move_lang::parse_into(content, &mut stats.move_lang),
+        LangId::Cairo => cairo::parse_into(content, &mut stats.cairo),
+        LangId::Vyper => vyper::parse_into(content, &mut stats.vyper),
+        LangId::Fennel => fennel::parse_into(content, &mut stats.fennel),
+        LangId::Hy => hy::parse_into(content, &mut stats.hy),
+        LangId::EmacsLisp => elisp::parse_into(content, &mut stats.elisp),
+        LangId::Raku => raku::parse_into(content, &mut stats.raku),
+        LangId::Forth => forth::parse_into(content, &mut stats.forth),
+        LangId::Smalltalk => smalltalk::parse_into(content, &mut stats.smalltalk),
+        LangId::Wren => wren::parse_into(content, &mut stats.wren),
+        LangId::FlatBuffers => flatbuffers::parse_into(content, &mut stats.flatbuffers),
+        LangId::Smithy => smithy::parse_into(content, &mut stats.smithy),
+        LangId::Janet => janet::parse_into(content, &mut stats.janet),
+        LangId::Idris => idris::parse_into(content, &mut stats.idris),
+        LangId::Modelica => modelica::parse_into(content, &mut stats.modelica),
+        LangId::Stan => stan::parse_into(content, &mut stats.stan),
+        LangId::Shen => shen::parse_into(content, &mut stats.shen),
+        LangId::Firrtl => firrtl::parse_into(content, &mut stats.firrtl),
+        LangId::Abap => abap::parse_into(content, &mut stats.abap),
+        LangId::Stata => stata::parse_into(content, &mut stats.stata),
+        LangId::GDScript => gdscript::parse_into(content, &mut stats.gdscript),
+        LangId::Prolog => prolog::parse_into(content, &mut stats.prolog),
+        LangId::Agda => agda::parse_into(content, &mut stats.agda),
+        LangId::OpenCL => opencl::parse_into(content, &mut stats.opencl),
+        LangId::PostScript => postscript::parse_into(content, &mut stats.postscript),
+        LangId::Grain => grain::parse_into(content, &mut stats.grain),
+        LangId::Prql => prql::parse_into(content, &mut stats.prql),
+        LangId::Q => q::parse_into(content, &mut stats.q),
+        LangId::Slang => slang::parse_into(content, &mut stats.slang),
+        LangId::AutoIt => autoit::parse_into(content, &mut stats.autoit),
+        LangId::Lean => lean::parse_into(content, &mut stats.lean),
+        LangId::Uiua => uiua::parse_into(content, &mut stats.uiua),
+        LangId::Bqn => bqn::parse_into(content, &mut stats.bqn),
+        LangId::Cypher => cypher::parse_into(content, &mut stats.cypher),
+        LangId::Gherkin => gherkin::parse_into(content, &mut stats.gherkin),
+        LangId::Eiffel => eiffel::parse_into(content, &mut stats.eiffel),
+        LangId::SuperCollider => supercollider::parse_into(content, &mut stats.supercollider),
+        LangId::Red => red::parse_into(content, &mut stats.red),
+        LangId::Koka => koka::parse_into(content, &mut stats.koka),
+        LangId::Bluespec => bluespec::parse_into(content, &mut stats.bluespec),
+        LangId::Modula2 => modula2::parse_into(content, &mut stats.modula2),
+        LangId::Rexx => rexx::parse_into(content, &mut stats.rexx),
+        LangId::Rebol => rebol::parse_into(content, &mut stats.rebol),
+        LangId::Factor => factor::parse_into(content, &mut stats.factor),
+        LangId::Logtalk => logtalk::parse_into(content, &mut stats.logtalk),
+        LangId::Sparql => sparql::parse_into(content, &mut stats.sparql),
+        LangId::Chuck => chuck::parse_into(content, &mut stats.chuck),
+        LangId::Io => io::parse_into(content, &mut stats.io),
+        LangId::Pike => pike::parse_into(content, &mut stats.pike),
+        LangId::Dylan => dylan::parse_into(content, &mut stats.dylan),
+        LangId::OpenSCAD => openscad::parse_into(content, &mut stats.openscad),
+        LangId::P4 => p4::parse_into(content, &mut stats.p4),
+        LangId::Alloy => alloy::parse_into(content, &mut stats.alloy),
+        LangId::AppleScript => applescript::parse_into(content, &mut stats.applescript),
+        LangId::Carp => carp::parse_into(content, &mut stats.carp),
+        LangId::LiveScript => livescript::parse_into(content, &mut stats.livescript),
+        LangId::MoonScript => moonscript::parse_into(content, &mut stats.moonscript),
+        LangId::Modula3 => modula3::parse_into(content, &mut stats.modula3),
+        LangId::Oberon => oberon::parse_into(content, &mut stats.oberon),
+        LangId::Clean => clean::parse_into(content, &mut stats.clean),
+        LangId::HolyC => holyc::parse_into(content, &mut stats.holyc),
+        LangId::Clarity => clarity::parse_into(content, &mut stats.clarity),
+        LangId::Pawn => pawn::parse_into(content, &mut stats.pawn),
+        LangId::BlitzMax => blitzmax::parse_into(content, &mut stats.blitzmax),
+        LangId::Asymptote => asymptote::parse_into(content, &mut stats.asymptote),
+        LangId::Gnuplot => gnuplot::parse_into(content, &mut stats.gnuplot),
+        LangId::Processing => processing::parse_into(content, &mut stats.processing),
+        LangId::Mlir => mlir::parse_into(content, &mut stats.mlir),
+        LangId::Txl => txl::parse_into(content, &mut stats.txl),
+        LangId::Pact => pact::parse_into(content, &mut stats.pact),
+        LangId::Arduino => arduino::parse_into(content, &mut stats.arduino),
+        LangId::Vba => vba::parse_into(content, &mut stats.vba),
+        LangId::Ceylon => ceylon::parse_into(content, &mut stats.ceylon),
+        LangId::Fantom => fantom::parse_into(content, &mut stats.fantom),
+        LangId::Xtend => xtend::parse_into(content, &mut stats.xtend),
+        LangId::Abnf => abnf::parse_into(content, &mut stats.abnf),
+        LangId::Al => al::parse_into(content, &mut stats.al),
+        LangId::JLang => j_lang::parse_into(content, &mut stats.j_lang),
+        LangId::Spice => spice::parse_into(content, &mut stats.spice),
+        LangId::Ats => ats::parse_into(content, &mut stats.ats),
     }
 }
 
@@ -4602,6 +6789,7 @@ pub fn skip_literal(content: &[u8], start_i: usize, quote: u8) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::doc;
 
     fn line_metrics(lang: LangId, content: &[u8]) -> [i64; 4] {
         let mut stats = LangStats::default();
@@ -4644,19 +6832,37 @@ mod tests {
                 | LangId::Justfile
                 | LangId::Crystal
                 | LangId::CoffeeScript
-                | LangId::CapnProto => "#",
-                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript => "--",
-                LangId::OCaml | LangId::Sml => "(*",
-                LangId::Fortran => "!",
-                LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
-                LangId::Racket | LangId::AutoHotkey => ";",
+                | LangId::CapnProto
+                | LangId::Vyper
+                | LangId::Raku
+                | LangId::Janet
+                | LangId::GDScript
+                | LangId::Prql
+                | LangId::Nickel
+                | LangId::Uiua
+                | LangId::Bqn
+                | LangId::Gherkin
+                | LangId::Sparql
+                | LangId::Gnuplot
+                | LangId::LiveScript => "#",
+                LangId::Lua | LangId::Sql | LangId::Haskell | LangId::Ada | LangId::Vhdl | LangId::Elm | LangId::PureScript | LangId::Dhall | LangId::Idris | LangId::Agda | LangId::Lean | LangId::Eiffel | LangId::Alloy | LangId::AppleScript | LangId::MoonScript => "--",
+                LangId::OCaml | LangId::Sml | LangId::Modula2 | LangId::Modula3 | LangId::Oberon => "(*",
+                LangId::Shen => "\\*",
+                LangId::Fortran | LangId::Factor => "!",
+                LangId::Erlang | LangId::Matlab | LangId::Tex | LangId::Prolog | LangId::PostScript | LangId::Logtalk | LangId::Txl => "%",
+                LangId::Racket | LangId::AutoHotkey | LangId::Fennel | LangId::Hy | LangId::EmacsLisp | LangId::Firrtl | LangId::AutoIt | LangId::Red | LangId::Rebol | LangId::Carp | LangId::Clarity | LangId::Pact | LangId::Abnf => ";",
+                LangId::BlitzMax | LangId::Vba => "'",
+                LangId::Q => "/",
+                LangId::JLang => "NB. ",
+                LangId::Spice => "*",
                 LangId::Svelte | LangId::Vue | LangId::Astro => "<!--",
                 LangId::Clojure | LangId::Scheme | LangId::Assembly | LangId::CommonLisp | LangId::Llvm => ";",
                 LangId::Wat => ";;",
                 LangId::Cobol => "*>",
                 LangId::Html | LangId::Xml => "<!--",
                 LangId::Json => "//",
-                LangId::VimScript => "\"",
+                LangId::Smalltalk | LangId::VimScript | LangId::Abap => "\"",
+                LangId::Forth => "\\",
                 LangId::Batch => "::",
                 _ => "//",
             };
@@ -4730,6 +6936,53 @@ mod tests {
                     | LangId::Batch
                     | LangId::Prisma
                     | LangId::CapnProto
+                    | LangId::Cue
+                    | LangId::Nickel
+                    | LangId::Dhall
+                    | LangId::Cairo
+                    | LangId::Vyper
+                    | LangId::Fennel
+                    | LangId::Hy
+                    | LangId::EmacsLisp
+                    | LangId::Raku
+                    | LangId::Forth
+                    | LangId::Smalltalk
+                    | LangId::Janet
+                    | LangId::Idris
+                    | LangId::Shen
+                    | LangId::Firrtl
+                    | LangId::Abap
+                    | LangId::GDScript
+                    | LangId::Agda
+                    | LangId::PostScript
+                    | LangId::Prql
+                    | LangId::Q
+                    | LangId::AutoIt
+                    | LangId::Lean
+                    | LangId::Uiua
+                    | LangId::Bqn
+                    | LangId::Gherkin
+                    | LangId::Eiffel
+                    | LangId::Red
+                    | LangId::Modula2
+                    | LangId::Rebol
+                    | LangId::Factor
+                    | LangId::Sparql
+                    | LangId::AppleScript
+                    | LangId::Carp
+                    | LangId::MoonScript
+                    | LangId::Modula3
+                    | LangId::Oberon
+                    | LangId::Clarity
+                    | LangId::BlitzMax
+                    | LangId::Gnuplot
+                    | LangId::Mlir
+                    | LangId::Txl
+                    | LangId::Pact
+                    | LangId::Vba
+                    | LangId::Abnf
+                    | LangId::JLang
+                    | LangId::Spice
             ) {
                 samples.push("a\n/* x\ny */".to_string());
                 samples.push("a\n/* x\ny */   ".to_string());
@@ -4747,12 +7000,22 @@ mod tests {
                 samples.push("a (; x\ny".to_string());
                 samples.push("a\n(; x ;) b".to_string());
             }
-            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript {
+            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript || lang == LangId::Dhall || lang == LangId::Idris || lang == LangId::Agda {
                 samples.push("a\n{- x\ny -}".to_string());
                 samples.push("a {- x\ny".to_string());
                 samples.push("a\n{- x -} b".to_string());
             }
-            if lang == LangId::OCaml || lang == LangId::FSharp || lang == LangId::Pascal || lang == LangId::Sml {
+            if lang == LangId::Lean {
+                samples.push("a\n/- x\ny -/".to_string());
+                samples.push("a /- x\ny".to_string());
+                samples.push("a\n/- x -/ b".to_string());
+            }
+            if lang == LangId::Shen {
+                samples.push("a\n\\* x\ny *\\".to_string());
+                samples.push("a \\* x\ny".to_string());
+                samples.push("a\n\\* x *\\ b".to_string());
+            }
+            if lang == LangId::OCaml || lang == LangId::FSharp || lang == LangId::Pascal || lang == LangId::Sml || lang == LangId::Modula2 || lang == LangId::AppleScript || lang == LangId::Modula3 || lang == LangId::Oberon {
                 samples.push("a\n(* x\ny *)".to_string());
                 samples.push("a (* x\ny".to_string());
                 samples.push("a\n(* x *) b".to_string());
@@ -4814,7 +7077,7 @@ mod tests {
             if lang == LangId::FSharp {
                 samples.push("type 'a t = 'a\nlet x = 'c'\n// c".to_string());
             }
-            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript {
+            if lang == LangId::Haskell || lang == LangId::Elm || lang == LangId::PureScript || lang == LangId::Dhall {
                 samples.push("f x' = x'' + 1\nc = '\\''\n-- c".to_string());
             }
             if lang == LangId::Nix {
@@ -5569,9 +7832,9 @@ mod tests {
         assert_eq!(detect_language(b"foo.odin", LANG_ODIN_MASK), Some(LangId::Odin));
         assert_eq!(detect_language(b"foo.c", LANG_ODIN_MASK), None);
 
-        assert_eq!(detect_language(b"foo.c", 0), None);
-        assert_eq!(detect_language(b"foo.h", 0), None);
-        assert_eq!(detect_language(b"foo.cpp", 0), None);
+        assert_eq!(detect_language(b"foo.c", LangMask::ZERO), None);
+        assert_eq!(detect_language(b"foo.h", LangMask::ZERO), None);
+        assert_eq!(detect_language(b"foo.cpp", LangMask::ZERO), None);
 
         assert_eq!(detect_shebang(b"#!/bin/bash\necho 1", LANG_ALL_MASK), Some(LangId::Bash));
         assert_eq!(detect_shebang(b"#!/bin/sh\necho 1", LANG_ALL_MASK), Some(LangId::Bash));
@@ -5649,6 +7912,116 @@ mod tests {
         assert_eq!(detect_language(b"foo.prisma", LANG_ALL_MASK), Some(LangId::Prisma));
         assert_eq!(detect_language(b"foo.kdl", LANG_ALL_MASK), Some(LangId::Kdl));
         assert_eq!(detect_language(b"foo.capnp", LANG_ALL_MASK), Some(LangId::CapnProto));
+        assert_eq!(detect_language(b"foo.cue", LANG_ALL_MASK), Some(LangId::Cue));
+        assert_eq!(detect_language(b"foo.jsonnet", LANG_ALL_MASK), Some(LangId::Jsonnet));
+        assert_eq!(detect_language(b"foo.libsonnet", LANG_ALL_MASK), Some(LangId::Jsonnet));
+        assert_eq!(detect_language(b"foo.dhall", LANG_ALL_MASK), Some(LangId::Dhall));
+        assert_eq!(detect_language(b"foo.ncl", LANG_ALL_MASK), Some(LangId::Nickel));
+        assert_eq!(detect_language(b"foo.bicep", LANG_ALL_MASK), Some(LangId::Bicep));
+        assert_eq!(detect_language(b"foo.wit", LANG_ALL_MASK), Some(LangId::Wit));
+        assert_eq!(detect_language(b"foo.move", LANG_ALL_MASK), Some(LangId::Move));
+        assert_eq!(detect_language(b"foo.cairo", LANG_ALL_MASK), Some(LangId::Cairo));
+        assert_eq!(detect_language(b"foo.vy", LANG_ALL_MASK), Some(LangId::Vyper));
+        assert_eq!(detect_language(b"foo.fnl", LANG_ALL_MASK), Some(LangId::Fennel));
+        assert_eq!(detect_language(b"foo.hy", LANG_ALL_MASK), Some(LangId::Hy));
+        assert_eq!(detect_language(b"foo.el", LANG_ALL_MASK), Some(LangId::EmacsLisp));
+        assert_eq!(detect_language(b"foo.raku", LANG_ALL_MASK), Some(LangId::Raku));
+        assert_eq!(detect_language(b"foo.rakumod", LANG_ALL_MASK), Some(LangId::Raku));
+        assert_eq!(detect_language(b"foo.fth", LANG_ALL_MASK), Some(LangId::Forth));
+        assert_eq!(detect_language(b"foo.4th", LANG_ALL_MASK), Some(LangId::Forth));
+        assert_eq!(detect_language(b"foo.st", LANG_ALL_MASK), Some(LangId::Smalltalk));
+        assert_eq!(detect_language(b"foo.wren", LANG_ALL_MASK), Some(LangId::Wren));
+        assert_eq!(detect_language(b"foo.fbs", LANG_ALL_MASK), Some(LangId::FlatBuffers));
+        assert_eq!(detect_language(b"foo.smithy", LANG_ALL_MASK), Some(LangId::Smithy));
+        assert_eq!(detect_language(b"foo.janet", LANG_ALL_MASK), Some(LangId::Janet));
+        assert_eq!(detect_language(b"foo.idr", LANG_ALL_MASK), Some(LangId::Idris));
+        assert_eq!(detect_language(b"foo.mo", LANG_ALL_MASK), Some(LangId::Modelica));
+        assert_eq!(detect_language(b"foo.stan", LANG_ALL_MASK), Some(LangId::Stan));
+        assert_eq!(detect_language(b"foo.shen", LANG_ALL_MASK), Some(LangId::Shen));
+        assert_eq!(detect_language(b"foo.fir", LANG_ALL_MASK), Some(LangId::Firrtl));
+        assert_eq!(detect_language(b"foo.abap", LANG_ALL_MASK), Some(LangId::Abap));
+        assert_eq!(detect_language(b"foo.do", LANG_ALL_MASK), Some(LangId::Stata));
+        assert_eq!(detect_language(b"foo.ado", LANG_ALL_MASK), Some(LangId::Stata));
+        assert_eq!(detect_language(b"foo.gd", LANG_ALL_MASK), Some(LangId::GDScript));
+        assert_eq!(detect_language(b"foo.pro", LANG_ALL_MASK), Some(LangId::Prolog));
+        assert_eq!(detect_language(b"foo.prolog", LANG_ALL_MASK), Some(LangId::Prolog));
+        assert_eq!(detect_language(b"foo.agda", LANG_ALL_MASK), Some(LangId::Agda));
+        assert_eq!(detect_language(b"foo.lagda", LANG_ALL_MASK), Some(LangId::Agda));
+        assert_eq!(detect_language(b"foo.cl", LANG_OPENCL_MASK), Some(LangId::OpenCL));
+        assert_eq!(detect_language(b"foo.opencl", LANG_ALL_MASK), Some(LangId::OpenCL));
+        assert_eq!(detect_language(b"foo.ocl", LANG_ALL_MASK), Some(LangId::OpenCL));
+        assert_eq!(detect_language(b"foo.ps", LANG_ALL_MASK), Some(LangId::PostScript));
+        assert_eq!(detect_language(b"foo.eps", LANG_ALL_MASK), Some(LangId::PostScript));
+        assert_eq!(detect_language(b"foo.gr", LANG_ALL_MASK), Some(LangId::Grain));
+        assert_eq!(detect_language(b"foo.prql", LANG_ALL_MASK), Some(LangId::Prql));
+        assert_eq!(detect_language(b"foo.q", LANG_ALL_MASK), Some(LangId::Q));
+        assert_eq!(detect_language(b"foo.slang", LANG_ALL_MASK), Some(LangId::Slang));
+        assert_eq!(detect_language(b"foo.au3", LANG_ALL_MASK), Some(LangId::AutoIt));
+        assert_eq!(detect_language(b"foo.lean", LANG_ALL_MASK), Some(LangId::Lean));
+        assert_eq!(detect_language(b"foo.ua", LANG_ALL_MASK), Some(LangId::Uiua));
+        assert_eq!(detect_language(b"foo.bqn", LANG_ALL_MASK), Some(LangId::Bqn));
+        assert_eq!(detect_language(b"foo.cyp", LANG_ALL_MASK), Some(LangId::Cypher));
+        assert_eq!(detect_language(b"foo.cypher", LANG_ALL_MASK), Some(LangId::Cypher));
+        assert_eq!(detect_language(b"foo.feature", LANG_ALL_MASK), Some(LangId::Gherkin));
+        assert_eq!(detect_language(b"foo.e", LANG_ALL_MASK), Some(LangId::Eiffel));
+        assert_eq!(detect_language(b"foo.scd", LANG_ALL_MASK), Some(LangId::SuperCollider));
+        assert_eq!(detect_language(b"foo.red", LANG_ALL_MASK), Some(LangId::Red));
+        assert_eq!(detect_language(b"foo.reds", LANG_ALL_MASK), Some(LangId::Red));
+        assert_eq!(detect_language(b"foo.kk", LANG_ALL_MASK), Some(LangId::Koka));
+        assert_eq!(detect_language(b"foo.koka", LANG_ALL_MASK), Some(LangId::Koka));
+        assert_eq!(detect_language(b"foo.bsv", LANG_ALL_MASK), Some(LangId::Bluespec));
+        assert_eq!(detect_language(b"foo.mod", LANG_ALL_MASK), Some(LangId::Modula2));
+        assert_eq!(detect_language(b"foo.m2", LANG_ALL_MASK), Some(LangId::Modula2));
+        assert_eq!(detect_language(b"foo.rex", LANG_ALL_MASK), Some(LangId::Rexx));
+        assert_eq!(detect_language(b"foo.rexx", LANG_ALL_MASK), Some(LangId::Rexx));
+        assert_eq!(detect_language(b"foo.reb", LANG_ALL_MASK), Some(LangId::Rebol));
+        assert_eq!(detect_language(b"foo.factor", LANG_ALL_MASK), Some(LangId::Factor));
+        assert_eq!(detect_language(b"foo.lgt", LANG_ALL_MASK), Some(LangId::Logtalk));
+        assert_eq!(detect_language(b"foo.logtalk", LANG_ALL_MASK), Some(LangId::Logtalk));
+        assert_eq!(detect_language(b"foo.rq", LANG_ALL_MASK), Some(LangId::Sparql));
+        assert_eq!(detect_language(b"foo.sparql", LANG_ALL_MASK), Some(LangId::Sparql));
+        assert_eq!(detect_language(b"foo.ck", LANG_ALL_MASK), Some(LangId::Chuck));
+        assert_eq!(detect_language(b"foo.io", LANG_ALL_MASK), Some(LangId::Io));
+        assert_eq!(detect_language(b"foo.pike", LANG_ALL_MASK), Some(LangId::Pike));
+        assert_eq!(detect_language(b"foo.pmod", LANG_ALL_MASK), Some(LangId::Pike));
+        assert_eq!(detect_language(b"foo.dyl", LANG_ALL_MASK), Some(LangId::Dylan));
+        assert_eq!(detect_language(b"foo.dylan", LANG_ALL_MASK), Some(LangId::Dylan));
+        assert_eq!(detect_language(b"foo.scad", LANG_ALL_MASK), Some(LangId::OpenSCAD));
+        assert_eq!(detect_language(b"foo.p4", LANG_ALL_MASK), Some(LangId::P4));
+        assert_eq!(detect_language(b"foo.als", LANG_ALL_MASK), Some(LangId::Alloy));
+        assert_eq!(detect_language(b"foo.scpt", LANG_ALL_MASK), Some(LangId::AppleScript));
+        assert_eq!(detect_language(b"foo.applescript", LANG_ALL_MASK), Some(LangId::AppleScript));
+        assert_eq!(detect_language(b"foo.carp", LANG_ALL_MASK), Some(LangId::Carp));
+        assert_eq!(detect_language(b"foo.ls", LANG_ALL_MASK), Some(LangId::LiveScript));
+        assert_eq!(detect_language(b"foo.moon", LANG_ALL_MASK), Some(LangId::MoonScript));
+        assert_eq!(detect_language(b"foo.m3", LANG_ALL_MASK), Some(LangId::Modula3));
+        assert_eq!(detect_language(b"foo.i3", LANG_ALL_MASK), Some(LangId::Modula3));
+        assert_eq!(detect_language(b"foo.obn", LANG_ALL_MASK), Some(LangId::Oberon));
+        assert_eq!(detect_language(b"foo.oberon", LANG_ALL_MASK), Some(LangId::Oberon));
+        assert_eq!(detect_language(b"foo.icl", LANG_ALL_MASK), Some(LangId::Clean));
+        assert_eq!(detect_language(b"foo.dcl", LANG_ALL_MASK), Some(LangId::Clean));
+        assert_eq!(detect_language(b"os.hc", LANG_ALL_MASK), Some(LangId::HolyC));
+        assert_eq!(detect_language(b"token.clar", LANG_ALL_MASK), Some(LangId::Clarity));
+        assert_eq!(detect_language(b"gamemode.pwn", LANG_ALL_MASK), Some(LangId::Pawn));
+        assert_eq!(detect_language(b"game.bmx", LANG_ALL_MASK), Some(LangId::BlitzMax));
+        assert_eq!(detect_language(b"game.bb", LANG_ALL_MASK), Some(LangId::BlitzMax));
+        assert_eq!(detect_language(b"diagram.asy", LANG_ALL_MASK), Some(LangId::Asymptote));
+        assert_eq!(detect_language(b"graph.gp", LANG_ALL_MASK), Some(LangId::Gnuplot));
+        assert_eq!(detect_language(b"graph.gnuplot", LANG_ALL_MASK), Some(LangId::Gnuplot));
+        assert_eq!(detect_language(b"sketch.pde", LANG_ALL_MASK), Some(LangId::Processing));
+        assert_eq!(detect_language(b"ir.mlir", LANG_ALL_MASK), Some(LangId::Mlir));
+        assert_eq!(detect_language(b"rule.txl", LANG_ALL_MASK), Some(LangId::Txl));
+        assert_eq!(detect_language(b"coin.pact", LANG_ALL_MASK), Some(LangId::Pact));
+        assert_eq!(detect_language(b"sketch.ino", LANG_ALL_MASK), Some(LangId::Arduino));
+        assert_eq!(detect_language(b"macro.vba", LANG_ALL_MASK), Some(LangId::Vba));
+        assert_eq!(detect_language(b"mod.ceylon", LANG_ALL_MASK), Some(LangId::Ceylon));
+        assert_eq!(detect_language(b"script.fan", LANG_ALL_MASK), Some(LangId::Fantom));
+        assert_eq!(detect_language(b"gen.xtend", LANG_ALL_MASK), Some(LangId::Xtend));
+        assert_eq!(detect_language(b"grammar.abnf", LANG_ALL_MASK), Some(LangId::Abnf));
+        assert_eq!(detect_language(b"page.al", LANG_ALL_MASK), Some(LangId::Al));
+        assert_eq!(detect_language(b"calc.ijs", LANG_ALL_MASK), Some(LangId::JLang));
+        assert_eq!(detect_language(b"circuit.cir", LANG_ALL_MASK), Some(LangId::Spice));
+        assert_eq!(detect_language(b"prog.dats", LANG_ALL_MASK), Some(LangId::Ats));
     }
 
     fn assert_keyword_sum_and_metrics(lang: LangId, stats: &LangStats, slice: &[u8]) {
@@ -5974,16 +8347,18 @@ mod tests {
                 | LangId::Justfile
                 | LangId::Crystal
                 | LangId::CoffeeScript
-                | LangId::CapnProto => "#",
+                | LangId::CapnProto
+                | LangId::Nickel => "#",
                 LangId::Lua
                 | LangId::Sql
                 | LangId::Haskell
                 | LangId::Ada
                 | LangId::Vhdl
                 | LangId::Elm
-                | LangId::PureScript => "--",
-                LangId::OCaml | LangId::Sml => "(*",
-                LangId::Fortran => "!",
+                | LangId::PureScript
+                | LangId::Dhall => "--",
+                LangId::OCaml | LangId::Sml | LangId::Modula2 | LangId::Modula3 | LangId::Oberon => "(*",
+                LangId::Fortran | LangId::Factor => "!",
                 LangId::Erlang | LangId::Matlab | LangId::Tex => "%",
                 LangId::Clojure
                 | LangId::Scheme
@@ -6002,7 +8377,7 @@ mod tests {
             };
 
             let block_open = match lang {
-                LangId::Haskell | LangId::Elm | LangId::PureScript => "{-",
+                LangId::Haskell | LangId::Elm | LangId::PureScript | LangId::Dhall => "{-",
                 LangId::OCaml | LangId::FSharp | LangId::Pascal | LangId::Sml => "(*",
                 LangId::Racket => "#|",
                 LangId::Svelte | LangId::Vue | LangId::Astro => "<!--",
@@ -6044,11 +8419,15 @@ mod tests {
                 | LangId::Crystal
                 | LangId::Ballerina
                 | LangId::VimScript
-                | LangId::Batch => "",
+                | LangId::Batch
+                | LangId::Prisma
+                | LangId::CapnProto
+                | LangId::Cue
+                | LangId::Nickel => "",
                 _ => "/*",
             };
             let block_close = match lang {
-                LangId::Haskell | LangId::Elm | LangId::PureScript => "-}",
+                LangId::Haskell | LangId::Elm | LangId::PureScript | LangId::Dhall => "-}",
                 LangId::OCaml | LangId::FSharp | LangId::Pascal | LangId::Sml => "*)",
                 LangId::Racket => "|#",
                 LangId::Svelte | LangId::Vue | LangId::Astro => "-->",
@@ -6090,7 +8469,11 @@ mod tests {
                 | LangId::Crystal
                 | LangId::Ballerina
                 | LangId::VimScript
-                | LangId::Batch => "",
+                | LangId::Batch
+                | LangId::Prisma
+                | LangId::CapnProto
+                | LangId::Cue
+                | LangId::Nickel => "",
                 _ => "*/",
             };
 

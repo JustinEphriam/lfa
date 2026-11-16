@@ -1,6 +1,6 @@
 # `lfa` Language & Oracle Workflow (`flow.md`)
 
-A deterministic execution guide and decision tree for adding languages, adding document formats, and diagnosing/fixing lexer bugs using [oracle.rs](file:///home/justin/Projects/lfa/src/lang/oracle.rs).
+A deterministic execution guide and decision tree for adding languages, adding document formats, and diagnosing/fixing lexer bugs using [oracle](file:///home/justin/Projects/lfa/src/oracle/mod.rs).
 
 ---
 
@@ -37,18 +37,18 @@ flowchart TD
     L2 --> L3["Implement src/lang/&lt;lang&gt;.rs"]
     L3 --> L4["Audit 7 Mandatory Lexer Invariants"]
     L4 --> L5["Register in all 20 sites of src/lang/mod.rs"]
-    L5 --> L6["Add entry to define_lang_oracle_specs! in oracle.rs"]
+    L5 --> L6["Add entry to define_lang_oracle_specs! in oracle/mod.rs"]
     L6 --> Gate["Run Gate: cargo test oracle -> full suite -> clippy -> release -> hyperfine"]
 
-    Doc --> D1["Add DocFormatId in src/lang/doc.rs"]
+    Doc --> D1["Add DocFormatId in src/doc/mod.rs"]
     D1 --> D2["Update DOC_FORMAT_COUNT, ALL_DOC_FORMATS, name(), detect_doc_format(), parse_doc_into()"]
-    D2 --> D3["Add entry to define_doc_oracle_specs! in oracle.rs"]
+    D2 --> D3["Add entry to define_doc_oracle_specs! in oracle/mod.rs"]
     D3 --> Gate
 
     Bug --> B1["Write / Identify Failing Test First (or Inspect Failing Oracle Case)"]
     B1 --> B2{"Bug in Lexer vs Oracle Spec?"}
     B2 -->|"Lexer violates invariant / grammar"| B3["Fix Lexer + Grep ALL src/lang/*.rs for Sibling Copies"]
-    B2 -->|"OracleSpec flags misdescribed Lexer grammar"| B4["Fix ONLY the Spec Field for that Language in oracle.rs"]
+    B2 -->|"OracleSpec flags misdescribed Lexer grammar"| B4["Fix ONLY the Spec Field for that Language in oracle/mod.rs"]
     B3 --> Gate
     B4 --> Gate
 ```
@@ -58,7 +58,7 @@ flowchart TD
 ## 3. Adding a New Programming Language (Step-by-Step)
 
 ### Step 1: Classify the Language's Lexical Rules
-Answer every item below **before** writing code; these exact answers feed both `src/lang/<lang>.rs` and `src/lang/oracle.rs`:
+Answer every item below **before** writing code; these exact answers feed both `src/lang/<lang>.rs` and `src/oracle/mod.rs`:
 
 - **Case sensitivity**: Are keywords case-insensitive? (Existing caseless languages use `kw | 0x20` hashing and `match_keyword_caseless_with`; see `autohotkey.rs`, `sql.rs`, `fortran.rs`, `pascal.rs`).
 - **Line comments**: Standard inline line comment prefix(es), e.g. `//`, `#`, `--`, `;`, `!`, `%`, `*>`, `;;`.
@@ -152,10 +152,10 @@ Search for `AutoHotkey` / `autohotkey` across `src/lang/mod.rs` (`grep -n "AutoH
 | 19 | `LangStats::token_kind_and_lut` | `LangId::Variant => (&<lang>::TOKEN_KIND, &<lang>::TOKEN_LUT_LO),` |
 | 20 | `detect_language` / `parse_into` / `mod tests` | Extension/filename routing (guarded by `enabled_mask & LANG_*_MASK`), `parse_into` dispatch, and comment-delimiter match arms in `mod tests` |
 
-If `.ext` collides with an existing extension (like `.m` for `Matlab` vs `ObjectiveC`, or `.h` for `CHeader`), explicitly handle disambiguation in scheduler/CLI logic (`src/main.rs`) and `oracle.rs`. Also add `detect_shebang` support if scripts use a `#!` interpreter.
+If `.ext` collides with an existing extension (like `.m` for `Matlab` vs `ObjectiveC`, or `.h` for `CHeader`), explicitly handle disambiguation in scheduler/CLI logic (`src/main.rs`) and `oracle`. Also add `detect_shebang` support if scripts use a `#!` interpreter.
 
-### Step 6: Register in `src/lang/oracle.rs`
-Append your language at the **exact matching position** in `define_lang_oracle_specs!` in [oracle.rs](file:///home/justin/Projects/lfa/src/lang/oracle.rs):
+### Step 6: Register in `src/oracle/mod.rs`
+Append your language at the **exact matching position** in `define_lang_oracle_specs!` in [oracle](file:///home/justin/Projects/lfa/src/oracle/mod.rs):
 - Set every field accurately (`file`, `caseless`, `line`, `line_start`, `block`, `doc_block`, `quotes`, `raw`, `prefixes`, `sigils`, `suffixes`, `datum`, `eof`, `spliced`, `tmpl`, `char_life`, `cpp_sep`, `transpose`, `tex_pct`, `perl_hash`, `ruby_def`).
 - Use the helper constructors for `raw`:
   - `rq(open, close)`: multi-line raw string without `\` escapes
@@ -167,14 +167,14 @@ Append your language at the **exact matching position** in `define_lang_oracle_s
 
 ## 4. Adding a New Document / Data Format
 
-1. In [doc.rs](file:///home/justin/Projects/lfa/src/lang/doc.rs):
-   - Add variant to `DocFormatId` (`u8`, must stay `< 128` because `FileTarget::DOC_FLAG = 0x80`).
+1. In [doc](file:///home/justin/Projects/lfa/src/doc/mod.rs):
+   - Add variant to `DocFormatId` (`u8`, `FileTarget` is `u16` with `FileTarget::DOC_FLAG = 0x8000`).
    - Increment `DOC_FORMAT_COUNT` and append to `ALL_DOC_FORMATS`.
    - Add display string in `DocFormatId::name`.
    - Add extension / exact-filename detection in `detect_doc_format`.
    - Implement line handling in `parse_doc_into`.
-     - Remember: `doc.rs` strips one trailing `\r` per line; blank lines inside multi-line block comments count as `comment_lines`.
-2. In [oracle.rs](file:///home/justin/Projects/lfa/src/lang/oracle.rs):
+     - Remember: `doc` strips one trailing `\r` per line; blank lines inside multi-line block comments count as `comment_lines`.
+2. In [oracle](file:///home/justin/Projects/lfa/src/oracle/mod.rs):
    - Add the format to `define_doc_oracle_specs!` in exact `ALL_DOC_FORMATS` order.
 
 ---

@@ -1,16 +1,19 @@
 #![forbid(unsafe_code)]
 
+mod doc;
 mod lang;
+#[cfg(test)]
+mod oracle;
 
-use lang::doc::{
+use doc::{
     detect_doc_format, parse_doc_into, AllDocStats, DocFormatId, FileTarget, ALL_DOC_FORMATS,
     DOC_FORMAT_COUNT,
 };
 #[cfg(test)]
-use lang::doc::DocStats;
+use doc::DocStats;
 use lang::{
-    detect_language, detect_shebang, parse_into, LangId, LangStats, ALL_LANGS, LANG_ALL_MASK,
-    LANG_COUNT, LANG_OBJECTIVEC_MASK,
+    detect_language, detect_shebang, parse_into, LangId, LangMask, LangStats, ALL_LANGS,
+    LANG_ALL_MASK, LANG_COUNT,
 };
 use rustix::buffer::spare_capacity;
 use rustix::fd::{AsFd, OwnedFd};
@@ -147,14 +150,14 @@ struct SchedulerState {
 }
 
 struct WorkScheduler {
-    enabled_mask: u128,
+    enabled_mask: LangMask,
     hidden: bool,
     mutex: Mutex<SchedulerState>,
     cond: Condvar,
 }
 
 impl WorkScheduler {
-    fn new(root: &[u8], enabled_mask: u128, hidden: bool) -> Self {
+    fn new(root: &[u8], enabled_mask: LangMask, hidden: bool) -> Self {
         assert!(!root.is_empty());
         let mut dirs_arena = Vec::with_capacity(65536);
         dirs_arena.extend_from_slice(root);
@@ -385,7 +388,7 @@ fn process_single_path<Fd: AsFd>(
     dirfd: Fd,
     path: &CStr,
     target: FileTarget,
-    enabled_mask: u128,
+    enabled_mask: LangMask,
     res: &mut WorkerResult,
     fb: &mut Vec<u8>,
 ) {
@@ -406,7 +409,7 @@ fn process_single_path<Fd: AsFd>(
         let mut lang = ALL_LANGS[target.lang_id() as usize];
         if read_file_into(dirfd, path, fb) {
             if lang == LangId::Matlab
-                && (enabled_mask & LANG_OBJECTIVEC_MASK) != 0
+                && enabled_mask.has(LangId::ObjectiveC)
                 && lang::objc::is_objc_file(fb)
             {
                 lang = LangId::ObjectiveC;
@@ -781,6 +784,8 @@ fn write_summary_markdown<W: std::io::Write>(
     _processing_time: f64,
     _num_workers: usize,
     _cpu_count: usize,
+    sort: SortColumn,
+    _top: Option<usize>,
 ) {
     let _ = writeln!(
         out,
@@ -818,7 +823,7 @@ fn write_summary_markdown<W: std::io::Write>(
         }
     }
 
-    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+    sort.sort_rows(&mut rows);
 
     for &(lang, files, lines, code, comments, blanks, kws) in &rows {
         let _ = writeln!(
@@ -928,6 +933,8 @@ fn write_detailed_markdown<W: std::io::Write>(
 fn write_summary_csv<W: std::io::Write>(
     out: &mut W,
     totals: &WorkerResult,
+    sort: SortColumn,
+    _top: Option<usize>,
 ) {
     let _ = writeln!(
         out,
@@ -961,9 +968,9 @@ fn write_summary_csv<W: std::io::Write>(
         }
     }
 
-    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+    sort.sort_rows(&mut rows);
 
-    for &(lang, files, lines, code, comments, blanks, kws) in &rows {
+    for (lang, files, lines, code, comments, blanks, kws) in rows {
         let _ = writeln!(
             out,
             "{},{},{},{},{},{},{}",
@@ -1061,6 +1068,8 @@ fn write_summary_json<W: std::io::Write>(
     processing_time: f64,
     num_workers: usize,
     cpu_count: usize,
+    sort: SortColumn,
+    _top: Option<usize>,
 ) {
     let mut rows: Vec<(LangId, i64, i64, i64, i64, i64, i64)> = Vec::with_capacity(LANG_COUNT);
     let mut total_files = 0i64;
@@ -1089,7 +1098,7 @@ fn write_summary_json<W: std::io::Write>(
         }
     }
 
-    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+    sort.sort_rows(&mut rows);
 
     let _ = writeln!(out, "{{");
     let _ = writeln!(out, "  \"summary\": {{");
@@ -1206,6 +1215,8 @@ fn print_summary_results(
     processing_time: f64,
     num_workers: usize,
     cpu_count: usize,
+    sort: SortColumn,
+    top: Option<usize>,
 ) {
     let color = should_color();
     let (c_cyan, c_white, c_green, c_gray, c_reset) = if color {
@@ -1267,13 +1278,51 @@ fn print_summary_results(
         }
     }
 
-    rows.sort_unstable_by(|a, b| b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())));
+    sort.sort_rows(&mut rows);
 
-    for &(lang, files, lines, code, comments, blanks, kws) in &rows {
+    let (display_rows, other_row) = if let Some(n) = top {
+        if n < rows.len() {
+            let mut other_files = 0i64;
+            let mut other_lines = 0i64;
+            let mut other_code = 0i64;
+            let mut other_comments = 0i64;
+            let mut other_blanks = 0i64;
+            let mut other_kws = 0i64;
+            for r in &rows[n..] {
+                other_files += r.1;
+                other_lines += r.2;
+                other_code += r.3;
+                other_comments += r.4;
+                other_blanks += r.5;
+                other_kws += r.6;
+            }
+            (&rows[..n], Some(("Other", other_files, other_lines, other_code, other_comments, other_blanks, other_kws)))
+        } else {
+            (&rows[..], None)
+        }
+    } else {
+        (&rows[..], None)
+    };
+
+    for &(lang, files, lines, code, comments, blanks, kws) in display_rows {
         let _ = writeln!(
             out,
             "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
             c_gray, c_cyan, lang.name(),
+            c_gray, c_reset, format_number(files),
+            c_gray, c_reset, format_number(lines),
+            c_gray, c_reset, format_number(code),
+            c_gray, c_reset, format_number(comments),
+            c_gray, c_reset, format_number(blanks),
+            c_gray, c_reset, format_number(kws),
+            c_gray
+        );
+    }
+    if let Some((name, files, lines, code, comments, blanks, kws)) = other_row {
+        let _ = writeln!(
+            out,
+            "{}│{} {:<18} {}│{} {:>8} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│{} {:>12} {}│",
+            c_gray, c_cyan, name,
             c_gray, c_reset, format_number(files),
             c_gray, c_reset, format_number(lines),
             c_gray, c_reset, format_number(code),
@@ -1504,6 +1553,45 @@ fn print_usage(prog: &str) {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum SortColumn {
+    #[default]
+    Keywords,
+    Lines,
+    Code,
+    Comments,
+    Blanks,
+    Files,
+    Name,
+}
+
+impl SortColumn {
+    pub fn sort_rows(self, rows: &mut [(LangId, i64, i64, i64, i64, i64, i64)]) {
+        rows.sort_unstable_by(|a, b| match self {
+            Self::Keywords => b.6.cmp(&a.6).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Lines => b.2.cmp(&a.2).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Code => b.3.cmp(&a.3).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Comments => b.4.cmp(&a.4).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Blanks => b.5.cmp(&a.5).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Files => b.1.cmp(&a.1).then_with(|| a.0.name().cmp(b.0.name())),
+            Self::Name => a.0.name().cmp(b.0.name()),
+        });
+    }
+
+    pub fn from_str_name(s: &str) -> Option<Self> {
+        match s {
+            "keywords" | "kws" => Some(Self::Keywords),
+            "lines" | "line" => Some(Self::Lines),
+            "code" => Some(Self::Code),
+            "comments" | "comment" | "comm" => Some(Self::Comments),
+            "blanks" | "blank" => Some(Self::Blanks),
+            "files" | "file" => Some(Self::Files),
+            "name" | "lang" => Some(Self::Name),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 enum OutputFormat {
     #[default]
     Table,
@@ -1531,10 +1619,12 @@ impl OutputFormat {
 enum CliResult<'a> {
     Run {
         target: &'a OsStr,
-        mask: u128,
+        mask: LangMask,
         selected_langs: Vec<LangId>,
         format: OutputFormat,
         hidden: bool,
+        sort: SortColumn,
+        top: Option<usize>,
     },
     Help,
     Version,
@@ -1547,10 +1637,12 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     }
 
     let mut target_os: Option<&'a OsStr> = None;
-    let mut flag_mask = 0u128;
+    let mut flag_mask = LangMask::ZERO;
     let mut selected_langs: Vec<LangId> = Vec::new();
     let mut format = OutputFormat::Table;
     let mut hidden = false;
+    let mut sort = SortColumn::Keywords;
+    let mut top: Option<usize> = None;
 
     let mut idx = 1;
     while idx < args.len() {
@@ -1587,6 +1679,52 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
             format = OutputFormat::Markdown;
         } else if bytes == b"--hidden" {
             hidden = true;
+        } else if bytes == b"--sort" {
+            idx += 1;
+            if idx >= args.len() {
+                return CliResult::Err("Missing argument for '--sort'".to_string());
+            }
+            let val = args[idx].to_string_lossy();
+            match SortColumn::from_str_name(&val) {
+                Some(col) => sort = col,
+                None => return CliResult::Err(format!("Unknown sort column '{val}'")),
+            }
+        } else if bytes.starts_with(b"--sort=") {
+            let val = String::from_utf8_lossy(&bytes[b"--sort=".len()..]);
+            match SortColumn::from_str_name(&val) {
+                Some(col) => sort = col,
+                None => return CliResult::Err(format!("Unknown sort column '{val}'")),
+            }
+        } else if bytes == b"--sort-keywords" || bytes == b"--sort-kws" {
+            sort = SortColumn::Keywords;
+        } else if bytes == b"--sort-lines" || bytes == b"--sort-line" {
+            sort = SortColumn::Lines;
+        } else if bytes == b"--sort-code" {
+            sort = SortColumn::Code;
+        } else if bytes == b"--sort-comments" || bytes == b"--sort-comm" {
+            sort = SortColumn::Comments;
+        } else if bytes == b"--sort-blanks" || bytes == b"--sort-blank" {
+            sort = SortColumn::Blanks;
+        } else if bytes == b"--sort-files" || bytes == b"--sort-file" {
+            sort = SortColumn::Files;
+        } else if bytes == b"--sort-name" || bytes == b"--sort-lang" {
+            sort = SortColumn::Name;
+        } else if bytes == b"--top" {
+            idx += 1;
+            if idx >= args.len() {
+                return CliResult::Err("Missing argument for '--top'".to_string());
+            }
+            let val = args[idx].to_string_lossy();
+            match val.parse::<usize>() {
+                Ok(n) if n > 0 => top = Some(n),
+                _ => return CliResult::Err(format!("Invalid number for '--top': '{val}'")),
+            }
+        } else if bytes.starts_with(b"--top=") {
+            let val = String::from_utf8_lossy(&bytes[b"--top=".len()..]);
+            match val.parse::<usize>() {
+                Ok(n) if n > 0 => top = Some(n),
+                _ => return CliResult::Err(format!("Invalid number for '--top': '{val}'")),
+            }
         } else if bytes.starts_with(b"-") && bytes.len() > 1 {
             if let Some(lang) = LangId::from_flag(bytes) {
                 flag_mask |= lang.mask();
@@ -1620,7 +1758,7 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
         return CliResult::Err("Missing target path <PATH>".to_string());
     };
 
-    let enabled_mask = if flag_mask != 0 {
+    let enabled_mask = if !flag_mask.is_empty() {
         flag_mask
     } else {
         LANG_ALL_MASK
@@ -1632,6 +1770,8 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
         selected_langs,
         format,
         hidden,
+        sort,
+        top,
     }
 }
 
@@ -1648,7 +1788,7 @@ fn print_error_and_exit(prog: &str, msg: &str) -> ! {
     process::exit(2);
 }
 
-fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u128, Vec<LangId>, OutputFormat, bool) {
+fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, LangMask, Vec<LangId>, OutputFormat, bool, SortColumn, Option<usize>) {
     let prog = args
         .first()
         .map(|s| s.to_string_lossy())
@@ -1661,7 +1801,9 @@ fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u128, Vec<LangId>, Ou
             selected_langs,
             format,
             hidden,
-        } => (target, mask, selected_langs, format, hidden),
+            sort,
+            top,
+        } => (target, mask, selected_langs, format, hidden, sort, top),
         CliResult::Help => {
             print_usage(&prog);
             process::exit(0);
@@ -1679,7 +1821,7 @@ fn parse_cli_args(args: &[std::ffi::OsString]) -> (&OsStr, u128, Vec<LangId>, Ou
 fn main() {
     let start = Instant::now();
     let args: Vec<_> = env::args_os().collect();
-    let (target_os, enabled_mask, selected_langs, output_format, hidden) = parse_cli_args(&args);
+    let (target_os, enabled_mask, selected_langs, output_format, hidden, sort, top) = parse_cli_args(&args);
     let target_bytes = target_os.as_bytes();
 
     let Ok(stx) = statx(CWD, target_bytes, AtFlags::empty(), StatxFlags::TYPE) else {
@@ -1768,7 +1910,7 @@ fn main() {
         let mut fb = Vec::with_capacity(131072);
         if read_file_into(CWD, target_cstr, &mut fb) {
             if lang == LangId::Matlab
-                && (enabled_mask & LANG_OBJECTIVEC_MASK) != 0
+                && enabled_mask.has(LangId::ObjectiveC)
                 && lang::objc::is_objc_file(&fb)
             {
                 lang = LangId::ObjectiveC;
@@ -1791,7 +1933,7 @@ fn main() {
     match output_format {
         OutputFormat::Table => {
             if selected_langs.is_empty() {
-                print_summary_results(&totals, processing_time, num_workers, cpu_count);
+                print_summary_results(&totals, processing_time, num_workers, cpu_count, sort, top);
             } else {
                 for (i, &lang) in selected_langs.iter().enumerate() {
                     if i > 0 {
@@ -1805,7 +1947,7 @@ fn main() {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             if selected_langs.is_empty() {
-                write_summary_markdown(&mut handle, &totals, processing_time, num_workers, cpu_count);
+                write_summary_markdown(&mut handle, &totals, processing_time, num_workers, cpu_count, sort, top);
             } else {
                 for (i, &lang) in selected_langs.iter().enumerate() {
                     if i > 0 {
@@ -1819,7 +1961,7 @@ fn main() {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             if selected_langs.is_empty() {
-                write_summary_csv(&mut handle, &totals);
+                write_summary_csv(&mut handle, &totals, sort, top);
             } else {
                 for (i, &lang) in selected_langs.iter().enumerate() {
                     if i > 0 {
@@ -1833,7 +1975,7 @@ fn main() {
             let stdout = std::io::stdout();
             let mut handle = stdout.lock();
             if selected_langs.is_empty() {
-                write_summary_json(&mut handle, &totals, processing_time, num_workers, cpu_count);
+                write_summary_json(&mut handle, &totals, processing_time, num_workers, cpu_count, sort, top);
             } else {
                 write_detailed_json(&mut handle, &totals, &selected_langs, processing_time, num_workers, cpu_count);
             }
@@ -2016,6 +2158,18 @@ mod tests {
         assert_eq!(detect_doc_format(b"doc.asciidoc"), Some(DocFormatId::AsciiDoc));
         assert_eq!(detect_doc_format(b"notes.org"), Some(DocFormatId::Org));
         assert_eq!(detect_doc_format(b"references.bib"), Some(DocFormatId::BibTeX));
+        assert_eq!(detect_doc_format(b"style.xslt"), Some(DocFormatId::Xslt));
+        assert_eq!(detect_doc_format(b"style.xsl"), Some(DocFormatId::Xslt));
+        assert_eq!(detect_doc_format(b"project.pbxproj"), Some(DocFormatId::Xcode));
+        assert_eq!(detect_doc_format(b"configure.ac"), Some(DocFormatId::Autoconf));
+        assert_eq!(detect_doc_format(b"macro.m4"), Some(DocFormatId::Autoconf));
+        assert_eq!(detect_doc_format(b"Doxyfile"), Some(DocFormatId::Doxygen));
+        assert_eq!(detect_doc_format(b"sudoers"), Some(DocFormatId::Sudoers));
+        assert_eq!(detect_doc_format(b"passwd"), Some(DocFormatId::Passwd));
+        assert_eq!(detect_doc_format(b"known_hosts"), Some(DocFormatId::KnownHosts));
+        assert_eq!(detect_doc_format(b"package.wrap"), Some(DocFormatId::MesonWrap));
+        assert_eq!(detect_doc_format(b"font.sfd"), Some(DocFormatId::FontForge));
+        assert_eq!(detect_doc_format(b"COMMIT_EDITMSG"), Some(DocFormatId::GitCommit));
         assert_eq!(detect_doc_format(b"unknown.xyz"), None);
 
         let parse_doc = |doc: DocFormatId, bytes: &[u8]| -> DocStats {
@@ -2196,7 +2350,7 @@ key=val
         assert_eq!(totals.lang_stats.c.lines_processed, (file_count * 2) as i64);
         assert_eq!(totals.lang_stats.c.total_keywords, (file_count * 2) as i64);
 
-        let disabled_sched = WorkScheduler::new(tmp_dir.as_bytes(), 0, true);
+        let disabled_sched = WorkScheduler::new(tmp_dir.as_bytes(), LangMask::ZERO, true);
         let disabled_res = unified_worker_proc(&disabled_sched);
         assert_eq!(disabled_res.total_files_found(), 0);
 
@@ -2206,7 +2360,7 @@ key=val
     #[test]
     fn test_cli_flag_parsing() {
         let args = vec![OsString::from("lfa"), OsString::from("/tmp")];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
         assert_eq!(detailed, Vec::<LangId>::new());
@@ -2218,7 +2372,7 @@ key=val
             OsString::from("--hidden"),
             OsString::from("/tmp"),
         ];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_hidden);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_hidden);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
         assert_eq!(detailed, Vec::<LangId>::new());
@@ -2230,7 +2384,7 @@ key=val
             OsString::from("/tmp"),
             OsString::from("-c"),
         ];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_c);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
         assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
@@ -2242,7 +2396,7 @@ key=val
             OsString::from("-c"),
             OsString::from("/tmp"),
         ];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_c_first);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_c_first);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
         assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
@@ -2254,7 +2408,7 @@ key=val
             OsString::from("-cpp"),
             OsString::from("/tmp"),
         ];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_cpp);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_cpp);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(mask, LangId::Cpp.mask() | LangId::CppHeader.mask());
         assert_eq!(detailed, vec![LangId::Cpp, LangId::CppHeader]);
@@ -2267,7 +2421,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_rs);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_rs);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Rust.mask());
             assert_eq!(detailed, vec![LangId::Rust]);
@@ -2281,7 +2435,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_py);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_py);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Python.mask());
             assert_eq!(detailed, vec![LangId::Python]);
@@ -2295,7 +2449,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_pl);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_pl);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Perl.mask());
             assert_eq!(detailed, vec![LangId::Perl]);
@@ -2309,7 +2463,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_go);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_go);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Go.mask());
             assert_eq!(detailed, vec![LangId::Go]);
@@ -2323,7 +2477,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_zig);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_zig);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Zig.mask());
             assert_eq!(detailed, vec![LangId::Zig]);
@@ -2337,7 +2491,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_odin);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_odin);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Odin.mask());
             assert_eq!(detailed, vec![LangId::Odin]);
@@ -2351,7 +2505,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_js);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_js);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::JavaScript.mask());
             assert_eq!(detailed, vec![LangId::JavaScript]);
@@ -2365,7 +2519,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_ts);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_ts);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::TypeScript.mask());
             assert_eq!(detailed, vec![LangId::TypeScript]);
@@ -2379,7 +2533,7 @@ key=val
                 OsString::from(flag),
                 OsString::from("/tmp"),
             ];
-            let (target, mask, detailed, format, hidden) = parse_cli_args(&args_lua);
+            let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_lua);
             assert_eq!(target.as_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Lua.mask());
             assert_eq!(detailed, vec![LangId::Lua]);
@@ -2395,7 +2549,7 @@ key=val
             OsString::from("-zig"),
             OsString::from("-odin"),
         ];
-        let (target, mask, detailed, format, hidden) = parse_cli_args(&args_multi);
+        let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_multi);
         assert_eq!(target.as_bytes(), b"/tmp");
         assert_eq!(
             mask,
@@ -2458,6 +2612,34 @@ key=val
             CliResult::Version
         ));
 
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--sort"), OsString::from("code"), OsString::from("/tmp")]) {
+            CliResult::Run { sort, .. } => assert_eq!(sort, SortColumn::Code),
+            _ => panic!("Expected CliResult::Run with sort code"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--sort=lines"), OsString::from("/tmp")]) {
+            CliResult::Run { sort, .. } => assert_eq!(sort, SortColumn::Lines),
+            _ => panic!("Expected CliResult::Run with sort lines"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--sort-files"), OsString::from("/tmp")]) {
+            CliResult::Run { sort, .. } => assert_eq!(sort, SortColumn::Files),
+            _ => panic!("Expected CliResult::Run with sort files"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--top"), OsString::from("5"), OsString::from("/tmp")]) {
+            CliResult::Run { top, .. } => assert_eq!(top, Some(5)),
+            _ => panic!("Expected CliResult::Run with top 5"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--top=10"), OsString::from("/tmp")]) {
+            CliResult::Run { top, .. } => assert_eq!(top, Some(10)),
+            _ => panic!("Expected CliResult::Run with top 10"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--sort"), OsString::from("invalid"), OsString::from("/tmp")]) {
+            CliResult::Err(e) => assert!(e.contains("Unknown sort column")),
+            _ => panic!("Expected CliResult::Err for invalid sort"),
+        }
+        match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("--top"), OsString::from("abc"), OsString::from("/tmp")]) {
+            CliResult::Err(e) => assert!(e.contains("Invalid number for '--top'")),
+            _ => panic!("Expected CliResult::Err for invalid top"),
+        }
         match try_parse_cli_args(&[OsString::from("lfa"), OsString::from("-f"), OsString::from("json"), OsString::from("/tmp")]) {
             CliResult::Run { format, .. } => assert_eq!(format, OutputFormat::Json),
             _ => panic!("Expected CliResult::Run with json format"),
@@ -2533,20 +2715,20 @@ key=val
         dummy_totals.lang_stats.rust.keyword_counts[0] = 1;
 
         let mut csv_buf = Vec::new();
-        write_summary_csv(&mut csv_buf, &dummy_totals);
+        write_summary_csv(&mut csv_buf, &dummy_totals, SortColumn::Keywords, None);
         let csv_str = String::from_utf8(csv_buf).unwrap();
         assert!(csv_str.contains("Rust,2,100,80,10,10,1"));
         assert!(csv_str.contains("Total,2,100,80,10,10,1"));
 
         let mut json_buf = Vec::new();
-        write_summary_json(&mut json_buf, &dummy_totals, 0.05, 4, 4);
+        write_summary_json(&mut json_buf, &dummy_totals, 0.05, 4, 4, SortColumn::Keywords, None);
         let json_str = String::from_utf8(json_buf).unwrap();
         assert!(json_str.contains("\"language\": \"Rust\""));
         assert!(json_str.contains("\"lines\": 100"));
         assert!(json_str.contains("\"code\": 80"));
 
         let mut md_buf = Vec::new();
-        write_summary_markdown(&mut md_buf, &dummy_totals, 0.05, 4, 4);
+        write_summary_markdown(&mut md_buf, &dummy_totals, 0.05, 4, 4, SortColumn::Keywords, None);
         let md_str = String::from_utf8(md_buf).unwrap();
         assert!(md_str.contains("| Rust | 2 | 100 | 80 | 10 | 10 | 1 |"));
 
