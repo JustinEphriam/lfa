@@ -293,6 +293,10 @@ impl AllDocStats {
 
 #[inline(always)]
 pub fn detect_doc_format(name: &[u8]) -> Option<DocFormatId> {
+    if name.ends_with(b"/.git/config") || name.ends_with(b"\\.git\\config") {
+        return Some(DocFormatId::GitConfig);
+    }
+    let name = crate::lang::get_basename(name);
     if name == b"README" || name == b"LICENSE" || name == b"COPYING" || name == b"AUTHORS" || name == b"INSTALL" {
         return Some(DocFormatId::PlainText);
     }

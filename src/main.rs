@@ -15,21 +15,26 @@ use lang::{
     detect_language, detect_shebang, parse_into, LangId, LangMask, LangStats, ALL_LANGS,
     LANG_ALL_MASK, LANG_COUNT,
 };
+#[cfg(unix)]
 use rustix::buffer::spare_capacity;
+#[cfg(unix)]
 use rustix::fd::{AsFd, OwnedFd};
+#[cfg(unix)]
 use rustix::ffi::CStr;
-use rustix::fs::{
-    fadvise, openat, statx, Advice, AtFlags, FileType, Mode, OFlags, RawDir, RawMode, StatxFlags,
-    CWD,
-};
-use rustix::io::{dup, read, write, Errno};
-use rustix::stdio::stdout;
+#[cfg(unix)]
+use rustix::fs::{openat, AtFlags, FileType, Mode, OFlags, RawMode, CWD};
+#[cfg(target_os = "linux")]
+use rustix::fs::{fadvise, statx, Advice, RawDir, StatxFlags};
+#[cfg(all(unix, not(target_os = "linux")))]
+use rustix::fs::{statat, Dir};
+#[cfg(unix)]
+use rustix::io::{dup, read, Errno};
 use std::cmp::Ordering;
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Write as _;
+use std::io::IsTerminal as _;
 use std::io::Write as _;
-use std::os::unix::ffi::OsStrExt;
 use std::process;
 use std::sync::{Condvar, Mutex};
 use std::thread;
@@ -42,6 +47,7 @@ const _: () = assert!(BATCH_SIZE > 0 && BATCH_SIZE <= 1024);
 const _: () = assert!(BATCH_BUF_SIZE >= 1024 && BATCH_BUF_SIZE <= u16::MAX as usize);
 
 struct Batch {
+    #[cfg(unix)]
     dirfd: Option<OwnedFd>,
     data: [u8; BATCH_BUF_SIZE],
     offsets: [u16; BATCH_SIZE],
@@ -55,6 +61,7 @@ struct Batch {
 impl Batch {
     fn new() -> Box<Self> {
         Box::new(Self {
+            #[cfg(unix)]
             dirfd: None,
             data: [0u8; BATCH_BUF_SIZE],
             offsets: [0u16; BATCH_SIZE],
@@ -68,7 +75,10 @@ impl Batch {
 
     #[inline(always)]
     fn reset(&mut self) {
-        self.dirfd = None;
+        #[cfg(unix)]
+        {
+            self.dirfd = None;
+        }
         self.data_len = 0;
         self.count = 0;
     }
@@ -80,7 +90,7 @@ impl Batch {
         assert!(self.data_len <= BATCH_BUF_SIZE);
         let dir_len = dir.len();
         let name_len = name.len();
-        let has_slash = dir_len > 0 && dir[dir_len - 1] == b'/';
+        let has_slash = dir_len > 0 && (dir[dir_len - 1] == b'/' || dir[dir_len - 1] == b'\\');
         let sep_len = usize::from(!has_slash);
         let path_len = dir_len + sep_len + name_len;
         let needed = path_len + 1;
@@ -112,6 +122,7 @@ impl Batch {
         true
     }
 
+    #[cfg(unix)]
     #[inline(always)]
     fn get_path_cstr(&self, idx: usize) -> &CStr {
         assert!(idx < self.count);
@@ -122,6 +133,7 @@ impl Batch {
         CStr::from_bytes_with_nul(&self.data[off..off + len + 1]).unwrap()
     }
 
+    #[cfg(unix)]
     #[inline(always)]
     fn get_rel_name_cstr(&self, idx: usize) -> &CStr {
         assert!(idx < self.count);
@@ -131,6 +143,16 @@ impl Batch {
         assert!(name_off >= off && off + len < self.data_len);
         assert!(self.data[off + len] == 0);
         CStr::from_bytes_with_nul(&self.data[name_off..off + len + 1]).unwrap()
+    }
+
+    #[cfg(windows)]
+    #[inline(always)]
+    fn get_path_bytes(&self, idx: usize) -> &[u8] {
+        assert!(idx < self.count);
+        let off = self.offsets[idx] as usize;
+        let len = self.lens[idx] as usize;
+        assert!(off + len < self.data_len);
+        &self.data[off..off + len]
     }
 }
 
@@ -345,6 +367,21 @@ impl WorkerResult {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[inline(always)]
+fn stat_file_type<Fd: AsFd, P: rustix::path::Arg>(dirfd: Fd, path: P, flags: AtFlags) -> Option<FileType> {
+    let stx = statx(dirfd, path, flags, StatxFlags::TYPE).ok()?;
+    Some(FileType::from_raw_mode(RawMode::from(stx.stx_mode)))
+}
+
+#[cfg(all(unix, not(target_os = "linux")))]
+#[inline(always)]
+fn stat_file_type<Fd: AsFd, P: rustix::path::Arg>(dirfd: Fd, path: P, flags: AtFlags) -> Option<FileType> {
+    let st = statat(dirfd, path, flags).ok()?;
+    Some(FileType::from_raw_mode(RawMode::from(st.st_mode)))
+}
+
+#[cfg(unix)]
 #[inline(always)]
 fn read_file_into<Fd: AsFd>(dirfd: Fd, path: &CStr, fb: &mut Vec<u8>) -> bool {
     let Ok(fd) = openat(
@@ -356,6 +393,7 @@ fn read_file_into<Fd: AsFd>(dirfd: Fd, path: &CStr, fb: &mut Vec<u8>) -> bool {
         return false;
     };
 
+    #[cfg(target_os = "linux")]
     let _ = fadvise(&fd, 0, None, Advice::Sequential);
 
     fb.clear();
@@ -383,6 +421,7 @@ fn read_file_into<Fd: AsFd>(dirfd: Fd, path: &CStr, fb: &mut Vec<u8>) -> bool {
     }
 }
 
+#[cfg(unix)]
 #[inline(always)]
 fn process_single_path<Fd: AsFd>(
     dirfd: Fd,
@@ -428,11 +467,184 @@ fn process_single_path<Fd: AsFd>(
     }
 }
 
+#[cfg(windows)]
+#[inline(always)]
+fn read_file_into_win(path: &std::path::Path, fb: &mut Vec<u8>) -> bool {
+    use std::io::Read as _;
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    fb.clear();
+    if fb.capacity() < 131072 {
+        fb.reserve(131072 - fb.capacity());
+    }
+    if file.read_to_end(fb).is_ok() {
+        true
+    } else {
+        fb.clear();
+        false
+    }
+}
+
+#[cfg(windows)]
+#[inline(always)]
+fn process_single_path_win(
+    path_bytes: &[u8],
+    target: FileTarget,
+    enabled_mask: LangMask,
+    res: &mut WorkerResult,
+    fb: &mut Vec<u8>,
+) {
+    let Ok(path_str) = std::str::from_utf8(path_bytes) else {
+        return;
+    };
+    let path = std::path::Path::new(path_str);
+    if target.is_doc() {
+        if let Some(doc) = target.doc_format() {
+            let idx = doc as usize;
+            res.doc_files_found[idx] += 1;
+            if read_file_into_win(path, fb) {
+                res.doc_files_processed[idx] += 1;
+                parse_doc_into(doc, fb, &mut res.doc_stats.stats[idx]);
+                if fb.capacity() > 524_288 {
+                    fb.clear();
+                    fb.shrink_to(131_072);
+                }
+            }
+        }
+    } else {
+        let mut lang = ALL_LANGS[target.lang_id() as usize];
+        if read_file_into_win(path, fb) {
+            if lang == LangId::Matlab
+                && enabled_mask.has(LangId::ObjectiveC)
+                && lang::objc::is_objc_file(fb)
+            {
+                lang = LangId::ObjectiveC;
+            }
+            let idx = lang as usize;
+            res.files_found[idx] += 1;
+            res.files_processed[idx] += 1;
+            parse_into(lang, fb, &mut res.lang_stats);
+            if fb.capacity() > 524_288 {
+                fb.clear();
+                fb.shrink_to(131_072);
+            }
+        } else {
+            res.files_found[lang as usize] += 1;
+        }
+    }
+}
+
+#[cfg(unix)]
+#[allow(clippy::too_many_arguments)]
+fn handle_unix_dir_entry(
+    fd: &OwnedFd,
+    mut ft: FileType,
+    name_cstr: &CStr,
+    dir_bytes: &[u8],
+    hidden: bool,
+    enabled_mask: LangMask,
+    sched: &WorkScheduler,
+    subdirs_arena: &mut Vec<u8>,
+    subdirs_spans: &mut Vec<(u32, u32)>,
+    local_batch: &mut Option<Box<Batch>>,
+    batch_started_empty: &mut bool,
+    res: &mut WorkerResult,
+    fb: &mut Vec<u8>,
+) {
+    let name = name_cstr.to_bytes();
+    if name == b"." || name == b".." {
+        return;
+    }
+    if !hidden && !name.is_empty() && name[0] == b'.' {
+        return;
+    }
+
+    if ft == FileType::Unknown
+        && let Some(resolved_ft) = stat_file_type(fd, name_cstr, AtFlags::SYMLINK_NOFOLLOW)
+    {
+        ft = resolved_ft;
+    }
+
+    if ft == FileType::Directory {
+        let has_slash = !dir_bytes.is_empty() && (dir_bytes[dir_bytes.len() - 1] == b'/' || dir_bytes[dir_bytes.len() - 1] == b'\\');
+        let sep_len = usize::from(!has_slash);
+        let sub_len = dir_bytes.len() + sep_len + name.len();
+        let start_off = subdirs_arena.len() as u32;
+        subdirs_arena.reserve(sub_len);
+        subdirs_arena.extend_from_slice(dir_bytes);
+        if !has_slash {
+            subdirs_arena.push(b'/');
+        }
+        subdirs_arena.extend_from_slice(name);
+        subdirs_spans.push((start_off, sub_len as u32));
+    } else if ft == FileType::RegularFile {
+        let mut target_opt = detect_language(name, enabled_mask)
+            .map(|l| FileTarget::from_lang(l as u8))
+            .or_else(|| {
+                if enabled_mask == LANG_ALL_MASK {
+                    detect_doc_format(name).map(FileTarget::from_doc)
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                if !name.contains(&b'.') {
+                    let mut probe_buf = [0u8; 128];
+                    if let Ok(file_fd) = openat(fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                        && let Ok(n) = read(&file_fd, &mut probe_buf)
+                    {
+                        return detect_shebang(&probe_buf[..n], enabled_mask)
+                            .map(|l| FileTarget::from_lang(l as u8));
+                    }
+                }
+                None
+            });
+
+        if let Some(target) = target_opt
+            && !target.is_doc()
+            && target.lang_id() == LangId::D as u8
+            && name.ends_with(b".d")
+        {
+            let mut probe_buf = [0u8; 128];
+            if let Ok(file_fd) = openat(fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                && let Ok(n) = read(&file_fd, &mut probe_buf)
+                && lang::d::is_d_dep_file(&probe_buf[..n])
+            {
+                target_opt = None;
+            }
+        }
+
+        if let Some(target) = target_opt {
+            let mut too_long = false;
+            let lb = local_batch.as_mut().unwrap();
+            if !lb.append(dir_bytes, name, target, &mut too_long) {
+                if too_long {
+                    process_single_path(fd, name_cstr, target, enabled_mask, res, fb);
+                } else {
+                    if *batch_started_empty && let Ok(dup_fd) = dup(fd) {
+                        lb.dirfd = Some(dup_fd);
+                    }
+                    let full = local_batch.take().unwrap();
+                    let mut next = sched.submit_batch_and_swap(full);
+                    *batch_started_empty = true;
+                    let mut dummy = false;
+                    let ok = next.append(dir_bytes, name, target, &mut dummy);
+                    assert!(ok);
+                    *local_batch = Some(next);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
 fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
     let enabled_mask = sched.enabled_mask;
     let hidden = sched.hidden;
     let mut res = WorkerResult::default();
     let mut fb = Vec::with_capacity(131072);
+    #[cfg(target_os = "linux")]
     let mut dents_buf: Vec<u8> = Vec::with_capacity(65536);
     let mut dir_buf: Vec<u8> = Vec::with_capacity(512);
     let mut subdirs_arena: Vec<u8> = Vec::with_capacity(4096);
@@ -482,33 +694,131 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                     subdirs_arena.clear();
                     subdirs_spans.clear();
 
-                    let mut raw_dir = RawDir::new(&fd, dents_buf.spare_capacity_mut());
-                    while let Some(Ok(entry)) = raw_dir.next() {
-                        let mut ft = entry.file_type();
-                        let name_cstr = entry.file_name();
-                        let name = name_cstr.to_bytes();
+                    #[cfg(target_os = "linux")]
+                    {
+                        let mut raw_dir = RawDir::new(&fd, dents_buf.spare_capacity_mut());
+                        while let Some(Ok(entry)) = raw_dir.next() {
+                            handle_unix_dir_entry(
+                                &fd,
+                                entry.file_type(),
+                                entry.file_name(),
+                                dir_bytes,
+                                hidden,
+                                enabled_mask,
+                                sched,
+                                &mut subdirs_arena,
+                                &mut subdirs_spans,
+                                &mut local_batch,
+                                &mut batch_started_empty,
+                                &mut res,
+                                &mut fb,
+                            );
+                        }
+                    }
 
+                    #[cfg(all(unix, not(target_os = "linux")))]
+                    {
+                        if let Ok(mut dir) = Dir::read_from(&fd) {
+                            while let Some(Ok(entry)) = dir.next() {
+                                handle_unix_dir_entry(
+                                    &fd,
+                                    entry.file_type(),
+                                    entry.file_name(),
+                                    dir_bytes,
+                                    hidden,
+                                    enabled_mask,
+                                    sched,
+                                    &mut subdirs_arena,
+                                    &mut subdirs_spans,
+                                    &mut local_batch,
+                                    &mut batch_started_empty,
+                                    &mut res,
+                                    &mut fb,
+                                );
+                            }
+                        }
+                    }
+
+                    if batch_started_empty
+                        && let Some(lb) = local_batch.as_mut()
+                        && lb.count >= 16
+                        && let Ok(dup_fd) = dup(&fd)
+                    {
+                        lb.dirfd = Some(dup_fd);
+                    }
+                    drop(fd);
+                    sched.finish_dir(&subdirs_arena, &subdirs_spans, &mut local_batch);
+                } else {
+                    sched.finish_dir(&[], &[], &mut local_batch);
+                }
+            }
+        }
+    }
+
+    res
+}
+
+#[cfg(windows)]
+fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
+    use std::io::Read as _;
+    let enabled_mask = sched.enabled_mask;
+    let hidden = sched.hidden;
+    let mut res = WorkerResult::default();
+    let mut fb = Vec::with_capacity(131072);
+    let mut dir_buf: Vec<u8> = Vec::with_capacity(512);
+    let mut subdirs_arena: Vec<u8> = Vec::with_capacity(4096);
+    let mut subdirs_spans: Vec<(u32, u32)> = Vec::with_capacity(64);
+
+    let mut local_batch: Option<Box<Batch>> = None;
+    let mut prev_finished_batch: Option<Box<Batch>> = None;
+
+    loop {
+        let task = sched.complete_batch_and_next(
+            prev_finished_batch.take(),
+            &mut local_batch,
+            &mut dir_buf,
+        );
+
+        match task {
+            Task::Done => break,
+            Task::Batch(b) => {
+                for i in 0..b.count {
+                    process_single_path_win(b.get_path_bytes(i), b.targets[i], enabled_mask, &mut res, &mut fb);
+                }
+                prev_finished_batch = Some(b);
+            }
+            Task::Dir => {
+                if local_batch.is_none() {
+                    local_batch = Some(sched.acquire_batch());
+                }
+
+                let dir_bytes = &dir_buf[..dir_buf.len() - 1];
+                let Ok(dir_str) = std::str::from_utf8(dir_bytes) else {
+                    sched.finish_dir(&[], &[], &mut local_batch);
+                    continue;
+                };
+
+                subdirs_arena.clear();
+                subdirs_spans.clear();
+
+                if let Ok(entries) = std::fs::read_dir(dir_str) {
+                    for entry in entries.flatten() {
+                        let name_os = entry.file_name();
+                        let name = name_os.as_encoded_bytes();
                         if name == b"." || name == b".." {
                             continue;
                         }
-                        if !hidden && name[0] == b'.' {
+                        if !hidden && !name.is_empty() && name[0] == b'.' {
                             continue;
                         }
 
-                        if ft == FileType::Unknown
-                            && let Ok(stx) = statx(
-                                &fd,
-                                name_cstr,
-                                AtFlags::SYMLINK_NOFOLLOW,
-                                StatxFlags::TYPE,
-                            )
-                        {
-                            ft = FileType::from_raw_mode(RawMode::from(stx.stx_mode));
-                        }
+                        let Ok(ft) = entry.file_type() else {
+                            continue;
+                        };
 
-                        if ft == FileType::Directory {
-                            let has_slash =
-                                !dir_bytes.is_empty() && dir_bytes[dir_bytes.len() - 1] == b'/';
+                        if ft.is_dir() {
+                            let has_slash = !dir_bytes.is_empty()
+                                && (dir_bytes[dir_bytes.len() - 1] == b'/' || dir_bytes[dir_bytes.len() - 1] == b'\\');
                             let sep_len = usize::from(!has_slash);
                             let sub_len = dir_bytes.len() + sep_len + name.len();
                             let start_off = subdirs_arena.len() as u32;
@@ -519,7 +829,7 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                             }
                             subdirs_arena.extend_from_slice(name);
                             subdirs_spans.push((start_off, sub_len as u32));
-                        } else if ft == FileType::RegularFile {
+                        } else if ft.is_file() {
                             let mut target_opt = detect_language(name, enabled_mask)
                                 .map(|l| FileTarget::from_lang(l as u8))
                                 .or_else(|| {
@@ -532,8 +842,8 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                 .or_else(|| {
                                     if !name.contains(&b'.') {
                                         let mut probe_buf = [0u8; 128];
-                                        if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
-                                            && let Ok(n) = read(&file_fd, &mut probe_buf)
+                                        if let Ok(mut f) = std::fs::File::open(entry.path())
+                                            && let Ok(n) = f.read(&mut probe_buf)
                                         {
                                             return detect_shebang(&probe_buf[..n], enabled_mask)
                                                 .map(|l| FileTarget::from_lang(l as u8));
@@ -548,8 +858,8 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                 && name.ends_with(b".d")
                             {
                                 let mut probe_buf = [0u8; 128];
-                                if let Ok(file_fd) = openat(&fd, name_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
-                                    && let Ok(n) = read(&file_fd, &mut probe_buf)
+                                if let Ok(mut f) = std::fs::File::open(entry.path())
+                                    && let Ok(n) = f.read(&mut probe_buf)
                                     && lang::d::is_d_dep_file(&probe_buf[..n])
                                 {
                                     target_opt = None;
@@ -561,14 +871,12 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                                 let lb = local_batch.as_mut().unwrap();
                                 if !lb.append(dir_bytes, name, target, &mut too_long) {
                                     if too_long {
-                                        process_single_path(&fd, name_cstr, target, enabled_mask, &mut res, &mut fb);
+                                        let entry_path = entry.path();
+                                        let path_bytes = entry_path.as_os_str().as_encoded_bytes();
+                                        process_single_path_win(path_bytes, target, enabled_mask, &mut res, &mut fb);
                                     } else {
-                                        if batch_started_empty && let Ok(dup_fd) = dup(&fd) {
-                                            lb.dirfd = Some(dup_fd);
-                                        }
                                         let full = local_batch.take().unwrap();
                                         let mut next = sched.submit_batch_and_swap(full);
-                                        batch_started_empty = true;
                                         let mut dummy = false;
                                         let ok = next.append(dir_bytes, name, target, &mut dummy);
                                         assert!(ok);
@@ -578,15 +886,6 @@ fn unified_worker_proc(sched: &WorkScheduler) -> WorkerResult {
                             }
                         }
                     }
-
-                    if batch_started_empty
-                        && let Some(lb) = local_batch.as_mut()
-                        && lb.count >= 16
-                        && let Ok(dup_fd) = dup(&fd)
-                    {
-                        lb.dirfd = Some(dup_fd);
-                    }
-                    drop(fd);
                     sched.finish_dir(&subdirs_arena, &subdirs_spans, &mut local_batch);
                 } else {
                     sched.finish_dir(&[], &[], &mut local_batch);
@@ -636,7 +935,7 @@ fn should_color() -> bool {
     if env::var_os("NO_COLOR").is_some() {
         return false;
     }
-    rustix::termios::isatty(stdout())
+    std::io::stdout().is_terminal()
 }
 
 fn print_detailed_results(
@@ -775,7 +1074,7 @@ fn print_detailed_results(
         c_reset
     );
 
-    let _ = write(stdout(), out.as_bytes());
+    let _ = std::io::stdout().lock().write_all(out.as_bytes());
 }
 
 fn write_summary_markdown<W: std::io::Write>(
@@ -1435,7 +1734,7 @@ fn print_summary_results(
         c_reset
     );
 
-    let _ = write(stdout(), out.as_bytes());
+    let _ = std::io::stdout().lock().write_all(out.as_bytes());
 }
 
 fn get_cpu_count() -> usize {
@@ -1647,7 +1946,7 @@ fn try_parse_cli_args<'a>(args: &'a [std::ffi::OsString]) -> CliResult<'a> {
     let mut idx = 1;
     while idx < args.len() {
         let arg = &args[idx];
-        let bytes = arg.as_bytes();
+        let bytes = arg.as_encoded_bytes();
         if bytes == b"-h" || bytes == b"--help" {
             return CliResult::Help;
         }
@@ -1822,29 +2121,51 @@ fn main() {
     let start = Instant::now();
     let args: Vec<_> = env::args_os().collect();
     let (target_os, enabled_mask, selected_langs, output_format, hidden, sort, top) = parse_cli_args(&args);
-    let target_bytes = target_os.as_bytes();
+    let target_bytes = target_os.as_encoded_bytes();
 
-    let Ok(stx) = statx(CWD, target_bytes, AtFlags::empty(), StatxFlags::TYPE) else {
-        let color = should_color();
-        let (c_bold_red, c_bold, c_yellow, c_reset) = if color {
-            ("\x1b[1;31m", "\x1b[1m", "\x1b[33m", "\x1b[0m")
-        } else {
-            ("", "", "", "")
+    #[cfg(unix)]
+    let is_dir = {
+        let Some(ft) = stat_file_type(CWD, target_bytes, AtFlags::empty()) else {
+            let color = should_color();
+            let (c_bold_red, c_bold, c_yellow, c_reset) = if color {
+                ("\x1b[1;31m", "\x1b[1m", "\x1b[33m", "\x1b[0m")
+            } else {
+                ("", "", "", "")
+            };
+            eprintln!(
+                "{c_bold_red}error:{c_reset} {c_bold}Cannot access path {c_yellow}'{}'{c_reset}",
+                target_os.to_string_lossy()
+            );
+            eprintln!("Please check that the file or directory exists and you have permission to read it.");
+            process::exit(1);
         };
-        eprintln!(
-            "{c_bold_red}error:{c_reset} {c_bold}Cannot access path {c_yellow}'{}'{c_reset}",
-            target_os.to_string_lossy()
-        );
-        eprintln!("Please check that the file or directory exists and you have permission to read it.");
-        process::exit(1);
+        ft == FileType::Directory
     };
 
-    let ft = FileType::from_raw_mode(RawMode::from(stx.stx_mode));
+    #[cfg(windows)]
+    let is_dir = {
+        let Ok(meta) = std::fs::metadata(target_os) else {
+            let color = should_color();
+            let (c_bold_red, c_bold, c_yellow, c_reset) = if color {
+                ("\x1b[1;31m", "\x1b[1m", "\x1b[33m", "\x1b[0m")
+            } else {
+                ("", "", "", "")
+            };
+            eprintln!(
+                "{c_bold_red}error:{c_reset} {c_bold}Cannot access path {c_yellow}'{}'{c_reset}",
+                target_os.to_string_lossy()
+            );
+            eprintln!("Please check that the file or directory exists and you have permission to read it.");
+            process::exit(1);
+        };
+        meta.is_dir()
+    };
+
     let cpu_count = get_cpu_count();
     let mut totals = WorkerResult::default();
     let mut num_workers = cpu_count;
 
-    if ft == FileType::Directory {
+    if is_dir {
         let sched = WorkScheduler::new(target_bytes, enabled_mask, hidden);
         let extra_threads = cpu_count.saturating_sub(1);
 
@@ -1866,14 +2187,16 @@ fn main() {
             }
         });
     } else {
-        let mut target_nul = Vec::with_capacity(target_bytes.len() + 1);
-        target_nul.extend_from_slice(target_bytes);
-        target_nul.push(0);
-        let target_cstr = CStr::from_bytes_with_nul(&target_nul).unwrap();
+        #[cfg(unix)]
+        {
+            let mut target_nul = Vec::with_capacity(target_bytes.len() + 1);
+            target_nul.extend_from_slice(target_bytes);
+            target_nul.push(0);
+            let target_cstr = CStr::from_bytes_with_nul(&target_nul).unwrap();
 
-        let mut lang_opt = if ft == FileType::RegularFile {
-            detect_language(target_bytes, enabled_mask).or_else(|| {
-                if !target_bytes.contains(&b'.') {
+            let base_bytes = lang::get_basename(target_bytes);
+            let mut lang_opt = detect_language(base_bytes, enabled_mask).or_else(|| {
+                if !base_bytes.contains(&b'.') {
                     let mut probe_buf = [0u8; 128];
                     if let Ok(file_fd) = openat(CWD, target_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
                         && let Ok(n) = read(&file_fd, &mut probe_buf)
@@ -1882,45 +2205,96 @@ fn main() {
                     }
                 }
                 None
-            })
-        } else {
-            None
-        };
+            });
 
-        if let Some(LangId::D) = lang_opt
-            && target_bytes.ends_with(b".d")
-        {
-            let mut probe_buf = [0u8; 128];
-            if let Ok(file_fd) = openat(CWD, target_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
-                && let Ok(n) = read(&file_fd, &mut probe_buf)
-                && lang::d::is_d_dep_file(&probe_buf[..n])
+            if let Some(LangId::D) = lang_opt
+                && target_bytes.ends_with(b".d")
             {
-                lang_opt = None;
+                let mut probe_buf = [0u8; 128];
+                if let Ok(file_fd) = openat(CWD, target_cstr, OFlags::RDONLY | OFlags::CLOEXEC, Mode::empty())
+                    && let Ok(n) = read(&file_fd, &mut probe_buf)
+                    && lang::d::is_d_dep_file(&probe_buf[..n])
+                {
+                    lang_opt = None;
+                }
+            }
+
+            let Some(mut lang) = lang_opt else {
+                eprintln!(
+                    "Error: {} is not a supported source file",
+                    target_os.to_string_lossy()
+                );
+                process::exit(1);
+            };
+            num_workers = 1;
+            let mut fb = Vec::with_capacity(131072);
+            if read_file_into(CWD, target_cstr, &mut fb) {
+                if lang == LangId::Matlab
+                    && enabled_mask.has(LangId::ObjectiveC)
+                    && lang::objc::is_objc_file(&fb)
+                {
+                    lang = LangId::ObjectiveC;
+                }
+                let idx = lang as usize;
+                totals.files_found[idx] = 1;
+                totals.files_processed[idx] = 1;
+                parse_into(lang, &fb, &mut totals.lang_stats);
+            } else {
+                totals.files_found[lang as usize] = 1;
             }
         }
 
-        let Some(mut lang) = lang_opt else {
-            eprintln!(
-                "Error: {} is not a supported source file",
-                target_os.to_string_lossy()
-            );
-            process::exit(1);
-        };
-        num_workers = 1;
-        let mut fb = Vec::with_capacity(131072);
-        if read_file_into(CWD, target_cstr, &mut fb) {
-            if lang == LangId::Matlab
-                && enabled_mask.has(LangId::ObjectiveC)
-                && lang::objc::is_objc_file(&fb)
+        #[cfg(windows)]
+        {
+            use std::io::Read as _;
+            let base_bytes = lang::get_basename(target_bytes);
+            let mut lang_opt = detect_language(base_bytes, enabled_mask).or_else(|| {
+                if !base_bytes.contains(&b'.') {
+                    let mut probe_buf = [0u8; 128];
+                    if let Ok(mut f) = std::fs::File::open(target_os)
+                        && let Ok(n) = f.read(&mut probe_buf)
+                    {
+                        return detect_shebang(&probe_buf[..n], enabled_mask);
+                    }
+                }
+                None
+            });
+
+            if let Some(LangId::D) = lang_opt
+                && target_bytes.ends_with(b".d")
             {
-                lang = LangId::ObjectiveC;
+                let mut probe_buf = [0u8; 128];
+                if let Ok(mut f) = std::fs::File::open(target_os)
+                    && let Ok(n) = f.read(&mut probe_buf)
+                    && lang::d::is_d_dep_file(&probe_buf[..n])
+                {
+                    lang_opt = None;
+                }
             }
-            let idx = lang as usize;
-            totals.files_found[idx] = 1;
-            totals.files_processed[idx] = 1;
-            parse_into(lang, &fb, &mut totals.lang_stats);
-        } else {
-            totals.files_found[lang as usize] = 1;
+
+            let Some(mut lang) = lang_opt else {
+                eprintln!(
+                    "Error: {} is not a supported source file",
+                    target_os.to_string_lossy()
+                );
+                process::exit(1);
+            };
+            num_workers = 1;
+            let mut fb = Vec::with_capacity(131072);
+            if read_file_into_win(std::path::Path::new(target_os), &mut fb) {
+                if lang == LangId::Matlab
+                    && enabled_mask.has(LangId::ObjectiveC)
+                    && lang::objc::is_objc_file(&fb)
+                {
+                    lang = LangId::ObjectiveC;
+                }
+                let idx = lang as usize;
+                totals.files_found[idx] = 1;
+                totals.files_processed[idx] = 1;
+                parse_into(lang, &fb, &mut totals.lang_stats);
+            } else {
+                totals.files_found[lang as usize] = 1;
+            }
         }
     }
 
@@ -1986,7 +2360,6 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustix::fs::{mkdirat, mknodat, symlinkat, unlinkat};
     use std::ffi::OsString;
     use std::fs;
 
@@ -2006,15 +2379,15 @@ mod tests {
 
     #[test]
     fn test_directory_traversal_and_edge_cases() {
-        let tmp_dir = format!("/tmp/lfa_rust_test_{}", process::id());
+        let tmp_path = std::env::temp_dir().join(format!("lfa_rust_test_{}", process::id()));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         let _ = fs::remove_dir_all(&tmp_dir);
-        mkdirat(CWD, tmp_dir.as_bytes(), Mode::RWXU).unwrap();
+        fs::create_dir_all(&tmp_dir).unwrap();
 
         let path_c = format!("{}/valid.c", tmp_dir);
         let path_h = format!("{}/UPPER.H", tmp_dir);
         let path_cpp = format!("{}/module.cpp", tmp_dir);
         let path_ignored = format!("{}/ignored.txt", tmp_dir);
-        let path_fifo = format!("{}/named_pipe.c", tmp_dir);
         let sub_dir = format!("{}/subdir", tmp_dir);
         let sub_c = format!("{}/subdir/nested.c", tmp_dir);
 
@@ -2026,15 +2399,18 @@ mod tests {
         )
         .unwrap();
         fs::write(&path_ignored, "int while for return if switch case default;\n").unwrap();
-        mknodat(
-            CWD,
-            path_fifo.as_bytes(),
-            FileType::Fifo,
-            Mode::RUSR | Mode::WUSR,
-            0,
-        )
-        .unwrap();
-        mkdirat(CWD, sub_dir.as_bytes(), Mode::RWXU).unwrap();
+        #[cfg(target_os = "linux")]
+        {
+            let path_fifo = format!("{}/named_pipe.c", tmp_dir);
+            let _ = rustix::fs::mknodat(
+                CWD,
+                path_fifo.as_bytes(),
+                FileType::Fifo,
+                Mode::RUSR | Mode::WUSR,
+                0,
+            );
+        }
+        fs::create_dir_all(&sub_dir).unwrap();
         fs::write(
             &sub_c,
             "static inline _Bool check(void) { return false; }\n",
@@ -2126,14 +2502,7 @@ mod tests {
         assert_eq!(cpp_only_res.files_found[c_idx], 0);
         assert_eq!(cpp_only_res.files_found[cpp_idx], 1);
 
-        unlinkat(CWD, sub_c.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, sub_dir.as_bytes(), AtFlags::REMOVEDIR).unwrap();
-        unlinkat(CWD, path_fifo.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, path_ignored.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, path_cpp.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, path_h.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, path_c.as_bytes(), AtFlags::empty()).unwrap();
-        unlinkat(CWD, tmp_dir.as_bytes(), AtFlags::REMOVEDIR).unwrap();
+        let _ = fs::remove_dir_all(&tmp_dir);
     }
 
     #[test]
@@ -2312,21 +2681,25 @@ key=val
 
     #[test]
     fn test_large_directory_multi_batch_and_symlinks() {
-        let tmp_dir = format!("/tmp/lfa_multi_batch_test_{}/", process::id());
+        let tmp_path = std::env::temp_dir().join(format!("lfa_multi_batch_test_{}", process::id()));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         let _ = fs::remove_dir_all(&tmp_dir);
-        mkdirat(CWD, tmp_dir.as_bytes(), Mode::RWXU).unwrap();
+        fs::create_dir_all(&tmp_dir).unwrap();
 
         let file_count = 150usize;
         for i in 0..file_count {
-            let p = format!("{}file_{}.c", tmp_dir, i);
+            let p = format!("{}/file_{}.c", tmp_dir, i);
             fs::write(&p, "int x = 0;\nreturn x;\n").unwrap();
         }
 
-        let empty_c = format!("{}empty.c", tmp_dir);
+        let empty_c = format!("{}/empty.c", tmp_dir);
         fs::write(&empty_c, "").unwrap();
 
-        let broken_link = format!("{}broken.c", tmp_dir);
-        symlinkat(&b"nonexistent_target.c"[..], CWD, broken_link.as_bytes()).unwrap();
+        #[cfg(unix)]
+        {
+            let broken_link = format!("{}/broken.c", tmp_dir);
+            let _ = rustix::fs::symlinkat(&b"nonexistent_target.c"[..], CWD, broken_link.as_bytes());
+        }
 
         let sched = WorkScheduler::new(tmp_dir.as_bytes(), LANG_ALL_MASK, true);
         let mut totals = WorkerResult::default();
@@ -2361,7 +2734,7 @@ key=val
     fn test_cli_flag_parsing() {
         let args = vec![OsString::from("lfa"), OsString::from("/tmp")];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
         assert_eq!(detailed, Vec::<LangId>::new());
         assert_eq!(format, OutputFormat::Table);
@@ -2373,7 +2746,7 @@ key=val
             OsString::from("/tmp"),
         ];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_hidden);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(mask, LANG_ALL_MASK);
         assert_eq!(detailed, Vec::<LangId>::new());
         assert_eq!(format, OutputFormat::Table);
@@ -2385,7 +2758,7 @@ key=val
             OsString::from("-c"),
         ];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_c);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
         assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
         assert_eq!(format, OutputFormat::Table);
@@ -2397,7 +2770,7 @@ key=val
             OsString::from("/tmp"),
         ];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_c_first);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(mask, LangId::C.mask() | LangId::CHeader.mask());
         assert_eq!(detailed, vec![LangId::C, LangId::CHeader]);
         assert_eq!(format, OutputFormat::Table);
@@ -2409,7 +2782,7 @@ key=val
             OsString::from("/tmp"),
         ];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_cpp);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(mask, LangId::Cpp.mask() | LangId::CppHeader.mask());
         assert_eq!(detailed, vec![LangId::Cpp, LangId::CppHeader]);
         assert_eq!(format, OutputFormat::Table);
@@ -2422,7 +2795,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_rs);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Rust.mask());
             assert_eq!(detailed, vec![LangId::Rust]);
             assert_eq!(format, OutputFormat::Table);
@@ -2436,7 +2809,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_py);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Python.mask());
             assert_eq!(detailed, vec![LangId::Python]);
             assert_eq!(format, OutputFormat::Table);
@@ -2450,7 +2823,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_pl);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Perl.mask());
             assert_eq!(detailed, vec![LangId::Perl]);
             assert_eq!(format, OutputFormat::Table);
@@ -2464,7 +2837,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_go);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Go.mask());
             assert_eq!(detailed, vec![LangId::Go]);
             assert_eq!(format, OutputFormat::Table);
@@ -2478,7 +2851,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_zig);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Zig.mask());
             assert_eq!(detailed, vec![LangId::Zig]);
             assert_eq!(format, OutputFormat::Table);
@@ -2492,7 +2865,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_odin);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Odin.mask());
             assert_eq!(detailed, vec![LangId::Odin]);
             assert_eq!(format, OutputFormat::Table);
@@ -2506,7 +2879,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_js);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::JavaScript.mask());
             assert_eq!(detailed, vec![LangId::JavaScript]);
             assert_eq!(format, OutputFormat::Table);
@@ -2520,7 +2893,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_ts);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::TypeScript.mask());
             assert_eq!(detailed, vec![LangId::TypeScript]);
             assert_eq!(format, OutputFormat::Table);
@@ -2534,7 +2907,7 @@ key=val
                 OsString::from("/tmp"),
             ];
             let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_lua);
-            assert_eq!(target.as_bytes(), b"/tmp");
+            assert_eq!(target.as_encoded_bytes(), b"/tmp");
             assert_eq!(mask, LangId::Lua.mask());
             assert_eq!(detailed, vec![LangId::Lua]);
             assert_eq!(format, OutputFormat::Table);
@@ -2550,7 +2923,7 @@ key=val
             OsString::from("-odin"),
         ];
         let (target, mask, detailed, format, hidden, _sort, _top) = parse_cli_args(&args_multi);
-        assert_eq!(target.as_bytes(), b"/tmp");
+        assert_eq!(target.as_encoded_bytes(), b"/tmp");
         assert_eq!(
             mask,
             LangId::Zig.mask() | LangId::C.mask() | LangId::CHeader.mask() | LangId::Odin.mask()
@@ -2572,7 +2945,7 @@ key=val
                 let res = try_parse_cli_args(&args_lang);
                 match res {
                     CliResult::Run { target, mask, selected_langs, .. } => {
-                        assert_eq!(target.as_bytes(), b"/tmp");
+                        assert_eq!(target.as_encoded_bytes(), b"/tmp");
                         let expected_mask = if lang == LangId::C {
                             LangId::C.mask() | LangId::CHeader.mask()
                         } else if lang == LangId::Cpp {
@@ -2767,7 +3140,8 @@ key=val
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let tmp_dir = format!("/tmp/lfa_pipe_test_{unique_id}");
+        let tmp_path = std::env::temp_dir().join(format!("lfa_pipe_test_{unique_id}"));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         fs::create_dir_all(&tmp_dir).unwrap();
 
         let rust_code = b"fn main() {\n    let mut x = 1;\n    // comment line\n    x += 1;\n}\n";
@@ -2813,7 +3187,8 @@ key=val
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let tmp_dir = format!("/tmp/lfa_hidden_test_{unique_id}");
+        let tmp_path = std::env::temp_dir().join(format!("lfa_hidden_test_{unique_id}"));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         let hidden_dir = format!("{tmp_dir}/.hidden_dir");
         fs::create_dir_all(&hidden_dir).unwrap();
 
@@ -2845,7 +3220,8 @@ key=val
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let tmp_dir = format!("/tmp/lfa_shebang_test_{unique_id}");
+        let tmp_path = std::env::temp_dir().join(format!("lfa_shebang_test_{unique_id}"));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         fs::create_dir_all(&tmp_dir).unwrap();
 
         let bash_script = b"#!/usr/bin/env bash\necho 'hello world'\nexit 0\n";
@@ -2877,7 +3253,8 @@ key=val
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let tmp_dir = format!("/tmp/lfa_m_disambig_{unique_id}");
+        let tmp_path = std::env::temp_dir().join(format!("lfa_m_disambig_{unique_id}"));
+        let tmp_dir = tmp_path.to_str().unwrap().to_string();
         fs::create_dir_all(&tmp_dir).unwrap();
 
         let objc_path = format!("{tmp_dir}/cls.m");

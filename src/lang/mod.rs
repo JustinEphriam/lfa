@@ -4190,6 +4190,7 @@ fn has_stem(name: &[u8], dot_idx: usize) -> bool {
 
 #[inline]
 pub fn detect_language(name: &[u8], enabled_mask: LangMask) -> Option<LangId> {
+    let name = get_basename(name);
     if enabled_mask.has(LangId::Makefile) && (name == b"Makefile" || name == b"makefile" || name == b"GNUmakefile") {
         return Some(LangId::Makefile);
     }
@@ -4751,10 +4752,11 @@ pub fn detect_language(name: &[u8], enabled_mask: LangMask) -> Option<LangId> {
 }
 
 #[inline(always)]
-fn get_basename(w: &[u8]) -> &[u8] {
+pub(crate) fn get_basename(w: &[u8]) -> &[u8] {
     let mut k = w.len();
     while k > 0 {
-        if w[k - 1] == b'/' {
+        let b = w[k - 1];
+        if b == b'/' || b == b'\\' {
             return &w[k..];
         }
         k -= 1;
@@ -8174,6 +8176,16 @@ mod tests {
 
             assert_eq!(names.len(), lens.len());
             assert!(min_len >= 2 && min_len <= max_len && max_len <= 16);
+
+            for &alias in lang.flag_aliases() {
+                assert_eq!(
+                    LangId::from_flag(alias.as_bytes()),
+                    Some(lang),
+                    "flag alias {} for {:?} failed to resolve",
+                    alias,
+                    lang
+                );
+            }
 
             let actual_min = names.iter().map(|s| s.len()).min().unwrap();
             let actual_max = names.iter().map(|s| s.len()).max().unwrap();
